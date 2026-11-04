@@ -59,8 +59,8 @@
  [
   "#Fast breathing",
   "",
-  "In a child age 2 months up to 12 months, 50 breaths or more per minute.",
-  "In a child age 12 months up to 5 years, 40 breaths or more per minute.",
+  "In a child age 2 months up to 12 months, 50 breaths or more per minute",
+  "In a child age 12 months up to 5 years, 40 breaths or more per minute",
   "",
   "Cough (less than 14 days) without fast breathing: no row in this booklet."
  ],
@@ -88,6 +88,8 @@
   "#A child outside the age range",
   "",
   "For a child under 2 months or 5 years and older:",
-  "refer child to health facility, write a referral note, and follow up child on return."
+  "refer child to health facility, write a referral note, and follow up child on return.",
+  "",
+  "If any OTHER PROBLEM or condition you cannot manage, refer child to health facility."
  ]
 ]

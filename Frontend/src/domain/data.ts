@@ -26,7 +26,6 @@ export function loadSpec(x: unknown, from: string): Spec {
 /** Hardcoded dummy logic model until the pipeline produces real ones. */
 export const DRAFT: Spec = loadSpec(draftJson, "The bundled sample logic model");
 
-/** The version live in CHT today (synthetic): no cough-duration question, older wording, antibiotic before referral only for fast breathing. */
 /** Sample mode: the sample guideline's text and a sample draft B, so every check can run without the backend. */
 export const SAMPLE_EVIDENCE: Evidence = {
   pages: (pagesJson as string[][]).map((lines, i) => ({ page: i + 1, text: lines.map(l => l.replace(/^#/, "")).join("\n") })),
@@ -35,6 +34,7 @@ export const SAMPLE_EVIDENCE: Evidence = {
   draftBFrom: "Draft B: sample placeholder until the model pipeline produces one",
 };
 
+/** The version live in CHT today (synthetic): no cough-duration question, older wording, antibiotic before referral only for fast breathing. */
 export const V3: Spec = (() => {
   const v = clone(DRAFT);
   v.questions = v.questions.filter(q => q.id !== "cough_days");
@@ -42,7 +42,7 @@ export const V3: Spec = (() => {
   v.questions.push({ id: "wheeze", order: 10, label: "Is there wheezing?", answer_type: "yes_no", required: true, shown_when: { field: "cough", op: "is_yes" }, origin: "guideline", source: { page: 5, quote: "Wheeze?" } });
   const ds = v.derived.find(d => d.id === "danger_sign")!;
   if ("any" in ds.definition) ds.definition = { any: ds.definition.any.slice(1) };
-  v.rules.find(r => r.id === "R2")!.when = { all: [{ field: "danger_sign", op: "is_yes" }, { field: "fast_breathing", op: "is_yes" }] };
+  v.rules.find(r => r.outcome === "refer_urgent_with_antibiotic")!.when = { all: [{ field: "danger_sign", op: "is_yes" }, { field: "fast_breathing", op: "is_yes" }] };
   v.outcomes.find(o => o.id === "treat_fast_breathing_at_home")!.title = "Pneumonia: give amoxicillin, follow up in 3 days";
   return v;
 })();
@@ -66,6 +66,7 @@ export const GOLDEN: Record<string, [id: string, answers: Answers, expected: str
     g("G-11", { age_months: 1 }, "refer_outside_age_range"),
     g("G-12", { age_months: 60 }, "refer_outside_age_range"),
     g("G-13", { cough: false }, "no_cough"),
+    g("G-14", { age_months: 1, convulsions: true }, "refer_urgent_outside_age_range"),
   ],
 };
 

@@ -125,13 +125,13 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 17 0 R >>
 endobj
 19 0 obj
-<< /Length 439 >>
+<< /Length 437 >>
 stream
 BT
 /F2 13 Tf 1 0 0 1 56 790 Tm (Fast breathing) Tj
 /F1 11 Tf 1 0 0 1 56 768 Tm () Tj
-/F1 11 Tf 1 0 0 1 56 758 Tm (In a child age 2 months up to 12 months, 50 breaths or more per minute.) Tj
-/F1 11 Tf 1 0 0 1 56 741 Tm (In a child age 12 months up to 5 years, 40 breaths or more per minute.) Tj
+/F1 11 Tf 1 0 0 1 56 758 Tm (In a child age 2 months up to 12 months, 50 breaths or more per minute) Tj
+/F1 11 Tf 1 0 0 1 56 741 Tm (In a child age 12 months up to 5 years, 40 breaths or more per minute) Tj
 /F1 11 Tf 1 0 0 1 56 724 Tm () Tj
 /F1 11 Tf 1 0 0 1 56 714 Tm (Cough \(less than 14 days\) without fast breathing: no row in this booklet.) Tj
 ET
@@ -185,13 +185,15 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 25 0 R >>
 endobj
 27 0 obj
-<< /Length 303 >>
+<< /Length 455 >>
 stream
 BT
 /F2 13 Tf 1 0 0 1 56 790 Tm (A child outside the age range) Tj
 /F1 11 Tf 1 0 0 1 56 768 Tm () Tj
 /F1 11 Tf 1 0 0 1 56 758 Tm (For a child under 2 months or 5 years and older:) Tj
 /F1 11 Tf 1 0 0 1 56 741 Tm (refer child to health facility, write a referral note, and follow up child on return.) Tj
+/F1 11 Tf 1 0 0 1 56 724 Tm () Tj
+/F1 11 Tf 1 0 0 1 56 714 Tm (If any OTHER PROBLEM or condition you cannot manage, refer child to health facility.) Tj
 ET
 endstream
 endobj
@@ -220,17 +222,17 @@ xref
 0000003849 00000 n 
 0000004363 00000 n 
 0000004501 00000 n 
-0000004992 00000 n 
-0000005130 00000 n 
-0000005608 00000 n 
-0000005746 00000 n 
-0000006043 00000 n 
-0000006181 00000 n 
-0000006474 00000 n 
-0000006612 00000 n 
-0000006967 00000 n 
+0000004990 00000 n 
+0000005128 00000 n 
+0000005606 00000 n 
+0000005744 00000 n 
+0000006041 00000 n 
+0000006179 00000 n 
+0000006472 00000 n 
+0000006610 00000 n 
+0000007117 00000 n 
 trailer
 << /Size 29 /Root 1 0 R >>
 startxref
-7105
+7255
 %%EOF

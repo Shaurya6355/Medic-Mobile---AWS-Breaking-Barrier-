@@ -4,7 +4,7 @@
     "pathway_id": "cough_fast_breathing",
     "version": 1,
     "parent_version": null,
-    "created_at": "2026-11-03T16:00:00-08:00",
+    "created_at": "2026-11-03T23:15:00-08:00",
     "created_by": "program_officer",
     "change_note": "Draft B: a second, independent draft used only by the cross check. Sample placeholder until the model pipeline produces one.",
     "guideline": {
@@ -177,6 +177,29 @@
   ],
   "derived": [
     {
+      "id": "outside_age_range",
+      "label": "Outside the age range this guideline covers",
+      "definition": {
+        "any": [
+          {
+            "field": "age_months",
+            "op": "less_than",
+            "value": 2
+          },
+          {
+            "field": "age_months",
+            "op": "at_least",
+            "value": 60
+          }
+        ]
+      },
+      "origin": "guideline",
+      "source": {
+        "page": 3,
+        "quote": "child age 2 months up to 5 years"
+      }
+    },
+    {
       "id": "fast_breathing",
       "label": "Fast breathing",
       "definition": {
@@ -232,7 +255,7 @@
       "origin": "guideline",
       "source": {
         "page": 8,
-        "quote": "In a child age 2 months up to 12 months, 50 breaths or more per minute"
+        "quote": "In a child age 2 months up to 12 months, 50 breaths or more per minute In a child age 12 months up to 5 years, 40 breaths or more per minute"
       }
     },
     {
@@ -284,9 +307,39 @@
   ],
   "outcomes": [
     {
+      "id": "refer_urgent_outside_age_range",
+      "severity": 1,
+      "title": "Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.",
+      "actions": [
+        {
+          "text": "Explain why the child needs to go to the health facility. Write a referral note and help arrange transport.",
+          "origin": "guideline",
+          "source": {
+            "page": 7,
+            "quote": "Explain why child needs to go to the health facility."
+          }
+        },
+        {
+          "text": "Do not give medicine from this form. The guideline gives no doses outside 2 months up to 5 years.",
+          "origin": "team"
+        }
+      ],
+      "follow_up": {
+        "kind": "on_return",
+        "due_in_days": 7,
+        "task_window_days_after_due": null,
+        "origin": "guideline",
+        "source": {
+          "page": 7,
+          "quote": "FOLLOW UP child on return at least once a week until child is well."
+        }
+      },
+      "origin": "team"
+    },
+    {
       "id": "refer_outside_age_range",
       "severity": 2,
-      "title": "Refer to health facility: child is outside the age range this form covers",
+      "title": "Outside this form's age range, no danger sign: refer to health facility",
       "actions": [
         {
           "text": "Refer child to health facility, write a referral note, and follow up child on return.",
@@ -474,25 +527,37 @@
       "id": "R1",
       "priority": 1,
       "when": {
-        "any": [
+        "all": [
           {
-            "field": "age_months",
-            "op": "less_than",
-            "value": 2
+            "field": "outside_age_range",
+            "op": "is_yes"
           },
           {
-            "field": "age_months",
-            "op": "at_least",
-            "value": 60
+            "field": "danger_sign",
+            "op": "is_yes"
           }
         ]
       },
-      "outcome": "refer_outside_age_range",
+      "outcome": "refer_urgent_outside_age_range",
       "origin": "team"
     },
     {
       "id": "R2",
       "priority": 2,
+      "when": {
+        "field": "outside_age_range",
+        "op": "is_yes"
+      },
+      "outcome": "refer_outside_age_range",
+      "origin": "guideline",
+      "source": {
+        "page": 12,
+        "quote": "If any OTHER PROBLEM or condition you cannot manage, refer child to health facility"
+      }
+    },
+    {
+      "id": "R3",
+      "priority": 3,
       "when": {
         "all": [
           {
@@ -521,8 +586,8 @@
       }
     },
     {
-      "id": "R3",
-      "priority": 3,
+      "id": "R4",
+      "priority": 4,
       "when": {
         "field": "danger_sign",
         "op": "is_yes"
@@ -535,8 +600,8 @@
       }
     },
     {
-      "id": "R4",
-      "priority": 4,
+      "id": "R5",
+      "priority": 5,
       "when": {
         "field": "fast_breathing",
         "op": "is_yes"
@@ -549,8 +614,8 @@
       }
     },
     {
-      "id": "R5",
-      "priority": 5,
+      "id": "R6",
+      "priority": 6,
       "when": {
         "field": "cough",
         "op": "is_yes"
@@ -559,8 +624,8 @@
       "origin": "team"
     },
     {
-      "id": "R6",
-      "priority": 6,
+      "id": "R7",
+      "priority": 7,
       "when": "otherwise",
       "outcome": "no_cough",
       "origin": "team"
@@ -582,9 +647,11 @@
     },
     {
       "id": "Q2",
-      "question": "The guideline covers 2 months up to 5 years only. Should a child under 2 months or 5 years and over be referred urgently or routinely?",
+      "question": "The guideline covers 2 months up to 5 years only. We refer out-of-range children urgently if they have a danger sign (R1) and routinely otherwise (R2), with no medicine. Is that right?",
       "affects": [
         "R1",
+        "R2",
+        "refer_urgent_outside_age_range",
         "refer_outside_age_range"
       ],
       "route_to": "clinician",
@@ -599,7 +666,7 @@
       "question": "The guideline gives no treatment row for cough without fast breathing. What should the health worker do, and is there a follow-up?",
       "affects": [
         "cough_no_fast_breathing",
-        "R5"
+        "R6"
       ],
       "route_to": "clinician",
       "status": "open",

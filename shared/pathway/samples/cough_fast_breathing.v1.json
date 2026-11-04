@@ -1,13 +1,12 @@
 {
   "schema_version": "1.0",
-
   "meta": {
     "pathway_id": "cough_fast_breathing",
     "version": 1,
     "parent_version": null,
-    "created_at": "2026-11-03T16:00:00-08:00",
+    "created_at": "2026-11-03T23:15:00-08:00",
     "created_by": "program_officer",
-    "change_note": "Hand-written reference draft, made before the first AI draft. Used to compare against the AI output and as a demo backup.",
+    "change_note": "Hand-written reference draft, made before the first AI draft. Seven rules: out-of-range children with a danger sign are referred urgently with no medicine. Used to compare against the AI output and as a demo backup.",
     "guideline": {
       "title": "Caring for the sick child in the community: Chart booklet",
       "publisher": "WHO and UNICEF",
@@ -15,18 +14,28 @@
       "file_sha256": "a48907d6ab7a72c2d1b6a47a64a1a129c6c71470d56858ea4d2a090f4eea5042"
     }
   },
-
   "scope": {
     "age_months_min": 2,
     "age_months_below": 60,
-    "source": { "page": 3, "quote": "child age 2 months up to 5 years" },
+    "source": {
+      "page": 3,
+      "quote": "child age 2 months up to 5 years"
+    },
     "excluded": [
-      { "item": "Diarrhoea, blood in stool and fever danger signs", "reason": "Other pathways in the same guideline. See Q4." },
-      { "item": "MUAC strap colour, swelling of both feet, HIV and TB questions", "reason": "Other pathways in the same guideline. See Q4." },
-      { "item": "Vaccine check", "reason": "Not part of the cough decision." }
+      {
+        "item": "Diarrhoea, blood in stool and fever danger signs",
+        "reason": "Other pathways in the same guideline. See Q4."
+      },
+      {
+        "item": "MUAC strap colour, swelling of both feet, HIV and TB questions",
+        "reason": "Other pathways in the same guideline. See Q4."
+      },
+      {
+        "item": "Vaccine check",
+        "reason": "Not part of the cough decision."
+      }
     ]
   },
-
   "questions": [
     {
       "id": "age_months",
@@ -35,9 +44,17 @@
       "answer_type": "integer",
       "unit": "months",
       "required": true,
-      "constraint": { "min": 0, "max": 120, "message": "Enter age in whole months.", "origin": "team" },
+      "constraint": {
+        "min": 0,
+        "max": 120,
+        "message": "Enter age in whole months.",
+        "origin": "team"
+      },
       "origin": "guideline",
-      "source": { "page": 3, "quote": "child age 2 months up to 5 years" }
+      "source": {
+        "page": 3,
+        "quote": "child age 2 months up to 5 years"
+      }
     },
     {
       "id": "cough",
@@ -46,7 +63,10 @@
       "answer_type": "yes_no",
       "required": true,
       "origin": "guideline",
-      "source": { "page": 5, "quote": "Cough? If yes, for how long?" }
+      "source": {
+        "page": 5,
+        "quote": "Cough? If yes, for how long?"
+      }
     },
     {
       "id": "cough_days",
@@ -55,10 +75,21 @@
       "answer_type": "integer",
       "unit": "days",
       "required": true,
-      "constraint": { "min": 0, "max": 365, "message": "Enter a number of days.", "origin": "team" },
-      "shown_when": { "field": "cough", "op": "is_yes" },
+      "constraint": {
+        "min": 0,
+        "max": 365,
+        "message": "Enter a number of days.",
+        "origin": "team"
+      },
+      "shown_when": {
+        "field": "cough",
+        "op": "is_yes"
+      },
       "origin": "guideline",
-      "source": { "page": 5, "quote": "Cough? If yes, for how long?" }
+      "source": {
+        "page": 5,
+        "quote": "Cough? If yes, for how long?"
+      }
     },
     {
       "id": "convulsions",
@@ -67,7 +98,10 @@
       "answer_type": "yes_no",
       "required": true,
       "origin": "guideline",
-      "source": { "page": 5, "quote": "Convulsions?" }
+      "source": {
+        "page": 5,
+        "quote": "Convulsions?"
+      }
     },
     {
       "id": "not_able_to_drink_or_feed",
@@ -76,7 +110,10 @@
       "answer_type": "yes_no",
       "required": true,
       "origin": "guideline",
-      "source": { "page": 5, "quote": "not able to drink or feed anything?" }
+      "source": {
+        "page": 5,
+        "quote": "not able to drink or feed anything?"
+      }
     },
     {
       "id": "vomits_everything",
@@ -85,7 +122,10 @@
       "answer_type": "yes_no",
       "required": true,
       "origin": "guideline",
-      "source": { "page": 5, "quote": "vomits everything?" }
+      "source": {
+        "page": 5,
+        "quote": "vomits everything?"
+      }
     },
     {
       "id": "chest_indrawing",
@@ -94,7 +134,10 @@
       "answer_type": "yes_no",
       "required": true,
       "origin": "guideline",
-      "source": { "page": 5, "quote": "Chest indrawing?" }
+      "source": {
+        "page": 5,
+        "quote": "Chest indrawing?"
+      }
     },
     {
       "id": "breaths_per_minute",
@@ -103,10 +146,21 @@
       "answer_type": "integer",
       "unit": "breaths_per_minute",
       "required": true,
-      "constraint": { "min": 10, "max": 120, "message": "Recount. Enter breaths in one full minute.", "origin": "team" },
-      "shown_when": { "field": "cough", "op": "is_yes" },
+      "constraint": {
+        "min": 10,
+        "max": 120,
+        "message": "Recount. Enter breaths in one full minute.",
+        "origin": "team"
+      },
+      "shown_when": {
+        "field": "cough",
+        "op": "is_yes"
+      },
       "origin": "guideline",
-      "source": { "page": 5, "quote": "If cough, count breaths in 1 minute" }
+      "source": {
+        "page": 5,
+        "quote": "If cough, count breaths in 1 minute"
+      }
     },
     {
       "id": "unusually_sleepy",
@@ -115,67 +169,197 @@
       "answer_type": "yes_no",
       "required": true,
       "origin": "guideline",
-      "source": { "page": 5, "quote": "Unusually sleepy or unconscious?" }
+      "source": {
+        "page": 5,
+        "quote": "Unusually sleepy or unconscious?"
+      }
     }
   ],
-
   "derived": [
+    {
+      "id": "outside_age_range",
+      "label": "Outside the age range this guideline covers",
+      "definition": {
+        "any": [
+          {
+            "field": "age_months",
+            "op": "less_than",
+            "value": 2
+          },
+          {
+            "field": "age_months",
+            "op": "at_least",
+            "value": 60
+          }
+        ]
+      },
+      "origin": "guideline",
+      "source": {
+        "page": 3,
+        "quote": "child age 2 months up to 5 years"
+      }
+    },
     {
       "id": "fast_breathing",
       "label": "Fast breathing",
       "definition": {
         "all": [
-          { "field": "cough", "op": "is_yes" },
+          {
+            "field": "cough",
+            "op": "is_yes"
+          },
           {
             "any": [
-              { "all": [
-                { "field": "age_months", "op": "at_least", "value": 2 },
-                { "field": "age_months", "op": "less_than", "value": 12 },
-                { "field": "breaths_per_minute", "op": "at_least", "value": 50 }
-              ] },
-              { "all": [
-                { "field": "age_months", "op": "at_least", "value": 12 },
-                { "field": "age_months", "op": "less_than", "value": 60 },
-                { "field": "breaths_per_minute", "op": "at_least", "value": 40 }
-              ] }
+              {
+                "all": [
+                  {
+                    "field": "age_months",
+                    "op": "at_least",
+                    "value": 2
+                  },
+                  {
+                    "field": "age_months",
+                    "op": "less_than",
+                    "value": 12
+                  },
+                  {
+                    "field": "breaths_per_minute",
+                    "op": "at_least",
+                    "value": 50
+                  }
+                ]
+              },
+              {
+                "all": [
+                  {
+                    "field": "age_months",
+                    "op": "at_least",
+                    "value": 12
+                  },
+                  {
+                    "field": "age_months",
+                    "op": "less_than",
+                    "value": 60
+                  },
+                  {
+                    "field": "breaths_per_minute",
+                    "op": "at_least",
+                    "value": 40
+                  }
+                ]
+              }
             ]
           }
         ]
       },
       "origin": "guideline",
-      "source": { "page": 8, "quote": "In a child age 2 months up to 12 months, 50 breaths or more per minute" }
+      "source": {
+        "page": 8,
+        "quote": "In a child age 2 months up to 12 months, 50 breaths or more per minute In a child age 12 months up to 5 years, 40 breaths or more per minute"
+      }
     },
     {
       "id": "danger_sign",
       "label": "Any danger sign",
       "definition": {
         "any": [
-          { "all": [ { "field": "cough", "op": "is_yes" }, { "field": "cough_days", "op": "at_least", "value": 14 } ] },
-          { "field": "convulsions", "op": "is_yes" },
-          { "field": "not_able_to_drink_or_feed", "op": "is_yes" },
-          { "field": "vomits_everything", "op": "is_yes" },
-          { "field": "chest_indrawing", "op": "is_yes" },
-          { "field": "unusually_sleepy", "op": "is_yes" }
+          {
+            "all": [
+              {
+                "field": "cough",
+                "op": "is_yes"
+              },
+              {
+                "field": "cough_days",
+                "op": "at_least",
+                "value": 14
+              }
+            ]
+          },
+          {
+            "field": "convulsions",
+            "op": "is_yes"
+          },
+          {
+            "field": "not_able_to_drink_or_feed",
+            "op": "is_yes"
+          },
+          {
+            "field": "vomits_everything",
+            "op": "is_yes"
+          },
+          {
+            "field": "chest_indrawing",
+            "op": "is_yes"
+          },
+          {
+            "field": "unusually_sleepy",
+            "op": "is_yes"
+          }
         ]
       },
       "origin": "guideline",
-      "source": { "page": 6, "quote": "Cough for 14 days or more" }
+      "source": {
+        "page": 6,
+        "quote": "Cough for 14 days or more"
+      }
     }
   ],
-
   "outcomes": [
+    {
+      "id": "refer_urgent_outside_age_range",
+      "severity": 1,
+      "title": "Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.",
+      "actions": [
+        {
+          "text": "Explain why the child needs to go to the health facility. Write a referral note and help arrange transport.",
+          "origin": "guideline",
+          "source": {
+            "page": 7,
+            "quote": "Explain why child needs to go to the health facility."
+          }
+        },
+        {
+          "text": "Do not give medicine from this form. The guideline gives no doses outside 2 months up to 5 years.",
+          "origin": "team"
+        }
+      ],
+      "follow_up": {
+        "kind": "on_return",
+        "due_in_days": 7,
+        "task_window_days_after_due": null,
+        "origin": "guideline",
+        "source": {
+          "page": 7,
+          "quote": "FOLLOW UP child on return at least once a week until child is well."
+        }
+      },
+      "origin": "team"
+    },
     {
       "id": "refer_outside_age_range",
       "severity": 2,
-      "title": "Refer to health facility: child is outside the age range this form covers",
+      "title": "Outside this form's age range, no danger sign: refer to health facility",
       "actions": [
         {
           "text": "Refer child to health facility, write a referral note, and follow up child on return.",
           "origin": "guideline",
-          "source": { "page": 12, "quote": "refer child to health facility, write a referral note, and follow up child on return" }
+          "source": {
+            "page": 12,
+            "quote": "refer child to health facility, write a referral note, and follow up child on return"
+          }
         }
       ],
-      "follow_up": { "kind": "on_return", "due_in_days": null, "task_window_days_after_due": null, "origin": "guideline", "source": { "page": 12, "quote": "follow up child on return" } },
+      "follow_up": {
+        "kind": "on_return",
+        "due_in_days": null,
+        "task_window_days_after_due": null,
+        "origin": "guideline",
+        "source": {
+          "page": 12,
+          "quote": "follow up child on return"
+        }
+      },
       "origin": "team"
     },
     {
@@ -186,21 +370,47 @@
         {
           "text": "Give first dose of oral antibiotic (amoxicillin tablet, 250 mg).",
           "dose_by_age": [
-            { "age_months_min": 2, "age_months_below": 12, "dose": "1 tablet" },
-            { "age_months_min": 12, "age_months_below": 60, "dose": "2 tablets" }
+            {
+              "age_months_min": 2,
+              "age_months_below": 12,
+              "dose": "1 tablet"
+            },
+            {
+              "age_months_min": 12,
+              "age_months_below": 60,
+              "dose": "2 tablets"
+            }
           ],
           "origin": "guideline",
-          "source": { "page": 7, "quote": "If fast breathing or chest indrawing, give first dose of oral antibiotic" }
+          "source": {
+            "page": 7,
+            "quote": "If fast breathing or chest indrawing, give first dose of oral antibiotic"
+          }
         },
         {
           "text": "Explain why the child needs to go to the health facility. Write a referral note and help arrange transport.",
           "origin": "guideline",
-          "source": { "page": 7, "quote": "Explain why child needs to go to the health facility." }
+          "source": {
+            "page": 7,
+            "quote": "Explain why child needs to go to the health facility."
+          }
         }
       ],
-      "follow_up": { "kind": "on_return", "due_in_days": 7, "task_window_days_after_due": null, "origin": "guideline", "source": { "page": 7, "quote": "FOLLOW UP child on return at least once a week until child is well." } },
+      "follow_up": {
+        "kind": "on_return",
+        "due_in_days": 7,
+        "task_window_days_after_due": null,
+        "origin": "guideline",
+        "source": {
+          "page": 7,
+          "quote": "FOLLOW UP child on return at least once a week until child is well."
+        }
+      },
       "origin": "guideline",
-      "source": { "page": 6, "quote": "REFER URGENTLY TO HEALTH FACILITY" }
+      "source": {
+        "page": 6,
+        "quote": "REFER URGENTLY TO HEALTH FACILITY"
+      }
     },
     {
       "id": "refer_urgent",
@@ -210,12 +420,27 @@
         {
           "text": "Explain why the child needs to go to the health facility. Write a referral note and help arrange transport.",
           "origin": "guideline",
-          "source": { "page": 7, "quote": "Explain why child needs to go to the health facility." }
+          "source": {
+            "page": 7,
+            "quote": "Explain why child needs to go to the health facility."
+          }
         }
       ],
-      "follow_up": { "kind": "on_return", "due_in_days": 7, "task_window_days_after_due": null, "origin": "guideline", "source": { "page": 7, "quote": "FOLLOW UP child on return at least once a week until child is well." } },
+      "follow_up": {
+        "kind": "on_return",
+        "due_in_days": 7,
+        "task_window_days_after_due": null,
+        "origin": "guideline",
+        "source": {
+          "page": 7,
+          "quote": "FOLLOW UP child on return at least once a week until child is well."
+        }
+      },
       "origin": "guideline",
-      "source": { "page": 6, "quote": "REFER URGENTLY TO HEALTH FACILITY" }
+      "source": {
+        "page": 6,
+        "quote": "REFER URGENTLY TO HEALTH FACILITY"
+      }
     },
     {
       "id": "treat_fast_breathing_at_home",
@@ -225,21 +450,49 @@
         {
           "text": "Give oral antibiotic (amoxicillin tablet, 250 mg) twice daily for 5 days. Help the caregiver give the first dose now.",
           "dose_by_age": [
-            { "age_months_min": 2, "age_months_below": 12, "dose": "1 tablet", "total": "10 tablets" },
-            { "age_months_min": 12, "age_months_below": 60, "dose": "2 tablets", "total": "20 tablets" }
+            {
+              "age_months_min": 2,
+              "age_months_below": 12,
+              "dose": "1 tablet",
+              "total": "10 tablets"
+            },
+            {
+              "age_months_min": 12,
+              "age_months_below": 60,
+              "dose": "2 tablets",
+              "total": "20 tablets"
+            }
           ],
           "origin": "guideline",
-          "source": { "page": 9, "quote": "Give twice daily for 5 days" }
+          "source": {
+            "page": 9,
+            "quote": "Give twice daily for 5 days"
+          }
         },
         {
           "text": "Advise to return immediately if the child cannot drink or feed, becomes sicker, or has blood in stool.",
           "origin": "guideline",
-          "source": { "page": 9, "quote": "return immediately if child" }
+          "source": {
+            "page": 9,
+            "quote": "return immediately if child"
+          }
         }
       ],
-      "follow_up": { "kind": "scheduled", "due_in_days": 3, "task_window_days_after_due": null, "origin": "guideline", "source": { "page": 9, "quote": "Follow up child in 3 days." } },
+      "follow_up": {
+        "kind": "scheduled",
+        "due_in_days": 3,
+        "task_window_days_after_due": null,
+        "origin": "guideline",
+        "source": {
+          "page": 9,
+          "quote": "Follow up child in 3 days."
+        }
+      },
       "origin": "guideline",
-      "source": { "page": 9, "quote": "Fast Breathing" }
+      "source": {
+        "page": 9,
+        "quote": "Fast Breathing"
+      }
     },
     {
       "id": "cough_no_fast_breathing",
@@ -259,116 +512,199 @@
       "severity": 5,
       "title": "No cough: this form does not apply. Assess other problems.",
       "actions": [
-        { "text": "Continue with the other parts of the sick child assessment.", "origin": "team" }
+        {
+          "text": "Continue with the other parts of the sick child assessment.",
+          "origin": "team"
+        }
       ],
       "follow_up": null,
       "origin": "team"
     }
   ],
-
   "hit_policy": "first_match_by_priority",
-
   "rules": [
     {
       "id": "R1",
       "priority": 1,
-      "when": { "any": [
-        { "field": "age_months", "op": "less_than", "value": 2 },
-        { "field": "age_months", "op": "at_least", "value": 60 }
-      ] },
-      "outcome": "refer_outside_age_range",
+      "when": {
+        "all": [
+          {
+            "field": "outside_age_range",
+            "op": "is_yes"
+          },
+          {
+            "field": "danger_sign",
+            "op": "is_yes"
+          }
+        ]
+      },
+      "outcome": "refer_urgent_outside_age_range",
       "origin": "team"
     },
     {
       "id": "R2",
       "priority": 2,
-      "when": { "all": [
-        { "field": "danger_sign", "op": "is_yes" },
-        { "any": [
-          { "field": "fast_breathing", "op": "is_yes" },
-          { "field": "chest_indrawing", "op": "is_yes" }
-        ] }
-      ] },
-      "outcome": "refer_urgent_with_antibiotic",
+      "when": {
+        "field": "outside_age_range",
+        "op": "is_yes"
+      },
+      "outcome": "refer_outside_age_range",
       "origin": "guideline",
-      "source": { "page": 7, "quote": "If fast breathing or chest indrawing, give first dose of oral antibiotic" }
+      "source": {
+        "page": 12,
+        "quote": "If any OTHER PROBLEM or condition you cannot manage, refer child to health facility"
+      }
     },
     {
       "id": "R3",
       "priority": 3,
-      "when": { "field": "danger_sign", "op": "is_yes" },
-      "outcome": "refer_urgent",
+      "when": {
+        "all": [
+          {
+            "field": "danger_sign",
+            "op": "is_yes"
+          },
+          {
+            "any": [
+              {
+                "field": "fast_breathing",
+                "op": "is_yes"
+              },
+              {
+                "field": "chest_indrawing",
+                "op": "is_yes"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome": "refer_urgent_with_antibiotic",
       "origin": "guideline",
-      "source": { "page": 6, "quote": "If ANY danger sign" }
+      "source": {
+        "page": 7,
+        "quote": "If fast breathing or chest indrawing, give first dose of oral antibiotic"
+      }
     },
     {
       "id": "R4",
       "priority": 4,
-      "when": { "field": "fast_breathing", "op": "is_yes" },
-      "outcome": "treat_fast_breathing_at_home",
+      "when": {
+        "field": "danger_sign",
+        "op": "is_yes"
+      },
+      "outcome": "refer_urgent",
       "origin": "guideline",
-      "source": { "page": 8, "quote": "In a child age 12 months up to 5 years, 40 breaths or more per minute" }
+      "source": {
+        "page": 6,
+        "quote": "If ANY danger sign"
+      }
     },
     {
       "id": "R5",
       "priority": 5,
-      "when": { "field": "cough", "op": "is_yes" },
-      "outcome": "cough_no_fast_breathing",
-      "origin": "team"
+      "when": {
+        "field": "fast_breathing",
+        "op": "is_yes"
+      },
+      "outcome": "treat_fast_breathing_at_home",
+      "origin": "guideline",
+      "source": {
+        "page": 8,
+        "quote": "In a child age 12 months up to 5 years, 40 breaths or more per minute"
+      }
     },
     {
       "id": "R6",
       "priority": 6,
+      "when": {
+        "field": "cough",
+        "op": "is_yes"
+      },
+      "outcome": "cough_no_fast_breathing",
+      "origin": "team"
+    },
+    {
+      "id": "R7",
+      "priority": 7,
       "when": "otherwise",
       "outcome": "no_cough",
       "origin": "team"
     }
   ],
-
   "open_questions": [
     {
       "id": "Q1",
       "question": "Is a child of exactly 12 months in the 40-breaths group? We read \"2 months up to 12 months\" as excluding 12, so 12 months uses 40.",
-      "affects": ["fast_breathing"],
+      "affects": [
+        "fast_breathing"
+      ],
       "route_to": "clinician",
       "status": "open",
-      "source": { "page": 8, "quote": "In a child age 12 months up to 5 years, 40 breaths or more per minute" }
+      "source": {
+        "page": 8,
+        "quote": "In a child age 12 months up to 5 years, 40 breaths or more per minute"
+      }
     },
     {
       "id": "Q2",
-      "question": "The guideline covers 2 months up to 5 years only. Should a child under 2 months or 5 years and over be referred urgently or routinely?",
-      "affects": ["R1", "refer_outside_age_range"],
+      "question": "The guideline covers 2 months up to 5 years only. We refer out-of-range children urgently if they have a danger sign (R1) and routinely otherwise (R2), with no medicine. Is that right?",
+      "affects": [
+        "R1",
+        "R2",
+        "refer_urgent_outside_age_range",
+        "refer_outside_age_range"
+      ],
       "route_to": "clinician",
       "status": "open",
-      "source": { "page": 3, "quote": "child age 2 months up to 5 years" }
+      "source": {
+        "page": 3,
+        "quote": "child age 2 months up to 5 years"
+      }
     },
     {
       "id": "Q3",
       "question": "The guideline gives no treatment row for cough without fast breathing. What should the health worker do, and is there a follow-up?",
-      "affects": ["cough_no_fast_breathing", "R5"],
+      "affects": [
+        "cough_no_fast_breathing",
+        "R6"
+      ],
       "route_to": "clinician",
       "status": "open",
-      "source": { "page": 8, "quote": "Cough (less than 14 days)" }
+      "source": {
+        "page": 8,
+        "quote": "Cough (less than 14 days)"
+      }
     },
     {
       "id": "Q4",
       "question": "This form asks only cough-related and general danger signs. Diarrhoea, fever, MUAC and feet-swelling danger signs live in other pathways. Is it safe to deploy the cough form alone?",
-      "affects": ["danger_sign"],
+      "affects": [
+        "danger_sign"
+      ],
       "route_to": "clinician",
       "status": "open",
-      "source": { "page": 6, "quote": "Diarrhoea for 14 days or more" }
+      "source": {
+        "page": 6,
+        "quote": "Diarrhoea for 14 days or more"
+      }
     },
     {
       "id": "Q5",
       "question": "How many days should the follow-up task stay open after it is due? The guideline gives the due day only.",
-      "affects": ["treat_fast_breathing_at_home"],
+      "affects": [
+        "treat_fast_breathing_at_home"
+      ],
       "route_to": "program_officer",
       "status": "open"
     },
     {
       "id": "Q6",
       "question": "Entry limits (age 0 to 120 months, breaths 10 to 120, cough 0 to 365 days) are our choice. Are they sensible?",
-      "affects": ["age_months", "breaths_per_minute", "cough_days"],
+      "affects": [
+        "age_months",
+        "breaths_per_minute",
+        "cough_days"
+      ],
       "route_to": "clinician",
       "status": "open"
     }

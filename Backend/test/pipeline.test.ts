@@ -52,7 +52,7 @@ test("PDF goes upload -> S3 event -> queue -> extract -> digest -> logic model",
   assert.equal(env.source, "placeholder");
   assert.equal(env.model.schema_version, "1.0");
   assert.equal(env.model.questions.length, 9);
-  assert.equal(env.model.rules.length, 6);
+  assert.equal(env.model.rules.length, 7);
   assert.deepEqual(env.quoteCheck.missing, []);
   assert.deepEqual(env.quoteCheck.wrongPage, []);
   assert.equal(env.quoteCheck.found, env.quoteCheck.total);

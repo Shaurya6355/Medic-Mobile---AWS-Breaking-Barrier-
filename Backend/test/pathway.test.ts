@@ -41,11 +41,11 @@ test("semantic errors are caught", () => {
   assert.match(errors(s1), /Unknown field chest_indrawin/);
   const s2 = clone(SPEC); s2.rules[3].when = { field: "breaths_per_minute", op: "is_yes" };
   assert.match(errors(s2), /is a number/);
-  const s3 = clone(SPEC); s3.rules[5].priority = 0;
+  const s3 = clone(SPEC); s3.rules[s3.rules.length - 1].priority = 0;
   assert.match(errors(s3), /must have the last priority/);
   const s4 = clone(SPEC); s4.rules[2].outcome = "nope";
   assert.match(errors(s4), /Unknown outcome nope/);
-  const s5 = clone(SPEC); s5.derived[0].definition = { field: "danger_sign", op: "is_yes" }; s5.derived[1].definition = { field: "fast_breathing", op: "is_yes" };
+  const s5 = clone(SPEC); s5.derived.find(d => d.id === "fast_breathing")!.definition = { field: "danger_sign", op: "is_yes" }; s5.derived.find(d => d.id === "danger_sign")!.definition = { field: "fast_breathing", op: "is_yes" };
   assert.match(errors(s5), /cycle/);
   const s6 = clone(SPEC); s6.questions[1].shown_when = { field: "cough_days", op: "at_least", value: 1 };
   assert.match(errors(s6), /asked later/);
@@ -55,8 +55,8 @@ test("semantic errors are caught", () => {
 test("XLSForm classification is the rule chain in priority order", () => {
   const rows = P.toXlsForm(SPEC);
   const cls = rows.find(r => r[1] === "classification")![4];
-  assert.ok(cls.startsWith("if(${age_months} < 2 or ${age_months} >= 60, 'refer_outside_age_range', "));
-  assert.ok(cls.endsWith("'cough_no_fast_breathing', 'no_cough')))))"));
+  assert.ok(cls.startsWith("if(${outside_age_range} = 'yes' and ${danger_sign} = 'yes', 'refer_urgent_outside_age_range', if(${outside_age_range} = 'yes', 'refer_outside_age_range', "));
+  assert.ok(cls.endsWith("'cough_no_fast_breathing', 'no_cough'))))))"));
   assert.equal(rows.find(r => r[1] === "breaths_per_minute")![3], "${cough} = 'yes'");
 });
 
@@ -90,8 +90,10 @@ test("evidence checks: quotes against the guideline text, numbers against their 
   const made = clone(SPEC); made.rules[0].source = { page: 3, quote: "a sentence that is not in the guideline" };
   assert.equal(P.quoteResults(made, pages).filter(r => !r.found).length, 1);
 
-  // fast_breathing cites only the 2-12 month passage, so 40 and 60 are not in its quote.
-  assert.deepEqual(P.numberResults(SPEC).filter(r => !r.ok).map(r => r.value).sort(), [40, 60]);
+  // Every guideline number is in its own step's quote; drop the 12-59 month passage and 40 and 60 go missing.
+  assert.deepEqual(P.numberResults(SPEC).filter(r => !r.ok), []);
+  const cut = clone(SPEC); cut.derived.find(d => d.id === "fast_breathing")!.source = { page: 8, quote: "In a child age 2 months up to 12 months, 50 breaths or more per minute" };
+  assert.deepEqual(P.numberResults(cut).filter(r => !r.ok).map(r => r.value).sort(), [40, 60]);
 
   const B = JSON.parse(readFileSync(new URL("../../shared/pathway/samples/cough_fast_breathing.v1.draftB.json", import.meta.url), "utf8")) as P.Spec;
   const x = P.crossCheck(SPEC, B);

@@ -118,3 +118,10 @@ Files or resources touched: shared/pathway/{evidence,index}.ts, shared/pathway/s
 What others must do or know: LogicModelBuilder.build may return `alt` (draft B); the envelope carries `draftB` (null if absent or invalid). The live UI reads guideline text from GET /guidelines/:id/digest. The sample draft B is a placeholder (one threshold changed: 40 to 45) until the model produces a real second draft. The sample spec's fast_breathing cites only the 2 to 12 month passage, so the number check warns on 40 and 60.
 Open items: AgentCore to produce draft B as an independent run.
 Related: INT-008
+
+### INT-010 | 2026-11-04 | Vishnu Athreya (agent) | Final cough_fast_breathing v1 logic JSON
+What changed: shared/pathway/samples/cough_fast_breathing.v1.json is now the final hand-written reference (Logic_final.json): 7 rules, new derived value outside_age_range, new outcome refer_urgent_outside_age_range (out-of-range child with a danger sign: refer urgently, no medicine), fast_breathing cites both age-band passages. Only change from the upload: "(BRD OQ-03)" removed from Q2 (no internal document references in the JSON, see INT-007). Draft B regenerated from it (same single change, 40 to 45). Sample guideline text updated so every quote is on its cited page (page 8 lines without the trailing full stop, page 12 gains the OTHER PROBLEM line); sample PDF regenerated. Golden case G-14 added for the new rule. Synthetic live v3 now targets the antibiotic-referral rule by outcome, not by id.
+Files or resources touched: shared/pathway/samples/{cough_fast_breathing.v1.json,cough_fast_breathing.v1.draftB.json,cough-guideline.pages.json}, Backend/samples/cough-guideline-sample.pdf, Backend/test/{pathway,pipeline}.test.ts, Frontend/src/domain/data.ts.
+What others must do or know: Re-upload the sample PDF to see 36 of 36 quotes on page. All checks pass on it except the cross check, which flags the placeholder draft B on purpose.
+Open items: none new.
+Related: INT-009
