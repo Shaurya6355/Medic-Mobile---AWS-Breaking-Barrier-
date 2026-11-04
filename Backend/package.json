@@ -16,6 +16,7 @@
     "compile:screenshots": "node compile-demo/preview/cli.mjs screenshots",
     "compile:verify": "tsx compile-demo/preview/verify-golden.mjs",
     "fill:live": "tsx scripts/fillLive.ts",
+    "metrics": "tsx scripts/runMetrics.ts",
     "pipeline:demo": "tsx pipeline-demo/run.ts",
     "compile:locked": "tsx scripts/compileLocked.ts"
   },

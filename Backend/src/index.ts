@@ -69,6 +69,7 @@ async function main(): Promise<void> {
       backoffMs: (a) => Math.min(30000, 1000 * 2 ** a),
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
       prices: cfg.prices,
+      modelBackend: cfg.modelBackend,
     },
   });
 
