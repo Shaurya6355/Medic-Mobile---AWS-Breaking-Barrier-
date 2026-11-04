@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryArtifactStore, artifactKey, inputPdfKey, pageImageName } from "../../src/artifacts/artifactStore.js";
 import type { StepContext } from "../../src/engine/step.js";
 import type { ModelClient } from "../../src/model/modelClient.js";
-import { createIngestStep } from "../../src/steps/ingest.js";
+import { DEFAULT_EXEC_TIMEOUT_MS, createDefaultExec, createIngestStep, defaultExec } from "../../src/steps/ingest.js";
 import { MemoryStore } from "../../src/store/memoryStore.js";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
@@ -222,5 +222,20 @@ describe("ingest step", () => {
     expect(err.message).toMatch(re);
     expect(calls).toHaveLength(0);
     expect(await artifacts.exists(artifactKey("r1", "ingest", "input_blocks.json"))).toBe(false);
+  });
+});
+
+describe("default exec", () => {
+  it("allows 5 minutes by default", () => {
+    expect(DEFAULT_EXEC_TIMEOUT_MS).toBe(300000);
+  });
+
+  it("runs a command", async () => {
+    await expect(defaultExec(process.execPath, ["-e", ""])).resolves.toBeUndefined();
+  });
+
+  it("fails a command that outlives its timeout", async () => {
+    const exec = createDefaultExec({ timeoutMs: 100 });
+    await expect(exec(process.execPath, ["-e", "setTimeout(() => {}, 10000)"])).rejects.toThrow(/Command failed: .*timed out after 100 ms/);
   });
 });

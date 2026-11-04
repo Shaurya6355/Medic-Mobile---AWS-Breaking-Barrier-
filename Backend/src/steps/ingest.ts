@@ -7,15 +7,23 @@ import type { Step } from "../engine/step.js";
 
 export type Exec = (cmd: string, args: string[]) => Promise<void>;
 
-const EXEC_TIMEOUT_MS = 120000;
+// Rendering every page of a long PDF can take minutes.
+export const DEFAULT_EXEC_TIMEOUT_MS = 300000;
 
-export const defaultExec: Exec = (cmd, args) =>
-  new Promise<void>((resolve, reject) => {
-    execFile(cmd, args, { timeout: EXEC_TIMEOUT_MS }, (err) => {
-      if (err) reject(new Error(`Command failed: ${path.basename(cmd)} (${err.message.split("\n")[0]})`));
-      else resolve();
+export function createDefaultExec(opts: { timeoutMs?: number } = {}): Exec {
+  const timeout = opts.timeoutMs ?? DEFAULT_EXEC_TIMEOUT_MS;
+  return (cmd, args) =>
+    new Promise<void>((resolve, reject) => {
+      execFile(cmd, args, { timeout }, (err) => {
+        if (err) {
+          const why = err.killed ? `timed out after ${timeout} ms` : err.message.split("\n")[0];
+          reject(new Error(`Command failed: ${path.basename(cmd)} (${why})`));
+        } else resolve();
+      });
     });
-  });
+}
+
+export const defaultExec: Exec = createDefaultExec();
 
 interface InputPage {
   pdf_page: number;
