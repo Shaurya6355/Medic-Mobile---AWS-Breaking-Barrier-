@@ -85,6 +85,12 @@ describe("findBadQuotes", () => {
     expect(bad).toEqual([{ block_id: o.nodes[0].src[0].block_id, quote: "not in the block" }]);
   });
 
+  it.each([["empty", ""], ["whitespace", "  \n\t "]])("reports an %s quote even for a real block", (_n, quote) => {
+    const o = structuredClone(realOutput);
+    o.nodes[0].src[0].quote = quote;
+    expect(findBadQuotes(o, realBlocks)).toEqual([{ block_id: o.nodes[0].src[0].block_id, quote }]);
+  });
+
   it("reports an unknown block id", () => {
     const o = structuredClone(realOutput);
     o.nodes[0].src[0].block_id = "p99.b99";

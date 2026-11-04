@@ -29,7 +29,8 @@ export function findBadQuotes(
         const id = String(rec.block_id);
         const quote = String(rec.quote);
         const text = blocks.get(id) ?? "";
-        if (!text.includes(quote)) bad.push({ block_id: id, quote });
+        // An empty quote would match any block, so it proves nothing.
+        if (quote.trim() === "" || !text.includes(quote)) bad.push({ block_id: id, quote });
       }
       Object.values(rec).forEach(walk);
     }
