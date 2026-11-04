@@ -5,13 +5,14 @@ import type { Check, ItemId, Model, Workflow } from "../domain/types";
 import type { Markers } from "./Flow";
 import type { EditFn } from "./NodeEditor";
 import { CommitInput, CondInput } from "./inputs";
+import { IssueLine } from "./Checks";
 
 const STATUS = { edit: ["Edit required", "bad"], check: ["Check", "warn"], ok: ["OK", "good"] } as const;
 
 function Issues({ checks, flags }: ReturnType<typeof rowIssues>) {
   return (
     <ul className="rissues">
-      {checks.map((c, i) => <li key={i} className={c.sev}><b>{c.sev === "blocking" ? "Fix" : "Check"}</b>{c.text}</li>)}
+      {checks.map((c, i) => <IssueLine key={i} c={c} />)}
       {flags.map(f => <li key={f.id} className="flag"><b>{"Flag " + f.id.slice(2)}</b>{(f.clinical ? "Clinician decides: " : "You decide: ") + f.title}</li>)}
     </ul>
   );

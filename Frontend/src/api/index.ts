@@ -38,7 +38,10 @@ interface LogicModelEnvelope {
   quoteCheck: { found: number; total: number; onPage?: number };
   /** Pathway spec JSON. Validated here again before use: the UI never trusts the wire. */
   model: unknown;
+  /** Draft B for the cross check, when the builder produced one. */
+  draftB?: unknown;
 }
+interface DigestBody { blocks: { page: number; text: string }[] }
 
 export const ACCEPT = ".pdf,.doc,.docx,.odt,.rtf,.xlsx,.xls,.csv,.ods,.png,.jpg,.jpeg,.tif,.tiff,.webp,.html,.htm,.txt,.md";
 const TYPE_BY_EXT: Record<string, GuidelineType> = {
@@ -103,9 +106,18 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
     const g = await getGuideline(args.guidelineId);
     const env = await http<LogicModelEnvelope>("/guidelines/" + g.id + "/logic-model");
     const model = loadSpec(env.model, "The pipeline's logic model");
+    const digest = await http<DigestBody>("/guidelines/" + g.id + "/digest").catch(() => null);
+    const byPage = new Map<number, string[]>();
+    digest?.blocks.forEach(b => byPage.set(b.page, [...(byPage.get(b.page) ?? []), b.text]));
+    const evidence = {
+      pages: digest ? [...byPage].map(([page, lines]) => ({ page, text: lines.join("\n") })) : null,
+      pagesFrom: g.name + " (text extracted by the pipeline" + (g.pages ? ", " + g.pages + " pages" : "") + ")",
+      draftB: env.draftB ? loadSpec(env.draftB, "The pipeline's draft B") : null,
+      draftBFrom: "Draft B from " + env.builder + (env.source === "placeholder" ? " (placeholder sample)" : ""),
+    };
     const qc = env.quoteCheck.found + " of " + env.quoteCheck.total + " source quotes found in this file" + (env.quoteCheck.onPage !== undefined ? ", " + env.quoteCheck.onPage + " on the cited page" : "");
     workflows[id] = wf.createDraft(wf.initialWorkflow(id), { id: g.id, name: g.name, pathway: args.pathway, pages: args.pages }, {
-      model,
+      model, evidence,
       event: env.source === "placeholder" ? "Loaded placeholder logic model (no model connected yet)" : "Loaded logic model from " + env.builder,
       note: (g.s3Uri ? g.s3Uri.replace(/\/uploads\/.*/, "/logic-models/" + g.id + "/logic-model.json") + " · " : "") + qc,
     });

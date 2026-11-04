@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import * as api from "./api";
-import { runChecks } from "./domain/logic";
-import { gate, initialWorkflow } from "./domain/workflow";
+import { checksOf, gate, initialWorkflow } from "./domain/workflow";
 import type { Role, Workflow } from "./domain/types";
 import { ROLE_NAME, type Actions } from "./actions";
 import { NextStrip, STAGES } from "./components/NextStrip";
@@ -22,7 +21,7 @@ export default function App() {
   const nav = useNavigate();
   const { pathname } = useLocation();
   const cur = w ?? EMPTY;
-  const checks = useMemo(() => runChecks(cur.model), [cur.model]);
+  const checks = useMemo(() => checksOf(cur), [cur]);
 
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
 
@@ -33,7 +32,7 @@ export default function App() {
   };
   /** After a decision, open the next open item for this role. */
   const nextAfter = (x: Workflow, current: string) => {
-    const g = gate(x, runChecks(x.model));
+    const g = gate(x, checksOf(x));
     const list = x.state === "clinician" ? g.reqLeft : x.state === "po_revise" ? g.unresolved : [];
     const nxt = list.find(id => id !== current);
     if (nxt) setTimeout(() => setSel(nxt), 350);

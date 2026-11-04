@@ -1,9 +1,10 @@
 /* Workflow state machine: none -> po_draft -> clinician -> (po_revise -> clinician)* -> verify -> deploy -> done.
    Every transition is a pure function returning a new Workflow. The api layer persists the result. */
 import { applyPatch, CondSyntaxError, itemOf, srcList, mutationScore, parse, print, splitItem, type Path, type Source } from "../../../shared/pathway/index.ts";
-import { DRAFT, V3, clone, fnv, hashOf } from "./data";
-import { allItems, clean, changedVs, classify, getO, getQ, grid, nodeSig, qStatus, runChecks, slots, srcOf, trayIds, usesOf, type Slot } from "./logic";
-import type { Check, Decision, FbType, Flag, ItemId, Model, Patch, Review, Suggestion, SuggestionOutcome, WfState, Workflow } from "./types";
+import { DRAFT, SAMPLE_EVIDENCE, V3, clone, fnv, hashOf } from "./data";
+import { runChecks } from "./checks";
+import { allItems, clean, changedVs, classify, getO, getQ, grid, nodeSig, qStatus, slots, srcOf, trayIds, usesOf, type Slot } from "./logic";
+import type { Check, Decision, Evidence, FbType, Flag, ItemId, Model, Patch, Review, Suggestion, SuggestionOutcome, WfState, Workflow } from "./types";
 
 export { applyPatch };
 
@@ -27,8 +28,11 @@ export function flagsFrom(m: Model): Flag[] {
   });
 }
 
-export function initialWorkflow(id: string, m: Model = DRAFT): Workflow {
-  return { id, guideline: null, state: "none", round: 0, rev: 0, model: clone(m), draft: clone(m), sent: null, required: [], reviews: {}, sug: {}, fixed: {},
+/** All of this workflow's checks, against its own evidence (guideline text, draft B). */
+export const checksOf = (w: Workflow): Check[] => runChecks(w.model, w.evidence);
+
+export function initialWorkflow(id: string, m: Model = DRAFT, evidence: Evidence = SAMPLE_EVIDENCE): Workflow {
+  return { id, guideline: null, state: "none", round: 0, rev: 0, model: clone(m), draft: clone(m), evidence, sent: null, required: [], reviews: {}, sug: {}, fixed: {},
     flags: flagsFrom(m), audit: [], versions: [], clock: 0, verify: null, approved: null, lastKey: null };
 }
 
@@ -186,11 +190,11 @@ function draftSuggestion(m: Model, id: ItemId, fb: Review): Suggestion {
     }
   }
 }
-export function suggestionCheckText(m: Model, s: Suggestion): string | null {
+export function suggestionCheckText(w: Workflow, s: Suggestion): string | null {
   if (s.kind !== "change") return null;
-  const x = applyPatch(m, s.patch);
-  const c = runChecks(x), b = c.filter(r => r.sev === "blocking").length;
-  const wn = c.filter(r => r.sev === "warning").length - runChecks(m).filter(r => r.sev === "warning").length;
+  const m = w.model, x = applyPatch(m, s.patch);
+  const c = runChecks(x, w.evidence), b = c.filter(r => r.sev === "blocking").length;
+  const wn = c.filter(r => r.sev === "warning").length - runChecks(m, w.evidence).filter(r => r.sev === "warning").length;
   return b ? b + " blocking check" + (b > 1 ? "s" : "") + " after this change"
     : "Checks re-run on the proposed change: no blocking problems" + (wn > 0 ? ", " + wn + " new warning" + (wn > 1 ? "s" : "") : "");
 }
@@ -209,10 +213,10 @@ export function gate(w: Workflow, checks: Check[]) {
 
 /* ---------- Transitions ---------- */
 /** `from` is a logic model loaded from the pipeline; without it the built-in sample draft is used. */
-export function createDraft(w: Workflow, g: { id: string; name: string; pathway: string; pages: number[] }, from?: { model: Model; event: string; note: string }): Workflow {
+export function createDraft(w: Workflow, g: { id: string; name: string; pathway: string; pages: number[] }, from?: { model: Model; event: string; note: string; evidence: Evidence }): Workflow {
   expect(w, "none");
   let x: Workflow = { ...initialWorkflow(w.id), state: "po_draft", guideline: g };
-  if (from) x = { ...x, model: clone(from.model), draft: clone(from.model), flags: flagsFrom(from.model) };
+  if (from) x = { ...x, model: clone(from.model), draft: clone(from.model), flags: flagsFrom(from.model), evidence: from.evidence };
   x = logged(x, "Program officer", "Created workflow draft", "Pages " + g.pages.join(", ") + " of " + g.name);
   x = from ? logged(x, "System", from.event, from.note)
     : logged(x, "System", "Drafted by Bedrock (inputs pass, rules pass, cross-check pass)", "Every quote and number checked against the source in code");
@@ -240,7 +244,7 @@ export function applyEdit(w: Workflow, item: ItemId, field: string, patch: Patch
 
 export function sendToClinician(w: Workflow): Workflow {
   expect(w, "po_draft", "po_revise");
-  const g = gate(w, runChecks(w.model));
+  const g = gate(w, checksOf(w));
   if (g.blockIds.length) throw new Error("Blocking checks are open");
   let y: Workflow;
   if (w.state === "po_draft") {
@@ -326,7 +330,7 @@ export function decideSuggestion(w: Workflow, item: ItemId, outcome: SuggestionO
 
 export function approveAll(w: Workflow): Workflow {
   expect(w, "clinician");
-  const g = gate(w, runChecks(w.model));
+  const g = gate(w, checksOf(w));
   if (g.reqLeft.length || g.clinFlags.length || g.changesNow.length) throw new Error("Round is not fully approved");
   let y: Workflow = { ...w, state: "verify", approved: { ver: "v4." + w.round, hash: hashOf(w.model), round: w.round } };
   y = addVersion(y, "Approved by clinician", "Clinician");

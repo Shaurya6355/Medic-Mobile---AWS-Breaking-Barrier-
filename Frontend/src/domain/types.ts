@@ -1,6 +1,6 @@
 /* Workflow types. The logic model itself is the pathway spec (shared/pathway/types.ts), the same JSON the
    backend pipeline produces. Everything here must survive JSON round-trips (stored by the backend later). */
-import type { Answers, ItemId, Patch, Path, Spec } from "../../../shared/pathway/index.ts";
+import type { Answers, ItemId, Page, Patch, Path, Spec } from "../../../shared/pathway/index.ts";
 
 export type { Answers, ItemId, Patch, Spec };
 /** The logic model under review: a pathway spec. */
@@ -11,7 +11,15 @@ export interface Patient { id: string; answers: Answers }
 export interface Classification { out: string | null; rule: string | null }
 
 export type Severity = "blocking" | "warning";
-export interface Check { sev: Severity; id: ItemId; text: string }
+export type CheckKey = "schema" | "quote" | "number" | "logic" | "golden" | "cross";
+export interface Check { sev: Severity; id: ItemId; text: string; kind?: CheckKey }
+/** What the checks compare the draft against. */
+export interface Evidence {
+  /** Guideline text by page, for the quote check. Null when not loaded. */
+  pages: Page[] | null; pagesFrom: string;
+  /** Draft B for the cross check. Null when the pipeline gave none. */
+  draftB: Spec | null; draftBFrom: string;
+}
 
 export type FbType = "wording" | "value" | "logic" | "show" | "source" | "remove" | "add";
 export interface Decision { status: "approved" | "changes"; type?: FbType; note?: string; value?: string }
@@ -56,6 +64,7 @@ export interface Workflow {
   round: number;
   rev: number;
   model: Model;
+  evidence: Evidence;
   /** The logic model as first drafted, before any hand edit. "Edited" markers compare against it. */
   draft: Model;
   sent: Model | null;

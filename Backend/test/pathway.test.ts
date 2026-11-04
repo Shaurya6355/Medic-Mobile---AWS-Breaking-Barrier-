@@ -79,3 +79,23 @@ test("schema 1.0 limits: operators, not, sources", () => {
   assert.equal(errors(s4), "");
   assert.equal(P.sources(s4).filter(x => x.path.startsWith("rules.R2")).length, 2);
 });
+
+test("evidence checks: quotes against the guideline text, numbers against their own quote, draft A vs draft B", () => {
+  const lines = JSON.parse(readFileSync(new URL("../../shared/pathway/samples/cough-guideline.pages.json", import.meta.url), "utf8")) as string[][];
+  const pages = lines.map((l, i) => ({ page: i + 1, text: l.map(x => x.replace(/^#/, "")).join("\n") }));
+  const q = P.quoteResults(SPEC, pages);
+  assert.equal(q.filter(r => r.onPage).length, q.length);
+  const moved = clone(SPEC); moved.rules[0].source = { page: 1, quote: "child age 2 months up to 5 years" };
+  assert.deepEqual(P.quoteResults(moved, pages).filter(r => !r.onPage).map(r => [r.found, r.foundOn]), [[true, [3]]]);
+  const made = clone(SPEC); made.rules[0].source = { page: 3, quote: "a sentence that is not in the guideline" };
+  assert.equal(P.quoteResults(made, pages).filter(r => !r.found).length, 1);
+
+  // fast_breathing cites only the 2-12 month passage, so 40 and 60 are not in its quote.
+  assert.deepEqual(P.numberResults(SPEC).filter(r => !r.ok).map(r => r.value).sort(), [40, 60]);
+
+  const B = JSON.parse(readFileSync(new URL("../../shared/pathway/samples/cough_fast_breathing.v1.draftB.json", import.meta.url), "utf8")) as P.Spec;
+  const x = P.crossCheck(SPEC, B);
+  assert.deepEqual(x.values.map(v => [v.field, v.a, v.b]), [["breaths_per_minute", 40, 45]]);
+  assert.ok(x.disagree.length > 0 && x.disagree.every(d => (d.answers.age_months as number) >= 12));
+  assert.equal(P.crossCheck(SPEC, clone(SPEC)).disagree.length, 0);
+});

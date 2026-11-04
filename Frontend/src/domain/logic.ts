@@ -1,7 +1,7 @@
 /* Read-only views of the logic model for the UI: items, facts, editable slots, checks. Deterministic, no AI.
    All semantics (types, evaluation, compile) come from the shared pathway compiler. */
 import {
-  analyze, evaluate, humanize, item, literals, srcList, patients, print, sources, splitItem, toGraph, usedFields, refs,
+  evaluate, humanize, item, literals, srcList, patients, print, splitItem, toGraph, usedFields, refs,
   type Answers, type Cond, type ItemId, type Literal, type Path, type Question, type Spec,
 } from "../../../shared/pathway/index.ts";
 import { DRAFT, GOLDEN, V3, same } from "./data";
@@ -227,45 +227,6 @@ export function grid(m: Spec): Answers[] {
   let g = cache.get(m);
   if (!g) { g = patients(m); cache.set(m, g); }
   return g;
-}
-
-/** Numbers that appear in the cited passages ("5 years" also counts as 60 months, "a week" as 7 days). */
-function citedNumbers(m: Spec): Set<number> {
-  const s = new Set<number>();
-  sources(m).forEach(({ source: { quote } }) => {
-    for (const x of quote.matchAll(/(\d+(?:\.\d+)?)\s*(years?|weeks?)?/gi)) {
-      const n = Number(x[1]); s.add(n);
-      if (/^year/i.test(x[2] || "")) s.add(n * 12);
-      if (/^week/i.test(x[2] || "")) s.add(n * 7);
-    }
-    if (/\ba week\b/i.test(quote)) s.add(7);
-  });
-  return s;
-}
-
-/** Same checks for AI drafts, PO edits and accepted AI revisions: compiler diagnostics, reachability, golden cases, cited numbers. */
-export function runChecks(m: Spec): Check[] {
-  const out: Check[] = analyze(m).map(d => ({ sev: d.level === "error" ? "blocking" : "warning", id: d.item, text: d.message }));
-  if (out.some(c => c.sev === "blocking")) return out;
-
-  const fired = new Set(grid(m).map(p => classify(m, p).rule));
-  m.rules.forEach(r => { if (r.when !== "otherwise" && !fired.has(r.id)) out.push({ sev: "blocking", id: item.rule(r.id), text: "No patient ever reaches this rule: an earlier rule always matches first, or the condition can't be true." }); });
-
-  const cited = citedNumbers(m);
-  const num = (id: ItemId, n: number | null | undefined) => { if (typeof n === "number" && !cited.has(n)) out.push({ sev: "warning", id, text: "The number " + n + " is not in any cited passage." }); };
-  if (m.scope.source) { num(item.scope, m.scope.age_months_min); num(item.scope, m.scope.age_months_below); }
-  literals(m).forEach(l => {
-    const [k, key] = splitItem(l.item);
-    const origin = k === "d" ? getD(m, key)?.origin : getR(m, key)?.origin;
-    if (origin === "guideline") num(l.item, l.leaf.value);
-  });
-  m.outcomes.forEach(o => { if (o.follow_up?.origin === "guideline") num(item.fu(o.id), o.follow_up.due_in_days); });
-
-  golden(m).filter(x => !x.ok).forEach(x => out.push({
-    sev: "blocking", id: x.rule ? item.rule(x.rule) : item.scope,
-    text: "Golden case " + x.id + " (" + describeP(m, x.a) + ") expected " + outName(m, x.exp) + ", got " + outName(m, x.got) + ".",
-  }));
-  return out;
 }
 
 /* ---------- Titles and sources ---------- */

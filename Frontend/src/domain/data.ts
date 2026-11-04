@@ -2,8 +2,10 @@
    DRAFT is the hardcoded logic model JSON (the same file the backend placeholder serves). Live mode fetches it
    from the pipeline instead; the rest of the app only ever sees the Spec shape. */
 import draftJson from "../../../shared/pathway/samples/cough_fast_breathing.v1.json";
+import draftBJson from "../../../shared/pathway/samples/cough_fast_breathing.v1.draftB.json";
+import pagesJson from "../../../shared/pathway/samples/cough-guideline.pages.json";
 import { validateSpec, type Answers, type Spec } from "../../../shared/pathway/index.ts";
-import type { FbType } from "./types";
+import type { Evidence, FbType } from "./types";
 
 export const clone = <T,>(o: T): T => JSON.parse(JSON.stringify(o));
 export const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -25,6 +27,14 @@ export function loadSpec(x: unknown, from: string): Spec {
 export const DRAFT: Spec = loadSpec(draftJson, "The bundled sample logic model");
 
 /** The version live in CHT today (synthetic): no cough-duration question, older wording, antibiotic before referral only for fast breathing. */
+/** Sample mode: the sample guideline's text and a sample draft B, so every check can run without the backend. */
+export const SAMPLE_EVIDENCE: Evidence = {
+  pages: (pagesJson as string[][]).map((lines, i) => ({ page: i + 1, text: lines.map(l => l.replace(/^#/, "")).join("\n") })),
+  pagesFrom: "Sample guideline text (cough-guideline-sample.pdf, 12 pages)",
+  draftB: loadSpec(draftBJson, "The bundled sample draft B"),
+  draftBFrom: "Draft B: sample placeholder until the model pipeline produces one",
+};
+
 export const V3: Spec = (() => {
   const v = clone(DRAFT);
   v.questions = v.questions.filter(q => q.id !== "cough_days");

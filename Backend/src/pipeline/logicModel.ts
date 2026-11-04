@@ -1,10 +1,14 @@
 import { readFileSync } from "node:fs";
-import { sources } from "../../../shared/pathway/index.ts";
+import { quoteResults } from "../../../shared/pathway/index.ts";
 import { validateSpec, type Diagnostic, type LogicModel } from "./schema.ts";
-import { normalise, type Digest } from "./digest.ts";
+import type { Digest } from "./digest.ts";
 
 export interface BuildInput { guideline: { id: string; name: string }; digest: Digest }
-export interface BuildOutput { model: unknown; source: "placeholder" | "agent"; notes: string[] }
+export interface BuildOutput {
+  model: unknown; source: "placeholder" | "agent"; notes: string[];
+  /** Draft B: a second, independent draft of the same pathway. The cross check compares it with the main draft. */
+  alt?: unknown;
+}
 
 /**
  * The model step. AgentCore will implement this interface (which model runs which task is theirs to decide).
@@ -17,7 +21,9 @@ export interface LogicModelBuilder {
 }
 
 /** Hardcoded dummy spec, shared with the UI's sample mode. */
-const TEMPLATE = JSON.parse(readFileSync(new URL("../../../shared/pathway/samples/cough_fast_breathing.v1.json", import.meta.url), "utf8")) as LogicModel;
+const sample = (f: string) => JSON.parse(readFileSync(new URL("../../../shared/pathway/samples/" + f, import.meta.url), "utf8")) as LogicModel;
+const TEMPLATE = sample("cough_fast_breathing.v1.json");
+const TEMPLATE_B = sample("cough_fast_breathing.v1.draftB.json");
 
 /**
  * Placeholder until AgentCore is connected. No model runs: it returns the sample cough spec (cough_fast_breathing v1)
@@ -28,6 +34,7 @@ export const placeholderBuilder: LogicModelBuilder = {
   async build() {
     return {
       model: structuredClone(TEMPLATE),
+      alt: structuredClone(TEMPLATE_B),
       source: "placeholder",
       notes: ["No model connected. This is the hardcoded cough_fast_breathing v1 spec, not content drafted from this guideline."],
     };
@@ -48,6 +55,8 @@ export interface LogicModelEnvelope {
   /** Compiler warnings (errors reject the model). */
   diagnostics: Diagnostic[];
   model: LogicModel;
+  /** Draft B for the cross check, or null when the builder gave none or it failed the compiler checks. */
+  draftB: LogicModel | null;
 }
 
 export interface QuoteCheck {
@@ -60,22 +69,19 @@ export interface QuoteCheck {
 
 /** Deterministic: every source quote must appear verbatim (case and whitespace aside), ideally on the page it cites. */
 export function checkQuotes(model: LogicModel, d: Digest): QuoteCheck {
-  const norm = (s: string) => normalise(s).toLowerCase();
-  const pages = new Map<number, string>();
-  d.blocks.forEach(b => pages.set(b.page, (pages.get(b.page) ?? "") + " " + b.text));
-  const pageText = new Map([...pages].map(([p, t]) => [p, norm(t)]));
-  const all = norm(d.blocks.map(b => b.text).join(" "));
-  const out: QuoteCheck = { found: 0, total: 0, onPage: 0, missing: [], wrongPage: [] };
-  for (const { path, source } of sources(model)) {
-    out.total++;
-    const q = norm(source.quote);
-    if (!all.includes(q)) { out.missing.push({ path, quote: source.quote }); continue; }
-    out.found++;
-    if (pageText.get(source.page)?.includes(q)) out.onPage++;
-    else out.wrongPage.push({ path, quote: source.quote, cited: source.page, foundOn: [...pageText].filter(([, t]) => t.includes(q)).map(([p]) => p) });
-  }
-  return out;
+  const rs = quoteResults(model, pagesOf(d));
+  return {
+    found: rs.filter(r => r.found).length, total: rs.length, onPage: rs.filter(r => r.onPage).length,
+    missing: rs.filter(r => !r.found).map(r => ({ path: r.path, quote: r.source.quote })),
+    wrongPage: rs.filter(r => r.found && !r.onPage).map(r => ({ path: r.path, quote: r.source.quote, cited: r.source.page, foundOn: r.foundOn })),
+  };
 }
+/** The digest as page texts: what the review UI's quote check reads. */
+export const pagesOf = (d: Digest) => {
+  const m = new Map<number, string>();
+  d.blocks.forEach(b => m.set(b.page, (m.get(b.page) ? m.get(b.page) + "\n" : "") + b.text));
+  return [...m].map(([page, text]) => ({ page, text }));
+};
 
 export async function buildLogicModel(builder: LogicModelBuilder, input: BuildInput): Promise<LogicModelEnvelope> {
   const out = await builder.build(input);
@@ -87,5 +93,6 @@ export async function buildLogicModel(builder: LogicModelBuilder, input: BuildIn
   return {
     schemaVersion: 1, guidelineId: input.guideline.id, builder: builder.name, source: out.source,
     createdAt: new Date().toISOString(), notes: out.notes, quoteCheck: checkQuotes(spec, input.digest), diagnostics, model: spec,
+    draftB: out.alt === undefined ? null : validateSpec(out.alt).spec ?? null,
   };
 }

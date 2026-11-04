@@ -54,7 +54,7 @@ export function FeedbackCard({ w, id, onSug }: { w: Workflow; id: string; onSug:
           ) : s.kind === "change" ? (
             <>
               <div><span className="note">{s.field + ": "}</span><del>{s.from}</del>{" → "}<b className="ins2">{s.to}</b></div>
-              <div className="note okc">{suggestionCheckText(w.model, s)}</div>
+              <div className="note okc">{suggestionCheckText(w, s)}</div>
               <div className="btnrow">
                 <button type="button" className="btn tiny ok" onClick={() => onSug(id, "accepted")}>Accept suggestion</button>
                 <button type="button" className="btn tiny" onClick={() => onSug(id, "edited")}>Accept, then edit</button>

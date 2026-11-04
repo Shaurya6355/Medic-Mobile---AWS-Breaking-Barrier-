@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { V3_HASH } from "../domain/data";
-import { golden, grid, itemLabel } from "../domain/logic";
+import { itemLabel } from "../domain/logic";
 import { flagsFor } from "../domain/workflow";
-import type { Check, Flag, Model, Role, Workflow } from "../domain/types";
+import type { Flag, Role, Workflow } from "../domain/types";
 
 type OnFlag = (id: string, choice: number, note: string) => void;
 
@@ -93,30 +93,6 @@ export function StepFlags({ w, role, id, onFlag }: { w: Workflow; role: Role; id
       <div className="lab">{fs.length === 1 ? "Flag on this step" : fs.length + " flags on this step"}</div>
       {fs.map((f, j) => <FlagCard key={f.id + (f.res ? ":done" : "") + (f.clinical ? ":c" : "")} f={f} w={w} role={role} onFlag={onFlag} pos={fs.length > 1 ? (j + 1) + " of " + fs.length : undefined} />)}
     </div>
-  );
-}
-
-export function ChecksPanel({ checks, m, onSelect }: { checks: Check[]; m: Model; onSelect: (id: string) => void }) {
-  const g = golden(m), ok = g.filter(x => x.ok).length;
-  const p = grid(m).length;
-  const blocking = checks.filter(c => c.sev === "blocking").length;
-  return (
-    <section className="panel">
-      <h2>Automatic checks</h2>
-      <div className="kv"><span>Golden cases</span><b className={ok === g.length ? "okc" : "badc"}>{ok} / {g.length} match</b></div>
-      <div className="kv"><span>Boundary patients run</span><b>{p}</b></div>
-      <div className="kv"><span>Blocking problems</span><b className={blocking ? "badc" : "okc"}>{blocking}</b></div>
-      {checks.length ? (
-        <ul className="clist">
-          {checks.map((c, i) => (
-            <li key={i} className={c.sev}>
-              <span className="sev">{c.sev[0].toUpperCase() + c.sev.slice(1)}</span>{" "}
-              <button type="button" className="lnk" onClick={() => onSelect(c.id)}>{itemLabel(c.id)}</button>: {c.text}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </section>
   );
 }
 

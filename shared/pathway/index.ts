@@ -6,3 +6,4 @@ export * from "./analyze.ts";
 export * from "./evaluate.ts";
 export * from "./patch.ts";
 export * from "./compile.ts";
+export * from "./evidence.ts";

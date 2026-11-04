@@ -1,0 +1,93 @@
+[
+ [
+  "#SAMPLE GUIDELINE - SYNTHETIC TEST DATA - NOT CLINICAL ADVICE",
+  "",
+  "#Caring for the sick child in the community: chart booklet (sample)",
+  "",
+  "Adapted for testing the guideline intake pipeline."
+ ],
+ [
+  "#Contents",
+  "",
+  "This page covers another part of the sick child assessment.",
+  "It is not used by the cough pathway."
+ ],
+ [
+  "#Who this booklet is for",
+  "",
+  "Use this booklet for a child age 2 months up to 5 years.",
+  "A younger or older child: see page 12."
+ ],
+ [
+  "#Greet the caregiver",
+  "",
+  "This page covers another part of the sick child assessment.",
+  "It is not used by the cough pathway."
+ ],
+ [
+  "#Ask and look",
+  "",
+  "ASK:",
+  "- Cough? If yes, for how long?",
+  "- Convulsions?",
+  "- Is the child not able to drink or feed anything?",
+  "- Does the child vomit everything? (vomits everything?)",
+  "LOOK:",
+  "- Chest indrawing?",
+  "- If cough, count breaths in 1 minute.",
+  "- Unusually sleepy or unconscious?"
+ ],
+ [
+  "#Decide: danger signs",
+  "",
+  "Danger signs include:",
+  "- Cough for 14 days or more",
+  "- Diarrhoea for 14 days or more",
+  "- Convulsions, not able to drink or feed, vomits everything, chest indrawing,",
+  "  unusually sleepy or unconscious.",
+  "",
+  "If ANY danger sign: REFER URGENTLY TO HEALTH FACILITY."
+ ],
+ [
+  "#Refer urgently",
+  "",
+  "If fast breathing or chest indrawing, give first dose of oral antibiotic.",
+  "Explain why child needs to go to the health facility.",
+  "Write a referral note. Help arrange transport.",
+  "FOLLOW UP child on return at least once a week until child is well."
+ ],
+ [
+  "#Fast breathing",
+  "",
+  "In a child age 2 months up to 12 months, 50 breaths or more per minute.",
+  "In a child age 12 months up to 5 years, 40 breaths or more per minute.",
+  "",
+  "Cough (less than 14 days) without fast breathing: no row in this booklet."
+ ],
+ [
+  "#Treat at home: Fast Breathing",
+  "",
+  "Give oral amoxicillin. Give twice daily for 5 days.",
+  "Advise the caregiver to return immediately if child cannot drink or feed,",
+  "becomes sicker, or has blood in stool.",
+  "Follow up child in 3 days."
+ ],
+ [
+  "#Diarrhoea",
+  "",
+  "This page covers another part of the sick child assessment.",
+  "It is not used by the cough pathway."
+ ],
+ [
+  "#Fever",
+  "",
+  "This page covers another part of the sick child assessment.",
+  "It is not used by the cough pathway."
+ ],
+ [
+  "#A child outside the age range",
+  "",
+  "For a child under 2 months or 5 years and older:",
+  "refer child to health facility, write a referral note, and follow up child on return."
+ ]
+]

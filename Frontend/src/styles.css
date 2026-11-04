@@ -595,3 +595,23 @@ h2{font-size:15px;font-weight:600}
 .btn.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .inspector .stepcard{border:0;padding:0}
 .inspector .tray-items .titem{flex-basis:100%}
+.oitem .oh{width:100%;font:inherit;background:none;border:0;padding:0;color:inherit;cursor:pointer;text-align:left}
+
+/* Check pipeline */
+.pipe{display:grid;gap:8px}
+.pipe-sec{font-size:12px;font-weight:600;color:var(--muted);border-bottom:1px dashed var(--line);padding:6px 0 2px}
+.stage{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:6px;padding:8px 10px;display:grid;gap:4px;scroll-margin-top:60px}
+.stage.s-pass{border-left-color:var(--add)} .stage.s-warn{border-left-color:var(--chg)} .stage.s-fail{border-left-color:var(--del)}
+.stage.on{outline:2px solid var(--accent);outline-offset:1px}
+.stage-h{display:flex;align-items:center;gap:8px;color:var(--ink);text-decoration:none;font-weight:600}
+.stage-h:hover .sname{text-decoration:underline}
+.stage .sn{font:600 12px/1 ui-monospace,monospace;border:1px solid var(--line);border-radius:999px;padding:3px 6px;min-width:22px;text-align:center}
+.stage .sname{flex:1}
+.pill{font-size:12px;font-weight:600;border-radius:999px;padding:2px 8px;border:1px solid}
+.pill.pass{color:var(--add);background:var(--add-bg)} .pill.warn{color:var(--chg);background:var(--chg-bg)} .pill.fail{color:var(--del);background:var(--del-bg)}
+.pill.skipped,.pill.missing{color:var(--muted);background:var(--bg)}
+.sbody{display:grid;gap:6px;margin-top:4px}
+.parts{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:13px}
+.parts li.ok span[aria-hidden]{color:var(--add)} .parts li.bad span[aria-hidden]{color:var(--del)}
+.chklink{color:var(--accent);font-weight:600;white-space:nowrap}
+.rissues .sev{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}

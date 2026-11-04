@@ -2,15 +2,17 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { V3, hashOf, same } from "../domain/data";
 import { allItems, changedVs, getQ, itemLabel, nodeSig, nodeTitle, qStatus, srcOf } from "../domain/logic";
-import { clinicianSteps, flagsFor, gate, todoItems, verLabel } from "../domain/workflow";
-import type { Check, Role, Workflow } from "../domain/types";
+import { checksOf, clinicianSteps, flagsFor, gate, todoItems, verLabel } from "../domain/workflow";
+import type { Check, CheckKey, Role, Workflow } from "../domain/types";
 import type { Actions } from "../actions";
 import { Flow, type Markers, type Tone } from "../components/Flow";
 import { Tray } from "../components/Tray";
 import { Facts, NodeEditor, QuestionsRead } from "../components/NodeEditor";
 import { ReviewControls } from "../components/ReviewControls";
 import { FeedbackCard } from "../components/FeedbackCard";
-import { ChecksPanel, FlagsPanel, StepFlags } from "../components/panels";
+import { FlagsPanel, StepFlags } from "../components/panels";
+import { CheckLink, CheckPipeline, IssueLine } from "../components/Checks";
+import { checkStages, STAGES } from "../domain/checks";
 import { RuleTable } from "../components/RuleTable";
 
 type View = "table" | "flow";
@@ -44,6 +46,17 @@ interface Props { w: Workflow | null; role: Role; sel: string; setSel: (id: stri
 export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
   const [view, setView] = useState<View>(readView);
   const [tab, setTab] = useState<Tab>("open");
+  // Checks are links: #check-<key> opens the Checks tab with that check expanded.
+  const [openCheck, setOpenCheck] = useState<CheckKey | null>(null);
+  useEffect(() => {
+    const read = () => {
+      const k = location.hash.match(/^#check-(\w+)$/)?.[1] as CheckKey | undefined;
+      if (k && STAGES.some(s => s.key === k)) { setTab("checks"); setOpenCheck(k); }
+    };
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
   const pickView = (v: View) => { setView(v); try { localStorage.setItem("reviewView", v); } catch { /* per-viewer convenience only */ } };
   const steps = w ? clinicianSteps(w) : [];
   const stepKey = w ? w.state + ":" + w.round + ":" + role : "";
@@ -75,8 +88,9 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
   const pick = (id: string) => { setSel(id); setTab("step"); };
   const goNext = () => { const i = todo.indexOf(sel); pick(todo[(i + 1) % todo.length] ?? todo[0]); };
   const quote = (id: string) => { const q = srcOf(m, id); return <div className="quote">{"“" + q[0] + "”"}<small>{m.meta.guideline.publisher + ", " + m.meta.guideline.title + " · " + q[1]}</small></div>; };
-  const nChecks = checks.length;
-  const TABS: [Tab, string][] = [["open", "Open items" + (todo.length ? " (" + todo.length + ")" : "")], ["step", "Step"], ["questions", "Questions"], ["checks", "Checks" + (nChecks ? " (" + nChecks + ")" : "")]];
+  const stages = checkStages(m, w.evidence);
+  const nFailed = stages.filter(s => s.status === "fail").length;
+  const TABS: [Tab, string][] = [["open", "Open items" + (todo.length ? " (" + todo.length + ")" : "")], ["step", "Step"], ["questions", "Questions"], ["checks", "Checks" + (nFailed ? " (" + nFailed + " failed)" : "")]];
 
   return (
     <>
@@ -116,7 +130,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
           </div>
           {tab === "open" ? <OpenItems w={w} role={role} checks={checks} todo={todo} steps={steps} sel={sel} pick={pick} setSel={setSel} act={act} />
             : tab === "questions" ? <Tray m={m} selected={sel} onSelect={pick} markers={mk} />
-            : tab === "checks" ? <ChecksPanel checks={checks} m={m} onSelect={pick} />
+            : tab === "checks" ? <CheckPipeline stages={stages} open={openCheck} setOpen={setOpenCheck} onSelect={pick} />
             : canReview ? <StepCard w={w} steps={steps} sel={sel} setSel={setSel} act={act} mk={mk} quote={quote} />
             : (
               <div className="stack">
@@ -127,7 +141,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
                 {canEdit && todo.length ? <button type="button" className="btn primary" onClick={goNext}>{"Next item ▶ (" + todo.length + " left)"}</button> : null}
                 {w.state === "po_revise" ? <FeedbackCard w={w} id={sel} onSug={act.sug} /> : null}
                 <StepFlags w={w} role={role} id={sel} onFlag={act.flag} />
-                {checks.filter(c => c.id === sel).map((c, i) => <div key={i} className={"issue " + c.sev}><span className="sev">{c.sev === "blocking" ? "Blocking" : "Warning"}</span> {c.text}</div>)}
+                <StepChecks checks={checks} id={sel} />
                 {canEdit ? <NodeEditor key={sel} m={m} id={sel} edit={act.edit} onRemoved={() => setSel("scope")} /> : <><Facts m={m} id={sel} /><QuestionsRead m={m} id={sel} /></>}
                 {quote(sel)}
                 {w.reviews[sel] && role !== "po" ? (
@@ -145,8 +159,8 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
 function OpenItems({ w, role, checks, todo, steps, sel, pick, setSel, act }: { w: Workflow; role: Role; checks: Check[]; todo: string[]; steps: string[]; sel: string; pick: (id: string) => void; setSel: (id: string) => void; act: Actions }) {
   const g = gate(w, checks);
   const flags = flagsFor(w, role).filter(f => !f.res);
-  const why = (id: string) => [
-    ...checks.filter(c => c.id === id && c.sev === "blocking").map(c => "Blocking: " + c.text),
+  const why = (id: string): React.ReactNode[] => [
+    ...checks.filter(c => c.id === id && c.sev === "blocking").map(c => <>{"Fix · "}<CheckLink k={c.kind} />{": " + c.text}</>),
     ...(g.unresolved.includes(id) ? ["Clinician requested a change"] : []),
     ...(role === "clinician" && g.reqLeft.includes(id) ? ["Changed: approve or request a change"] : []),
     ...flags.filter(f => f.about === id && (role === "clinician" ? f.clinical : !f.clinical)).map(f => "Flag: " + f.title),
@@ -158,11 +172,11 @@ function OpenItems({ w, role, checks, todo, steps, sel, pick, setSel, act }: { w
       {list.length ? (
         <ol className="olist">
           {list.map(id => (
-            <li key={id}>
-              <button type="button" className={"oitem" + (sel === id ? " sel" : "") + (open.has(id) ? " open" : " done")} onClick={() => pick(id)}>
-                <span className="oh"><b>{itemLabel(id)}</b><span className={"badge " + (open.has(id) ? "todo" : "ok")}>{open.has(id) ? "Open" : "Done"}</span></span>
-                {why(id).map((t, i) => <span key={i} className="note">{t}</span>)}
+            <li key={id} className={"oitem" + (sel === id ? " sel" : "") + (open.has(id) ? " open" : " done")}>
+              <button type="button" className="oh" onClick={() => pick(id)}>
+                <b>{itemLabel(id)}</b><span className={"badge " + (open.has(id) ? "todo" : "ok")}>{open.has(id) ? "Open" : "Done"}</span>
               </button>
+              {why(id).map((t, i) => <span key={i} className="note">{t}</span>)}
             </li>
           ))}
         </ol>
@@ -206,9 +220,22 @@ function StepCard({ w, steps, sel, setSel, act, mk, quote }: { w: Workflow; step
         review={r && (r.round === w.round || r.status === "approved") ? r : null}
         required={w.required.includes(id)} onDecide={d => act.decide(id, d)} />
       <StepFlags w={w} role="clinician" id={id} onFlag={act.flag} />
+      <StepChecks checks={checksOf(w)} id={id} />
       <Facts m={w.model} id={id} />
       {quote(id)}
       <details className="qdetails"><summary>Questions this step reads</summary><QuestionsRead m={w.model} id={id} /></details>
+    </div>
+  );
+}
+
+/** The checks that found something on this step, each linked to its check. */
+function StepChecks({ checks, id }: { checks: Check[]; id: string }) {
+  const cs = checks.filter(c => c.id === id);
+  if (!cs.length) return null;
+  return (
+    <div className="stepflags">
+      <div className="lab">{cs.length === 1 ? "1 check found something here" : cs.length + " checks found something here"}</div>
+      <ul className="clist">{cs.map((c, i) => <IssueLine key={i} c={c} />)}</ul>
     </div>
   );
 }

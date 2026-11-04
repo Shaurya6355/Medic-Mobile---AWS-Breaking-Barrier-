@@ -1,64 +1,14 @@
 /* Writes samples/cough-guideline-sample.pdf: a small synthetic guideline with a real text layer,
    for testing the pipeline. Synthetic test data, loosely based on the public WHO IMCI chart. Not clinical advice.
    Run: npm run sample-pdf */
-import { writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/* 12 pages so every quote in shared/pathway/samples/cough_fast_breathing.v1.json sits on the page it cites. */
-const filler = (title: string): string[] => ["#" + title, "", "This page covers another part of the sick child assessment.", "It is not used by the cough pathway."];
-const PAGES: string[][] = [
-  ["#SAMPLE GUIDELINE - SYNTHETIC TEST DATA - NOT CLINICAL ADVICE", "", "#Caring for the sick child in the community: chart booklet (sample)", "", "Adapted for testing the guideline intake pipeline."],
-  filler("Contents"),
-  ["#Who this booklet is for", "", "Use this booklet for a child age 2 months up to 5 years.", "A younger or older child: see page 12."],
-  filler("Greet the caregiver"),
-  [
-    "#Ask and look", "",
-    "ASK:",
-    "- Cough? If yes, for how long?",
-    "- Convulsions?",
-    "- Is the child not able to drink or feed anything?",
-    "- Does the child vomit everything? (vomits everything?)",
-    "LOOK:",
-    "- Chest indrawing?",
-    "- If cough, count breaths in 1 minute.",
-    "- Unusually sleepy or unconscious?",
-  ],
-  [
-    "#Decide: danger signs", "",
-    "Danger signs include:",
-    "- Cough for 14 days or more",
-    "- Diarrhoea for 14 days or more",
-    "- Convulsions, not able to drink or feed, vomits everything, chest indrawing,",
-    "  unusually sleepy or unconscious.",
-    "",
-    "If ANY danger sign: REFER URGENTLY TO HEALTH FACILITY.",
-  ],
-  [
-    "#Refer urgently", "",
-    "If fast breathing or chest indrawing, give first dose of oral antibiotic.",
-    "Explain why child needs to go to the health facility.",
-    "Write a referral note. Help arrange transport.",
-    "FOLLOW UP child on return at least once a week until child is well.",
-  ],
-  [
-    "#Fast breathing", "",
-    "In a child age 2 months up to 12 months, 50 breaths or more per minute.",
-    "In a child age 12 months up to 5 years, 40 breaths or more per minute.",
-    "",
-    "Cough (less than 14 days) without fast breathing: no row in this booklet.",
-  ],
-  [
-    "#Treat at home: Fast Breathing", "",
-    "Give oral amoxicillin. Give twice daily for 5 days.",
-    "Advise the caregiver to return immediately if child cannot drink or feed,",
-    "becomes sicker, or has blood in stool.",
-    "Follow up child in 3 days.",
-  ],
-  filler("Diarrhoea"),
-  filler("Fever"),
-  ["#A child outside the age range", "", "For a child under 2 months or 5 years and older:", "refer child to health facility, write a referral note, and follow up child on return."],
-];
+/* 12 pages, so every quote in shared/pathway/samples/cough_fast_breathing.v1.json sits on the page it cites. */
+/* Page lines live in shared/pathway/samples so the review UI's sample mode can run the quote check on the same text.
+   A line starting with # is a heading. */
+const PAGES = JSON.parse(readFileSync(new URL("../../shared/pathway/samples/cough-guideline.pages.json", import.meta.url), "utf8")) as string[][];
 
 const esc = (s: string) => s.replace(/[\\()]/g, m => "\\" + m);
 function stream(lines: string[]): string {
