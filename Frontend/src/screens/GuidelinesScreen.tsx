@@ -26,7 +26,7 @@ function elapsed(s: PipelineStep): string {
   return ms < 1000 ? ms + " ms" : (ms / 1000).toFixed(1) + " s";
 }
 
-/** The loader: where the file is in upload -> S3 event -> extract -> digest -> logic model. */
+/** The loader: where the run is in upload -> ingest -> extract -> logic model -> backend checks. */
 function PipelineLoader({ g }: { g: Guideline }) {
   if (!g.steps) return null;
   return (
@@ -45,12 +45,6 @@ function PipelineLoader({ g }: { g: Guideline }) {
           </li>
         ))}
       </ol>
-      {g.status === "Indexed" && g.logicModel?.source === "placeholder" ? (
-        <div className="banner muted">
-          No model is connected yet, so the logic model is the hardcoded sample spec (cough_fast_breathing v1), not content drafted from this file.
-          {" Quote check: " + g.logicModel.quotesFound + " of " + g.logicModel.quotesTotal + " source quotes appear in this file" + (g.logicModel.quotesOnPage !== undefined ? ", " + g.logicModel.quotesOnPage + " on the page they cite" : "") + "."}
-        </div>
-      ) : null}
       {g.error && g.status !== "Indexed" ? <div className="banner" role="alert">{g.error}</div> : null}
     </div>
   );
@@ -101,15 +95,11 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
   const f = lib.find(x => x.id === selId);
   const maxPages = f?.pages ?? 1;
 
-  // A file from the pipeline: default to all of its pages once they are known.
-  useEffect(() => {
-    if (api.LIVE && f?.pages) setPageText(f.pages > 1 ? "1-" + f.pages : "1");
-  }, [selId, f?.pages]);
-
-  const pages = f?.pages ? parsePages(pageText, maxPages) : [];
+  // Live: the backend chose the pages when the run was created (every page), so there is nothing to pick here.
+  const pages = api.LIVE ? [] : f?.pages ? parsePages(pageText, maxPages) : [];
   const wrongPath = path !== PATHWAYS[0];
   const sampleOnly = wrongPath || (!api.LIVE && selId !== "g-imci");
-  const canCreate = role === "clinician" && !!f && f.status === "Indexed" && pages.length > 0 && !sampleOnly && !creating;
+  const canCreate = role === "clinician" && !!f && f.status === "Indexed" && (api.LIVE || pages.length > 0) && !sampleOnly && !creating;
 
   const create = async () => {
     if (!f) return;
@@ -122,10 +112,10 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
     <div className="grid2 g-lib">
       <section className="panel">
         <div className="ph"><h2>Guideline library</h2><span className="ver">{lib.length} files{api.LIVE ? " · live pipeline" : " · sample data"}</span></div>
-        <input ref={fileInput} type="file" multiple accept={api.ACCEPT} hidden onChange={onPick} />
+        <input ref={fileInput} type="file" multiple accept={api.LIVE ? ".pdf" : api.ACCEPT} hidden onChange={onPick} />
         <div className="btnrow">
           <button type="button" className="btn primary" disabled={role !== "clinician"} onClick={() => fileInput.current?.click()}>Upload guideline</button>
-          <span className="note">{api.LIVE ? "Local mode reads PDF (with a text layer), TXT, MD, CSV and HTML" : "PDF, Word, spreadsheet, image or web page"}</span>
+          <span className="note">{api.LIVE ? "PDF only; the backend runs ingest, extract, logic drafting and checks" : "PDF, Word, spreadsheet, image or web page"}</span>
         </div>
         {loadErr ? <div className="banner" role="alert">{loadErr}</div> : null}
         {Object.entries(uploading).map(([n, pct]) => (
@@ -157,14 +147,14 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
             {PATHWAYS.map(p => <button key={p} type="button" className={"chipb" + (path === p ? " on" : "")} aria-pressed={path === p} onClick={() => setPath(p)}>{p}</button>)}
           </div>
 
-          <div className="fld">
+          {api.LIVE ? <div className="note">The backend reads every page of the PDF.</div> : <div className="fld">
             <label htmlFor="pages">Pages to read</label>
             <input id="pages" type="text" className="mono" value={pageText} disabled={!f.pages} onChange={e => setPageText(e.target.value)} placeholder="for example 14-15, 18" />
             <span className="note">
               {f.pages ? pages.length + " of " + f.pages + " pages selected" + (pages.length ? " (" + pages.join(", ") + ")" : "") + ". Only these pages are indexed and sent to the model."
                 : BUSY(f) ? "Pages are known once text extraction finishes." : "This file has no readable pages."}
             </span>
-          </div>
+          </div>}
 
           <div className="lab">Existing form to compare against</div>
           <div className="mono pcard">forms/app/cough_assessment.xlsx · deployed v3</div>
@@ -177,7 +167,7 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
                   : sampleOnly ? "Sample data covers only the IMCI booklet and the cough pathway."
                   : BUSY(f) ? "Waiting for the pipeline to finish."
                   : f.status !== "Indexed" ? "This file did not make it through the pipeline."
-                  : api.LIVE ? "Loads the logic model JSON the pipeline built for this file."
+                  : api.LIVE ? "Loads the latest logic model version of this run from the backend."
                   : "Drafts questions and rules with verbatim quotes; the AI agent checks them before you see them."}
               </span>
               <button type="button" className="btn primary" disabled={!canCreate} onClick={create}>

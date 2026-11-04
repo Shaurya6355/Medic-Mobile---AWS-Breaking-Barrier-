@@ -55,7 +55,7 @@ In scope (from the Technical Environment Document):
 Out of scope:
 
 - Anything not named above. When unsure, ask.
-- Model training or hosting, relational databases, AWS Fargate, Elastic Beanstalk, SageMaker, Kinesis, MSK, and Lambda for application logic.
+- Model training or hosting, relational databases, AWS Fargate, Elastic Beanstalk, SageMaker, Kinesis, and MSK. (Lambda for application logic was out of scope but is now allowed; organisers confirmed, see DEC-010.)
 - Model calls that bypass Amazon Bedrock.
 - Real patient data or real CHT credentials.
 - Anything generative running on a health worker's phone.
@@ -81,8 +81,10 @@ Open question: Reference path (build on cht-ui-builder) or Open path (own tools)
 - Compute: containers on EC2, defined in code. Never install tools on an instance by hand.
 - Model access: Amazon Bedrock only. Claude Code on Bedrock uses `CLAUDE_CODE_USE_BEDROCK=1` and `AWS_REGION=us-west-2`.
 - Infrastructure as code: Terraform or CDK in TypeScript, one configuration, no hard-coded ARNs or account IDs.
+- Infrastructure code is part of every change: whenever work adds or alters an AWS resource, an environment variable, or an IAM permission the application needs, write or update the matching code in `Infra/` (CDK, TypeScript) in the same piece of work, keep its README and the Backend env table in step, and run its tests and `cdk synth`. Never leave the app depending on a resource that exists only in the console. Tracked as DEC-009.
 - Validate every model output against a schema (Zod or Ajv) before it drives the next step.
 - Edit existing XLSForm workbooks by cell (ExcelJS or openpyxl). Never regenerate a workbook wholesale.
+- Monitor every pipeline process (extraction, drafting, validation, compile, build-and-test): record token usage (input and output), running cost, and latency per process and per run, tied to the run and snapshot ID. Store the records (CloudWatch and/or DynamoDB) and report cost per pathway run in the README. Tracked as DEC-003.
 - Never set `NODE_TLS_REJECT_UNAUTHORIZED=0`.
 - Tag every AWS resource with the project tag.
 
@@ -98,3 +100,5 @@ Open question: Reference path (build on cht-ui-builder) or Open path (own tools)
 - Technical Environment Document: No-Code CHT Configuration (currently at `~/Documents/Medic Mobile/technical-environment-document-no-code-cht-configuration.md`, outside this repository).
 - Vision Document: No-Code CHT Configuration (companion to the above).
 - Team decision needed: copy these into the repository so every laptop has them. Tracked as DEC-002 in decisions.md.
+- [brd.md](brd.md): the Business Requirements Document (BR, AR, RR, GR, OQ ids). When building or testing against a requirement, cite its id (for example "implements BR-05", "tests AR-08"). Its approval, release and guardrail rules are non-negotiable. Tracked as DEC-012.
+- [system-design.md](system-design.md): the end-to-end system design (logic model schema in section 4, stages S1 to S13, checks, state machine). Where it conflicts with the BRD on approvals, the BRD wins; where it conflicts with decisions.md on hosting, decisions.md wins. Tracked as DEC-012 to DEC-014.

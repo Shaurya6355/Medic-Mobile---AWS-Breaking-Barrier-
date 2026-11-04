@@ -51,6 +51,12 @@ export function intro(w: Workflow, checks: Check[]): Msg[] {
     { from: "agent", text: "I checked the draft before handing it to you. " + ["schema", "quote", "number", "logic"].map(line).join(" ") + " " + fixes },
     { from: "agent", text: line("golden") + " " + line("cross") + (blocking ? " " + plural(blocking, "blocking problem") + " left: see the checks at the top." : "") },
   ];
+  if (w.remote) {
+    const mine = w.remote.findings.filter(f => f.role === "clinician" && f.check !== "openQuestions");
+    const block = mine.filter(f => f.severity === "blocking"), warn = mine.filter(f => f.severity === "warning");
+    out.push({ from: "agent", text: "The backend also checked version " + w.remote.n + ": " + w.remote.claimText + " For you: " + plural(block.length, "blocking finding") + ", " + plural(warn.length, "warning") + "."
+      + (block.length ? " " + block.slice(0, 5).map(f => f.message).join(" ") : "") });
+  }
   if (w.flags.length) {
     out.push({ from: "agent", text: "The guideline leaves " + plural(w.flags.length, "question") + " open. Only you can answer these. Keep the draft's choice, or change it in the Edit tab." });
     w.flags.forEach(f => out.push({ from: "agent", text: f.title, ask: f.id, select: f.about }));

@@ -1,0 +1,7 @@
+# Python dependencies for the Python stages under Backend/:
+#   extraction/run_extraction.py   (Claude Haiku 5.5 via Bedrock)
+#   cross-check/run_extraction.py  (Llama 4 Scout via Bedrock)
+# Only boto3 is a third-party package. prepare_input.py, build_flow.py and
+# validation/compare_outputs.py use only the standard library. prepare_input.py also needs the
+# poppler tools (pdftoppm, pdftotext) installed on the system (macOS: brew install poppler).
+boto3>=1.34,<2

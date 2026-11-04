@@ -1,25 +1,44 @@
 {
-  "name": "guideline-pipeline",
-  "private": true,
+  "name": "orchestrator",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
-  "description": "Guideline intake pipeline: upload to S3, S3 event to queue, worker runs extract, digest and logic model steps. Local mode emulates S3 and SQS on disk.",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=22"
   },
   "scripts": {
-    "dev": "node --watch src/server.ts",
-    "start": "node src/server.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.ts",
-    "sample-pdf": "node scripts/make-sample-pdf.ts"
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json && node -e \"require('node:fs').cpSync('src/compiler/template','dist/compiler/template',{recursive:true})\"",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "compile:demo": "tsx compile-demo/run.mjs",
+    "compile:preview": "node compile-demo/preview/cli.mjs preview",
+    "compile:screenshots": "node compile-demo/preview/cli.mjs screenshots",
+    "compile:verify": "tsx compile-demo/preview/verify-golden.mjs",
+    "fill:live": "tsx scripts/fillLive.ts",
+    "metrics": "tsx scripts/runMetrics.ts",
+    "pipeline:demo": "tsx pipeline-demo/run.ts",
+    "compile:locked": "tsx scripts/compileLocked.ts"
   },
   "dependencies": {
-    "unpdf": "^1.9.1",
-    "zod": "^3.25.76"
+    "@aws-sdk/client-bedrock-agentcore": "^3.1161.0",
+    "@aws-sdk/client-dynamodb": "^3.1161.0",
+    "@aws-sdk/client-s3": "^3.1161.0",
+    "@aws-sdk/client-sqs": "^3.1161.0",
+    "@aws-sdk/lib-dynamodb": "^3.1161.0",
+    "@aws-sdk/s3-request-presigner": "^3.1161.0",
+    "@strands-agents/sdk": "^1.23.0",
+    "exceljs": "^4.4.0",
+    "fastify": "^5.12.8",
+    "jszip": "^3.10.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.164",
     "@types/node": "^22.20.5",
-    "typescript": "5.8"
+    "aws-sdk-client-mock": "^4.1.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12"
   }
 }

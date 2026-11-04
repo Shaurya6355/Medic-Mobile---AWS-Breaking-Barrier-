@@ -1,4 +1,2 @@
-node_modules
-.local-data
-.env
-.env.*
+node_modules/
+dist/

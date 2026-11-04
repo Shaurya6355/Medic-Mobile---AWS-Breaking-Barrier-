@@ -1,0 +1,115 @@
+/* eslint-disable */
+// Red-team 1 mutations of the resolved real draft (copied from the red-team harness muts.mts). Synthetic, no patient data.
+type M = any;
+const Q = (m: M, id: string) => m.questions.find((q: any) => q.id === id);
+const D = (m: M, id: string) => m.derived.find((q: any) => q.id === id);
+const O = (m: M, id: string) => m.outcomes.find((q: any) => q.id === id);
+const R = (m: M, id: string) => m.rules.find((q: any) => q.id === id);
+const FB = (m: M) => D(m, "fast_breathing").definition.all[1].any; // [infantBand, childBand]
+const DS = (m: M) => D(m, "danger_sign").definition.any;
+const homeDose = (m: M) => O(m, "treat_fast_breathing_at_home").actions[1].dose_by_age;
+const refDose = (m: M) => O(m, "refer_urgent_with_antibiotic").actions[1].dose_by_age;
+const nest = (c: any, n: number) => { let x = c; for (let i = 0; i < n; i++) x = { all: [x] }; return x; };
+const renameEverywhere = (m: M, from: string, to: string) => JSON.parse(JSON.stringify(m).split(`"${from}"`).join(`"${to}"`));
+export const MUTS: Record<string, { exp: string; fn: (m: M) => any }> = {
+  M00_baseline: { exp: "no", fn: () => {} },
+  // thresholds
+  M01_fb_infant_50_to_51: { exp: "yes", fn: (m) => { FB(m)[0].all[2].value = 51; } },
+  M02_fb_swap_50_40: { exp: "yes", fn: (m) => { FB(m)[0].all[2].value = 40; FB(m)[1].all[2].value = 50; } },
+  M03_fb_ageband_12_to_13: { exp: "yes", fn: (m) => { FB(m)[0].all[1].value = 13; FB(m)[1].all[0].value = 13; } },
+  M04_fb_op_flip_at_least_to_less_than: { exp: "yes", fn: (m) => { FB(m)[0].all[2].op = "less_than"; } },
+  M05_fb_any_to_all: { exp: "yes", fn: (m) => { const d = D(m, "fast_breathing").definition.all[1]; d.all = d.any; delete d.any; } },
+  M06_ds_any_to_all: { exp: "yes", fn: (m) => { const d = D(m, "danger_sign").definition; d.all = d.any; delete d.any; } },
+  M07_cough_days_14_to_15: { exp: "yes", fn: (m) => { DS(m)[0].all[1].value = 15; } },
+  M08_cough_days_op_flip: { exp: "yes", fn: (m) => { DS(m)[0].all[1].op = "less_than"; } },
+  M09_cough_days_14_to_7_with_real_quote_of_7: { exp: "yes", fn: (m) => { DS(m)[0].all[1].value = 7; D(m, "danger_sign").source[0] = { page: 6, quote: "Fever for last 7 days or more" }; } },
+  M10_fb_team_origin_threshold_60: { exp: "yes", fn: (m) => { const d = D(m, "fast_breathing"); d.origin = "team"; delete d.source; FB(m)[0].all[2].value = 60; FB(m)[1].all[2].value = 55; } },
+  // danger signs
+  M11_drop_convulsions_from_ds: { exp: "yes", fn: (m) => { D(m, "danger_sign").definition.any = DS(m).filter((x: any) => x.field !== "convulsions"); } },
+  M12_drop_convulsions_from_ds_reuse_in_R5: { exp: "yes", fn: (m) => { D(m, "danger_sign").definition.any = DS(m).filter((x: any) => x.field !== "convulsions"); R(m, "R5").when = { any: [{ field: "cough", op: "is_yes" }, { field: "convulsions", op: "is_yes" }] }; } },
+  M13_drop_chest_indrawing_from_ds_keep_in_R2: { exp: "yes", fn: (m) => { D(m, "danger_sign").definition.any = DS(m).filter((x: any) => x.field !== "chest_indrawing"); } },
+  M14_remove_convulsions_question_entirely: { exp: "yes", fn: (m) => { D(m, "danger_sign").definition.any = DS(m).filter((x: any) => x.field !== "convulsions"); m.questions = m.questions.filter((q: any) => q.id !== "convulsions"); } },
+  M15_remove_sleepy_question_entirely: { exp: "yes", fn: (m) => { D(m, "danger_sign").definition.any = DS(m).filter((x: any) => x.field !== "unusually_sleepy"); m.questions = m.questions.filter((q: any) => q.id !== "unusually_sleepy"); } },
+  M16_ds_convulsions_not_negated_trick_any_with_impossible: { exp: "yes", fn: (m) => { const i = DS(m).findIndex((x: any) => x.field === "convulsions"); DS(m)[i] = { all: [{ field: "convulsions", op: "is_yes" }, { field: "age_months", op: "at_least", value: 60 }] }; } },
+  // rules / outcomes / severity
+  M17_R2_all_to_any: { exp: "yes", fn: (m) => { const w = R(m, "R2").when; w.any = w.all; delete w.all; } },
+  M18_swap_R5_R6_outcomes: { exp: "yes", fn: (m) => { R(m, "R5").outcome = "no_cough"; R(m, "R6").outcome = "cough_no_fast_breathing"; } },
+  M19_refer_urgent_sev_1_to_4: { exp: "yes", fn: (m) => { O(m, "refer_urgent").severity = 4; } },
+  M20_refer_urgent_sev_1_to_9: { exp: "yes", fn: (m) => { O(m, "refer_urgent").severity = 9; } },
+  M21_refer_with_ab_sev_1_to_3: { exp: "yes", fn: (m) => { O(m, "refer_urgent_with_antibiotic").severity = 3; } },
+  M22_all_severities_flattened_to_5: { exp: "yes", fn: (m) => { for (const o of m.outcomes) o.severity = 5; } },
+  M23_outside_age_sev_1_to_5: { exp: "yes", fn: (m) => { O(m, "refer_outside_age_range").severity = 5; } },
+  M24_swap_sev_home_and_mild: { exp: "yes", fn: (m) => { O(m, "treat_fast_breathing_at_home").severity = 4; O(m, "cough_no_fast_breathing").severity = 3; } },
+  M25_swap_R4_R5_outcomes: { exp: "yes", fn: (m) => { R(m, "R4").outcome = "cough_no_fast_breathing"; R(m, "R5").outcome = "treat_fast_breathing_at_home"; } },
+  M26_R3_before_R2: { exp: "yes", fn: (m) => { R(m, "R3").priority = 2; R(m, "R2").priority = 3; m.rules.sort((a: any, b: any) => a.priority - b.priority); } },
+  M27_remove_R1_and_outside_outcome: { exp: "yes", fn: (m) => { m.rules = m.rules.filter((r: any) => r.id !== "R1"); m.outcomes = m.outcomes.filter((o: any) => o.id !== "refer_outside_age_range"); } },
+  M28_R1_less_than_2_to_1: { exp: "yes", fn: (m) => { R(m, "R1").when.any[0].value = 1; } },
+  M29_R1_less_than_2_to_1_and_scope_min_1: { exp: "yes", fn: (m) => { R(m, "R1").when.any[0].value = 1; m.scope.age_months_min = 1; for (const b of [FB(m)[0].all[0]]) b.value = 1; homeDose(m)[0].age_months_min = 1; refDose(m)[0].age_months_min = 1; } },
+  M30_rule_undefined_outcome: { exp: "yes", fn: (m) => { R(m, "R5").outcome = "does_not_exist"; } },
+  M31_catchall_to_urgent_then_R5_to_no_cough: { exp: "yes", fn: (m) => { R(m, "R4").outcome = "cough_no_fast_breathing"; R(m, "R6").outcome = "treat_fast_breathing_at_home"; R(m, "R5").outcome = "no_cough"; } },
+  M32_outcome_actions_swapped_between_refer_and_home: { exp: "yes", fn: (m) => { const a = O(m, "refer_urgent").actions; O(m, "refer_urgent").actions = O(m, "cough_no_fast_breathing").actions; O(m, "cough_no_fast_breathing").actions = a; } },
+  M33_refer_urgent_title_and_actions_neutered: { exp: "yes", fn: (m) => { const o = O(m, "refer_urgent"); o.title = "Danger sign: advise fluids at home"; o.actions = O(m, "cough_no_fast_breathing").actions; } },
+  // doses
+  M34_dose_overlap: { exp: "yes", fn: (m) => { homeDose(m)[0].age_months_below = 13; } },
+  M35_dose_gap: { exp: "yes", fn: (m) => { homeDose(m)[0].age_months_below = 11; homeDose(m)[1].age_months_min = 11 + 1; } },
+  M36_dose_swap_1_and_2_tablets: { exp: "yes", fn: (m) => { const d = homeDose(m); [d[0].dose, d[1].dose] = [d[1].dose, d[0].dose]; } },
+  M37_dose_total_swap: { exp: "yes", fn: (m) => { const d = homeDose(m); [d[0].total, d[1].total] = [d[1].total, d[0].total]; } },
+  M38_dose_1_to_3_tablets: { exp: "yes", fn: (m) => { homeDose(m)[0].dose = "3 tablets"; } },
+  M39_dose_text_unitless: { exp: "yes", fn: (m) => { homeDose(m)[1].dose = "two tablets"; } },
+  M40_dose_drop_band_entirely: { exp: "yes", fn: (m) => { O(m, "treat_fast_breathing_at_home").actions[1].dose_by_age = [homeDose(m)[0]]; } },
+  M41_dose_by_age_removed: { exp: "yes", fn: (m) => { delete O(m, "treat_fast_breathing_at_home").actions[1].dose_by_age; } },
+  M42_dose_band_reversed_lo_gt_hi: { exp: "yes", fn: (m) => { homeDose(m)[0].age_months_min = 12; homeDose(m)[0].age_months_below = 2; } },
+  // follow-ups
+  M43_remove_followup_home_treatment: { exp: "yes", fn: (m) => { O(m, "treat_fast_breathing_at_home").follow_up = null; } },
+  M44_followup_3_to_30_days: { exp: "yes", fn: (m) => { O(m, "treat_fast_breathing_at_home").follow_up.due_in_days = 30; } },
+  M45_followup_scheduled_to_on_return: { exp: "yes", fn: (m) => { const f = O(m, "treat_fast_breathing_at_home").follow_up; f.kind = "on_return"; f.due_in_days = null; } },
+  M46_remove_followup_refer_urgent: { exp: "yes", fn: (m) => { O(m, "refer_urgent").follow_up = null; } },
+  M47_followup_due_0: { exp: "yes", fn: (m) => { O(m, "treat_fast_breathing_at_home").follow_up.due_in_days = 0; } },
+  // question visibility / constraints / required
+  M48_breaths_shown_never: { exp: "yes", fn: (m) => { Q(m, "breaths_per_minute").shown_when = { all: [{ field: "cough", op: "is_yes" }, { field: "age_months", op: "less_than", value: 0 }] }; } },
+  M49_breaths_shown_only_age_ge_12: { exp: "yes", fn: (m) => { Q(m, "breaths_per_minute").shown_when = { all: [{ field: "cough", op: "is_yes" }, { field: "age_months", op: "at_least", value: 12 }] }; } },
+  M50_breaths_constraint_max_45: { exp: "yes", fn: (m) => { Q(m, "breaths_per_minute").constraint.max = 45; } },
+  M51_age_constraint_max_11: { exp: "yes", fn: (m) => { Q(m, "age_months").constraint.max = 11; } },
+  M52_age_constraint_min2_max59: { exp: "yes", fn: (m) => { Q(m, "age_months").constraint.min = 2; Q(m, "age_months").constraint.max = 59; } },
+  M53_cough_days_constraint_max_13: { exp: "yes", fn: (m) => { Q(m, "cough_days").constraint.max = 13; } },
+  M54_convulsions_optional: { exp: "yes", fn: (m) => { Q(m, "convulsions").required = false; } },
+  M55_convulsions_shown_only_if_cough: { exp: "yes", fn: (m) => { Q(m, "convulsions").shown_when = { field: "cough", op: "is_yes" }; } },
+  M56_scope_below_60_to_61: { exp: "yes", fn: (m) => { m.scope.age_months_below = 61; } },
+  M57_unguarded_cough_days_in_ds: { exp: "no(harmless)", fn: (m) => { DS(m)[0] = { field: "cough_days", op: "at_least", value: 14 }; } },
+  // structural / hostile input
+  M58_cyclic_derived: { exp: "yes", fn: (m) => { D(m, "fast_breathing").definition.all.push({ field: "danger_sign", op: "is_yes" }); DS(m).push({ field: "fast_breathing", op: "is_yes" }); } },
+  M59_nesting_33: { exp: "yes", fn: (m) => { R(m, "R5").when = nest(R(m, "R5").when, 33); } },
+  M60_nesting_31_valid: { exp: "no", fn: (m) => { R(m, "R5").when = nest(R(m, "R5").when, 30); } },
+  M61_wide_any_500_dupes: { exp: "no", fn: (m) => { R(m, "R5").when = { any: Array.from({ length: 500 }, () => ({ field: "cough", op: "is_yes" })) }; } },
+  M62_wide_any_501: { exp: "yes(schema)", fn: (m) => { R(m, "R5").when = { any: Array.from({ length: 501 }, () => ({ field: "cough", op: "is_yes" })) }; } },
+  M63_unicode_lookalike_id: { exp: "yes", fn: (m) => renameEverywhere(m, "cough", "cоugh") },
+  M64_NaN_value: { exp: "yes", fn: (m) => { FB(m)[0].all[2].value = NaN; } },
+  M65_Infinity_value: { exp: "yes", fn: (m) => { FB(m)[0].all[2].value = Infinity; } },
+  M66_neg_zero_age: { exp: "yes", fn: (m) => { R(m, "R1").when.any[0].value = -0; } },
+  M67_huge_threshold_1e308: { exp: "yes", fn: (m) => { FB(m)[0].all[2].value = 1e308; } },
+  M68_huge_constraint_max: { exp: "?", fn: (m) => { Q(m, "breaths_per_minute").constraint.max = 1e308; } },
+  M69_dup_id_derived_eq_question: { exp: "yes", fn: (m) => { m.derived.push({ ...structuredClone(D(m, "danger_sign")), id: "cough" }); } },
+  M70_dup_id_outcome_eq_question: { exp: "?", fn: (m) => { m = renameEverywhere(m, "no_cough", "cough_days"); return m; } },
+  M71_whitespace_action_text: { exp: "yes", fn: (m) => { for (const a of O(m, "refer_urgent").actions) a.text = " "; } },
+  M72_whitespace_title: { exp: "?", fn: (m) => { O(m, "refer_urgent").title = " "; } },
+  M73_id_constructor: { exp: "no crash", fn: (m) => renameEverywhere(m, "unusually_sleepy", "constructor") },
+  M74_id_proto: { exp: "yes(schema)", fn: (m) => renameEverywhere(m, "unusually_sleepy", "__proto__") },
+  M75_extra_key: { exp: "yes(schema)", fn: (m) => { R(m, "R2").note = "x"; } },
+  M76_reserved_field_name: { exp: "yes", fn: (m) => renameEverywhere(m, "unusually_sleepy", "name") },
+  M77_grid_explosion_20_unused_yes_no: { exp: "yes(NOT_PROVEN)", fn: (m) => { for (let i = 0; i < 20; i++) m.questions.push({ id: `x${i}`, order: 100 + i, label: "x", answer_type: "yes_no", required: true, origin: "team" }); } },
+  M78_bool_compared_numerically: { exp: "yes", fn: (m) => { DS(m)[1] = { field: "convulsions", op: "at_least", value: 1 }; } },
+  M79_fb_infant_band_lower_drop: { exp: "yes", fn: (m) => { FB(m)[0].all.splice(0, 1); } },
+  M80_ds_wrapped_in_cough_guard: { exp: "yes", fn: (m) => { const d = D(m, "danger_sign"); d.definition = { all: [{ field: "cough", op: "is_yes" }, d.definition] }; } },
+  M81_R2_with_ab_only_for_age_ge_12: { exp: "yes", fn: (m) => { R(m, "R2").when.all.push({ field: "age_months", op: "at_least", value: 12 }); } },
+  M82_dose_band_for_ref_shifted_to_match_tamper: { exp: "yes", fn: (m) => { for (const d of [homeDose(m), refDose(m)]) { d[0].age_months_below = 24; d[1].age_months_min = 24; } } },
+  M09b_cough_days_14_to_7_add_fever_quote: { exp: "yes", fn: (m) => { DS(m)[0].all[1].value = 7; D(m, "danger_sign").source.push({ page: 6, quote: "Fever for last 7 days or more" }); } },
+  M27b_remove_R1_scrub_affects: { exp: "yes", fn: (m) => { m.rules = m.rules.filter((r: any) => r.id !== "R1"); m.outcomes = m.outcomes.filter((o: any) => o.id !== "refer_outside_age_range"); for (const q of m.open_questions) q.affects = q.affects.filter((a: string) => a !== "R1" && a !== "refer_outside_age_range"); } },
+  M83_dose_1_to_half_tablet: { exp: "yes", fn: (m) => { homeDose(m)[0].dose = "1/2 tablet"; } },
+  M84_followup_3_to_5_with_borrowed_quote: { exp: "yes", fn: (m) => { const f = O(m, "treat_fast_breathing_at_home").follow_up; f.due_in_days = 5; f.source.push({ page: 9, quote: "Give twice daily for 5 days:" }); } },
+  M86_age_unit_renamed_then_dose_overlap: { exp: "yes", fn: (m) => { Q(m, "age_months").unit = "mo"; homeDose(m)[0].age_months_below = 60; } },
+  M87_age_unit_renamed_only: { exp: "?", fn: (m) => { Q(m, "age_months").unit = "mo"; } },
+  M89_convulsions_hidden_behind_cough_guarded: { exp: "yes", fn: (m) => { Q(m, "convulsions").shown_when = { field: "cough", op: "is_yes" }; const i = DS(m).findIndex((x: any) => x.field === "convulsions"); DS(m)[i] = { all: [{ field: "cough", op: "is_yes" }, { field: "convulsions", op: "is_yes" }] }; } },
+  M90_catchall_to_urgent: { exp: "yes", fn: (m) => { R(m, "R6").outcome = "refer_urgent"; } },
+  M91_scope_excluded_list_used_to_hide_sign: { exp: "yes", fn: (m) => { D(m, "danger_sign").definition.any = DS(m).filter((x: any) => x.field !== "convulsions"); m.questions = m.questions.filter((q: any) => q.id !== "convulsions"); m.scope.excluded.push({ item: "Convulsions", reason: "Not asked in this form." }); } },
+  M92_id_constructor_conditional: { exp: "no crash", fn: (m) => { const x = renameEverywhere(m, "unusually_sleepy", "constructor"); Q(x, "constructor").shown_when = { field: "cough", op: "is_yes" }; return x; } },
+};

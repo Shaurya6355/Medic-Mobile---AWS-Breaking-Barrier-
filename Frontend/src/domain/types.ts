@@ -46,6 +46,11 @@ export interface AuditRow { t: string; actor: string; event: string; ver: string
 export interface VersionRow { ver: string; event: string; meta: string }
 export interface VerifyResult { match: number; total: number; cov: number; covTotal: number; tasks: number; mut: number; mutTotal: number }
 
+/** A finding from the backend's checks (GET /runs/:id/versions/:n/findings), worded for one role. */
+export interface RemoteFinding { severity: "blocking" | "warning" | "info"; message: string; check: string; role: "program_officer" | "clinician" }
+/** Live mode: the backend run and version this workflow was loaded from. */
+export interface Remote { runId: string; n: number; modelSha: string; base: Model; claimText: string; findings: RemoteFinding[] }
+
 export interface Workflow {
   id: string;
   guideline: { id: string; name: string; pathway: string; pages: number[] } | null;
@@ -64,8 +69,10 @@ export interface Workflow {
   versions: VersionRow[];
   clock: number;
   verify: VerifyResult | null;
-  approved: { ver: string; hash: string } | null;
+  approved: { ver: string; hash: string; locked?: { n: number; modelSha: string } } | null;
   lastKey: string | null;
+  /** Set in live mode only. */
+  remote: Remote | null;
 }
 
 export type GuidelineType = "PDF" | "Word" | "Spreadsheet" | "Image" | "Web or text" | "Other";
@@ -78,5 +85,4 @@ export interface Guideline {
   steps?: PipelineStep[];
   error?: string;
   s3Uri?: string;
-  logicModel?: { source: "placeholder" | "agent"; builder: string; quotesFound: number; quotesTotal: number; quotesOnPage?: number };
 }

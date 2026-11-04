@@ -1,0 +1,162 @@
+import { z } from "zod";
+import { InvalidUserId, normaliseUserId } from "../signoff/identity.js";
+
+export const RunState = z.enum([
+  "created",
+  "ingesting",
+  "extracting",
+  "filling_logic",
+  "in_review",
+  "checking",
+  "awaiting_officer",
+  "awaiting_clinician",
+  "locked",
+  "failed",
+]);
+export type RunState = z.infer<typeof RunState>;
+
+// Sign-off (BRD AR-01 to AR-10, DEC-019). The two roles that sign a version, officer first.
+export const SignerRole = z.enum(["program_officer", "clinician"]);
+export type SignerRole = z.infer<typeof SignerRole>;
+
+// A signer's id, normalised (NFKC, invisible characters removed, trimmed, lower case) and restricted
+// to [a-z0-9._@-], so "Alice", " alice" and fullwidth "ａｌｉｃｅ" are one person (signoff/identity.ts, DEC-020).
+// AUTH SEAM (DEC-015, not built): bind this to the Cognito token's `sub` instead of the body.
+export const UserId = z
+  .string()
+  .max(512)
+  .transform((raw, ctx) => {
+    try {
+      return normaliseUserId(raw);
+    } catch (e) {
+      ctx.addIssue({ code: "custom", message: e instanceof InvalidUserId ? e.message : "invalid userId" });
+      return z.NEVER;
+    }
+  });
+
+// AUTH SEAM (DEC-015, not built): role and userId are passed in the body for now. When Cognito is
+// added they come from the verified token instead, and these two fields are dropped from the body.
+export const SignRequest = z
+  .object({
+    role: SignerRole,
+    userId: UserId,
+    // The modelSha the signer reviewed (from the findings or status response). A different sha means
+    // the content changed since they looked: the signature is refused (AR-07).
+    modelSha: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+export type SignRequest = z.input<typeof SignRequest>;
+
+// The clinician rejects a version with a comment on the rule (BRD AR-06), optionally marking the needed
+// change urgent (RR-02). The version stays in the history and can never be signed or released; the
+// officer's fix is a new version. AUTH SEAM as for SignRequest.
+export const RejectRequest = z
+  .object({
+    role: z.literal("clinician"),
+    userId: UserId,
+    modelSha: z.string().regex(/^[0-9a-f]{64}$/),
+    comment: z.string().trim().min(15).max(5000),
+    // The rule or item the comment is about, for example "rules.R3".
+    itemRef: z.string().min(1).max(500).optional(),
+    urgent: z.boolean().default(false),
+  })
+  .strict();
+export type RejectRequest = z.input<typeof RejectRequest>;
+
+export const FindingsQuery = z.object({ audience: SignerRole.optional() }).strict();
+export type FindingsQuery = z.infer<typeof FindingsQuery>;
+
+export const CreateRunRequest = z.object({
+  pages: z
+    .array(z.number().int().positive())
+    .min(1, { message: "pages must not be empty; omit pages to use every page" })
+    .refine((p) => new Set(p).size === p.length, { message: "pages must not contain duplicates" })
+    .optional(),
+  filename: z.string().min(1).max(255),
+});
+export type CreateRunRequest = z.infer<typeof CreateRunRequest>;
+
+export const CreateRunResponse = z.object({
+  runId: z.string(),
+  uploadUrl: z.string(),
+});
+export type CreateRunResponse = z.infer<typeof CreateRunResponse>;
+
+export const SaveVersionRequest = z.object({
+  parentVersion: z.number().int().nonnegative(),
+  body: z.unknown(),
+  author: z.string().min(1).max(200),
+  // The role the author saves in (DEC-020): an open question counts as answered only in a version saved
+  // by the role it is routed to. AUTH SEAM (DEC-015): from the token's group once Cognito is built.
+  authorRole: SignerRole.optional(),
+});
+export type SaveVersionRequest = z.infer<typeof SaveVersionRequest>;
+
+export const CreateCommentRequest = z.object({
+  itemRef: z.string().min(1).max(500),
+  text: z.string().min(1).max(10000),
+  author: z.string().min(1).max(200),
+});
+export type CreateCommentRequest = z.infer<typeof CreateCommentRequest>;
+
+// Amazon Bedrock AgentCore Runtime HTTP protocol: GET /ping and POST /invocations.
+export const PingResponse = z.object({
+  status: z.enum(["Healthy", "HealthyBusy"]),
+  time_of_last_update: z.number().int().nonnegative().optional(),
+});
+export type PingResponse = z.infer<typeof PingResponse>;
+
+export const INVOCATION_MAX_BODY_BYTES = 1024 * 1024;
+
+export const InvocationRequest = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("uploaded"), runId: z.string().regex(/^[A-Za-z0-9-]+$/).max(128) }),
+  z.object({ action: z.literal("resume_all") }),
+  z.object({
+    action: z.literal("http"),
+    method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
+    path: z.string().max(2048).startsWith("/"),
+    headers: z
+      .record(z.string().max(256), z.string().max(8192))
+      .refine((h) => Object.keys(h).length <= 20, { message: "at most 20 headers" })
+      .optional(),
+    body: z.string().max(INVOCATION_MAX_BODY_BYTES).optional(),
+  }),
+]);
+export type InvocationRequest = z.infer<typeof InvocationRequest>;
+
+export const InvocationResponse = z.union([
+  z.object({ accepted: z.literal(true) }),
+  z.object({ statusCode: z.number().int(), headers: z.record(z.string(), z.string()), body: z.string() }),
+]);
+export type InvocationResponse = z.infer<typeof InvocationResponse>;
+
+// Lambda Web Adapter pass-through: non-HTTP events (SQS, EventBridge schedule) arrive as POST /events.
+export const LAMBDA_MAX_SQS_RECORDS = 100;
+
+export const LambdaSqsRecord = z
+  .object({ messageId: z.string().min(1).max(256), body: z.string().max(1024 * 1024) })
+  .passthrough();
+export type LambdaSqsRecord = z.infer<typeof LambdaSqsRecord>;
+
+// Top level only: each record is validated on its own so one bad record cannot reject a batch.
+export const LambdaSqsEnvelope = z.object({ Records: z.array(z.unknown()).min(1).max(LAMBDA_MAX_SQS_RECORDS) });
+export type LambdaSqsEnvelope = z.infer<typeof LambdaSqsEnvelope>;
+
+export const LambdaSqsEvent = z.object({ Records: z.array(LambdaSqsRecord).min(1).max(LAMBDA_MAX_SQS_RECORDS) });
+export type LambdaSqsEvent = z.infer<typeof LambdaSqsEvent>;
+
+export const LambdaScheduledEvent = z
+  .object({ source: z.string().optional(), "detail-type": z.string().optional() })
+  .passthrough()
+  .refine((e) => e.source === "aws.events" || e["detail-type"] === "Scheduled Event", {
+    message: "not a scheduled event",
+  });
+export type LambdaScheduledEvent = z.infer<typeof LambdaScheduledEvent>;
+
+export const LambdaEvent = z.union([LambdaSqsEvent, LambdaScheduledEvent]);
+export type LambdaEvent = z.infer<typeof LambdaEvent>;
+
+export const LambdaEventResponse = z.object({
+  batchItemFailures: z.array(z.object({ itemIdentifier: z.string() })),
+});
+export type LambdaEventResponse = z.infer<typeof LambdaEventResponse>;

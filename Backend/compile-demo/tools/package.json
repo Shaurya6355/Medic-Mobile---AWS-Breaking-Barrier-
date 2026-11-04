@@ -1,0 +1,8 @@
+{
+  "name": "compile-demo-tools",
+  "private": true,
+  "description": "Pinned cht-conf used by run.mjs to compile and validate the generated CHT project. Not part of the orchestrator build.",
+  "dependencies": {
+    "cht-conf": "6.6.1"
+  }
+}

@@ -36,14 +36,173 @@ How to prevent a repeat:
 
 | Pending | Fixed (human) | Fixed (agent) |
 |---------|---------------|---------------|
-| 0 | 0 | 0 |
+| 1 | 0 | 10 |
 
 Update these counts when you move an entry.
 
 ## Pending
 
-No pending errors.
+### ERR-001 | Source PDF page references off by one
+Found: 2026-11-03 by utg1209 (Claude session), via review
+System: Guideline intake and extraction (Cough_Guideline.pdf)
+Severity: low
+Symptom (exact error text if short): p7 "To give first dose oral medication, see page 10" and p9 "Help caregiver give first dose now. (Go to page 10.)"; page 10 is the ORS page, oral medicine instructions are on page 11. Similar for "To give ORS solution, see page 9" (ORS is on page 10).
+How to reproduce: Open Guideline_Docs/Cough_Guideline.pdf, follow the page links on pages 7 and 9.
+Suspected or confirmed cause: The booklet's printed page links do not match its page numbers in this PDF (probably an editing or pagination difference in the source).
+Owner: unassigned
+Related: DEC-005, INT-002
+Handling: extraction records it as unclear item u1 and resolves the goto to the page 11 node; a reviewer confirms in the UI.
+
 
 ## Fixed
 
-No fixed errors.
+### ERR-002 | Older locked version could be released after a newer one locked
+Found: 2026-11-04 by red team 3 (Claude session), via test
+System: Compile guard (Backend/src/signoff/signoff.ts verifyLocked)
+Severity: high
+Symptom (exact error text if short): compileLockedVersion built v1 after v2 was locked (red team 3, A2).
+How to reproduce: Lock v1, save and lock v2, compile v1.
+Suspected or confirmed cause: verifyLocked only checked that n itself was locked.
+Owner: utg1209 (Claude session)
+Related: DEC-019, DEC-020, INT-012
+--- fill in when fixed ---
+Fixed: 2026-11-04
+Fixed by: agent (Claude session; to be reviewed by utg1209)
+Fix: verifyLocked refuses any n that is not the newest locked version (409 not_latest_locked); a newer unsigned draft still does not block (AR-09).
+How to prevent a repeat: Backend/tests/signoff/hardening.test.ts and the red-team harness.
+
+### ERR-003 | Planted or stale findings artifact opened every gate
+Found: 2026-11-04 by red team 3 (Claude session), via test
+System: Sign-off checks (Backend/src/signoff/checks.ts)
+Severity: blocker
+Symptom (exact error text if short): A findings file with gates all true let the officer and clinician sign a draft with 12 blockers and built it (A3).
+How to reproduce: Write a record with gates true and findings [] at the findings key, then sign and compile.
+Suspected or confirmed cause: ensureFindings trusted the stored record and its gate booleans.
+Owner: utg1209 (Claude session)
+Related: DEC-019, DEC-020, INT-012
+--- fill in when fixed ---
+Fixed: 2026-11-04
+Fixed by: agent (Claude session; to be reviewed by utg1209)
+Fix: Stored records are zod-validated and their gates recomputed from the findings, for the views only; sign, reject and verifyLocked rerun the checks. CHECKS_VERSION and the inputs sha are part of the key. The false comment in rules.ts was corrected.
+How to prevent a repeat: Backend/tests/signoff/hardening.test.ts and the red-team harness.
+
+### ERR-004 | Separation of duties beaten by userId variants
+Found: 2026-11-04 by red team 3 (Claude session), via test
+System: Sign-off identity (schemas, signoff, rules, both stores)
+Severity: high
+Symptom (exact error text if short): "alice" as officer and "Alice", " alice", alice plus a zero-width space, or fullwidth letters as clinician locked the version (A1).
+How to reproduce: Sign as officer with alice and as clinician with a variant.
+Suspected or confirmed cause: userIds were compared byte for byte.
+Owner: utg1209 (Claude session)
+Related: DEC-019, DEC-020, INT-012
+--- fill in when fixed ---
+Fixed: 2026-11-04
+Fixed by: agent (Claude session; to be reviewed by utg1209)
+Fix: signoff/identity.ts normalises (NFKC, format characters removed, trim, lower case) and restricts the characters; every comparison and every stored signature uses the normalised id. Seam comment for the Cognito sub.
+How to prevent a repeat: Backend/tests/signoff/hardening.test.ts and the red-team harness.
+
+### ERR-005 | Clinician open questions settled by deleting them or writing x
+Found: 2026-11-04 by red team 3 (Claude session), via test
+System: Open-question check (Backend/src/validation/checks/openQuestions.ts)
+Severity: blocker
+Symptom (exact error text if short): Removed questions, resolution "x" and resolved-without-resolution all opened the clinician gate (A4).
+How to reproduce: Resolve or remove the clinician questions in a version and run the checks.
+Suspected or confirmed cause: The check looked only at the current version and treated a missing answer as a warning.
+Owner: utg1209 (Claude session)
+Related: DEC-019, DEC-020, INT-012
+--- fill in when fixed ---
+Fixed: 2026-11-04
+Fixed by: agent (Claude session; to be reviewed by utg1209)
+Fix: Trivial or missing answers block; with the version chain, removed, rerouted and wrong-role answers block, and a clinician answer needs the clinician name and a change note. Version.authorRole is recorded at save.
+How to prevent a repeat: Backend/tests/signoff/hardening.test.ts and the red-team harness.
+
+### ERR-006 | Unsigned compile settings changed the release output
+Found: 2026-11-04 by red team 3 (Claude session), via test
+System: Compile guard and check inputs
+Severity: high
+Symptom (exact error text if short): taskWindowDays 365 and flowMode full built a different tasks.js under the same signed sha and manifest key (A6); production checks ran without golden cases or settings.
+How to reproduce: Lock a version, compile twice with different settings.
+Suspected or confirmed cause: Settings were neither checked nor bound to the signatures.
+Owner: utg1209 (Claude session)
+Related: DEC-019, DEC-020, INT-012
+--- fill in when fixed ---
+Fixed: 2026-11-04
+Fixed by: agent (Claude session; to be reviewed by utg1209)
+Fix: Golden cases and settings are check inputs in production (signoff/checkInputs.ts); signatures carry settingsSha; a build with other settings is refused; the manifest key and audit carry settingsSha.
+How to prevent a repeat: Backend/tests/signoff/hardening.test.ts and the red-team harness.
+
+### ERR-007 | compileSnapshot accepted hand-made lock evidence
+Found: 2026-11-04 by red team 3 (Claude session), via test
+System: Compiler (Backend/src/compiler/compileSnapshot.ts)
+Severity: blocker
+Symptom (exact error text if short): A release of a draft with blockers was built from a forged LockEvidence object with no store (A5).
+How to reproduce: Call compileSnapshot with buildKind release and an approval object.
+Suspected or confirmed cause: The release path checked only the shape of caller-supplied evidence and never ran the checks.
+Owner: utg1209 (Claude session)
+Related: DEC-019, DEC-020, INT-012
+--- fill in when fixed ---
+Fixed: 2026-11-04
+Fixed by: agent (Claude session; to be reviewed by utg1209)
+Fix: Caller-built evidence is refused; a release names the stored version and goes through releaseBuild, which runs verifyLocked with fresh checks.
+How to prevent a repeat: Backend/tests/signoff/hardening.test.ts and the red-team harness.
+
+### ERR-008 | Save accepted a false lineage and reported plain success when checks failed
+Found: 2026-11-04 by red team 3 (Claude session), via test
+System: API save (Backend/src/api/server.ts) and sign-off
+Severity: medium
+Symptom (exact error text if short): meta.version 99 / parent_version 42 saved as n=2; onVersionSaved throwing still answered 201 {n} (A8c, A8d); a save during a lease left the run in awaiting_clinician with 0 signatures on the newest version.
+How to reproduce: POST a version with mismatched meta; make onVersionSaved throw; save while another lease is held.
+Suspected or confirmed cause: No lineage check; the error was only logged; the run state was never reconciled.
+Owner: utg1209 (Claude session)
+Related: DEC-019, DEC-020, INT-012
+--- fill in when fixed ---
+Fixed: 2026-11-04
+Fixed by: agent (Claude session; to be reviewed by utg1209)
+Fix: 422 version_mismatch; 201 with checks_status failed; a failed check leaves the run failed at the checks step (resume retries); status, sign and reject heal a stuck run state.
+How to prevent a repeat: Backend/tests/signoff/hardening.test.ts and the red-team harness.
+
+### ERR-009 | No way to reject a version
+Found: 2026-11-04 by red team 3 (Claude session), via test
+System: Sign-off (AR-06, RR-02)
+Severity: medium
+Symptom (exact error text if short): The clinician could only sign or wait.
+How to reproduce: n/a
+Suspected or confirmed cause: Not built in INT-011.
+Owner: utg1209 (Claude session)
+Related: DEC-019, DEC-020, INT-012
+--- fill in when fixed ---
+Fixed: 2026-11-04
+Fixed by: agent (Claude session; to be reviewed by utg1209)
+Fix: POST /runs/:id/versions/:n/reject with a required comment, itemRef and urgent; status rejected, never signable or buildable; Infra route and tests.
+How to prevent a repeat: Backend/tests/signoff/hardening.test.ts and the red-team harness.
+
+### ERR-010 | Locked version body could be rewritten in fields outside modelSha
+Found: 2026-11-04 by red team 3 (Claude session), via test
+System: Compile guard
+Severity: medium
+Symptom (exact error text if short): change_note, created_by and created_at rewritten in S3 after the lock still built (A9a).
+How to reproduce: Overwrite the locked artifact with only those fields changed and compile.
+Suspected or confirmed cause: modelSha leaves them out and the bytes were not recorded.
+Owner: utg1209 (Claude session)
+Related: DEC-019, DEC-020, INT-012
+--- fill in when fixed ---
+Fixed: 2026-11-04
+Fixed by: agent (Claude session; to be reviewed by utg1209)
+Fix: Version.bodySha256 is recorded at save; sign and verifyLocked refuse when the stored bytes differ, and a release refuses a version with no record.
+How to prevent a repeat: Backend/tests/signoff/hardening.test.ts and the red-team harness.
+
+### ERR-011 | Signers not told which checks did not run
+Found: 2026-11-04 by red team 3 (Claude session), via test
+System: Sign-off checks
+Severity: medium
+Symptom (exact error text if short): Golden-case and form-readiness checks were skipped in production with only an information item.
+How to reproduce: Run the checks without golden cases or settings.
+Suspected or confirmed cause: computeFindings passed neither input; nothing in the gates said so.
+Owner: utg1209 (Claude session)
+Related: DEC-019, DEC-020, INT-012
+--- fill in when fixed ---
+Fixed: 2026-11-04
+Fixed by: agent (Claude session; to be reviewed by utg1209)
+Fix: checksNotRun on the record, the findings view, the status, the sign result and the 422 body, and a "Not checked:" sentence in the gate summary.
+How to prevent a repeat: Backend/tests/signoff/hardening.test.ts and the red-team harness.
+

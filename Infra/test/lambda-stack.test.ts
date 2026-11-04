@@ -1,0 +1,174 @@
+import { readdirSync, readFileSync } from "node:fs";
+import * as path from "node:path";
+import { App } from "aws-cdk-lib";
+import { Template } from "aws-cdk-lib/assertions";
+import { describe, expect, it } from "vitest";
+import { OrchestratorDataStack } from "../lib/data-stack";
+import { OrchestratorLambdaStack } from "../lib/lambda-stack";
+import { routes } from "../../Backend/src/contract/routes";
+
+function build(context: Record<string, unknown> = {}, env: { region: string; account: string } | null = { region: "us-west-2", account: "111111111111" }): Template {
+  const app = new App({ context });
+  const stackEnv = env ?? undefined;
+  const data = new OrchestratorDataStack(app, "D", { env: stackEnv });
+  const stack = new OrchestratorLambdaStack(app, "L", {
+    env: stackEnv,
+    runsTable: data.runsTable,
+    stepsTable: data.stepsTable,
+    versionsTable: data.versionsTable,
+    commentsTable: data.commentsTable,
+    auditTable: data.auditTable,
+    artifactBucket: data.artifactBucket,
+    uploadQueue: data.uploadQueue,
+    appPolicy: data.appPolicy,
+    bedrockPolicy: data.bedrockPolicy,
+  });
+  return Template.fromStack(stack);
+}
+const t = build();
+const fn = () => Object.values(t.findResources("AWS::Lambda::Function"))[0] as any;
+
+describe("function", () => {
+  it("is an arm64 image function with the sizing from the plan", () => {
+    t.resourceCountIs("AWS::Lambda::Function", 1);
+    const p = fn().Properties;
+    expect(p.PackageType).toBe("Image");
+    expect(p.Architectures).toEqual(["arm64"]);
+    expect(p.Timeout).toBe(900);
+    expect(p.MemorySize).toBe(2048);
+    expect(p.EphemeralStorage).toEqual({ Size: 2048 });
+  });
+  it("sets the environment", () => {
+    const e = fn().Properties.Environment.Variables;
+    expect(e.RUN_MODE).toBe("lambda");
+    expect(e.LEASE_MS).toBe("960000");
+    expect(e.MODEL_ID).toBe("us.anthropic.claude-sonnet-4-5-20250929-v1:0");
+    expect(e.TMPDIR).toBe("/tmp");
+    for (const k of ["TABLE_RUNS", "TABLE_STEPS", "TABLE_VERSIONS", "TABLE_COMMENTS", "TABLE_AUDIT", "ARTIFACT_BUCKET"]) {
+      expect(e[k]).toBeDefined();
+    }
+    expect(e.PRICES_JSON).toBeUndefined();
+  });
+  it("passes PRICES_JSON and modelId from context", () => {
+    const t2 = build({ modelId: "us.x.y-v1:0", prices: { "us.x.y-v1:0": { inPerMTok: 1, outPerMTok: 2 } } });
+    const e = (Object.values(t2.findResources("AWS::Lambda::Function"))[0] as any).Properties.Environment.Variables;
+    expect(e.MODEL_ID).toBe("us.x.y-v1:0");
+    expect(JSON.parse(e.PRICES_JSON)).toEqual({ "us.x.y-v1:0": { inPerMTok: 1, outPerMTok: 2 } });
+  });
+  it("attaches the app managed policy to the role", () => {
+    const roles = Object.values(t.findResources("AWS::IAM::Role")) as any[];
+    const withPolicy = roles.filter((r) => (r.Properties.ManagedPolicyArns ?? []).some((a: any) => JSON.stringify(a).includes("OrchestratorAppPolicy") || JSON.stringify(a).includes("Fn::ImportValue")));
+    expect(withPolicy.length).toBeGreaterThanOrEqual(1);
+  });
+  it("has a two-week log group", () => {
+    t.hasResourceProperties("AWS::Logs::LogGroup", { RetentionInDays: 14 });
+    expect(fn().Properties.LoggingConfig.LogGroup).toBeDefined();
+  });
+});
+
+describe("image asset", () => {
+  it("builds the lambda target for linux/arm64 from ../Backend", () => {
+    const app = new App();
+    const env = { region: "us-west-2", account: "111111111111" };
+    const d = new OrchestratorDataStack(app, "D", { env });
+    const l = new OrchestratorLambdaStack(app, "L", {
+      env, runsTable: d.runsTable, stepsTable: d.stepsTable, versionsTable: d.versionsTable,
+      commentsTable: d.commentsTable, auditTable: d.auditTable, artifactBucket: d.artifactBucket,
+      uploadQueue: d.uploadQueue, appPolicy: d.appPolicy, bedrockPolicy: d.bedrockPolicy,
+    });
+    const asm = app.synth();
+    const file = readdirSync(asm.directory).find((f) => f === `${l.artifactId}.assets.json`);
+    expect(file).toBeDefined();
+    const manifest = readFileSync(path.join(asm.directory, file as string), "utf8").replace(/\s/g, "");
+    expect(manifest).toContain('"dockerBuildTarget":"lambda"');
+    expect(manifest).toContain('"platform":"linux/arm64"');
+  });
+});
+
+describe("triggers", () => {
+  it("maps the upload queue with batch size 1, partial failures and max concurrency 5", () => {
+    t.resourceCountIs("AWS::Lambda::EventSourceMapping", 1);
+    t.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      BatchSize: 1,
+      FunctionResponseTypes: ["ReportBatchItemFailures"],
+      ScalingConfig: { MaximumConcurrency: 5 },
+    });
+  });
+  it("runs a schedule every 5 minutes with an input the backend schema accepts", () => {
+    t.hasResourceProperties("AWS::Events::Rule", { ScheduleExpression: "rate(5 minutes)" });
+    const rule = Object.values(t.findResources("AWS::Events::Rule"))[0] as any;
+    const input = JSON.parse(rule.Properties.Targets[0].Input);
+    expect(input).toEqual({ source: "aws.events", "detail-type": "Scheduled Event" });
+    // Mirrors the LambdaScheduledEvent refine in Backend/src/contract/schemas.ts (source or detail-type).
+    expect(input.source === "aws.events" || input["detail-type"] === "Scheduled Event").toBe(true);
+  });
+});
+
+describe("http api", () => {
+  const routeKeys = (): string[] =>
+    (Object.values(t.findResources("AWS::ApiGatewayV2::Route")) as any[]).map((r) => r.Properties.RouteKey as string);
+  it("exposes exactly the public contract routes", () => {
+    const paths = new Set(routeKeys().map((k) => k.split(" ")[1]));
+    const want = new Set(routes.proxiable.map((p) => p.replace(/:(\w+)/g, "{$1}")));
+    expect(paths).toEqual(want);
+    expect(new Set(routeKeys()).size).toBe(routeKeys().length);
+  });
+  it("lists the documented methods per route", () => {
+    expect([...routeKeys()].sort()).toEqual(
+      [
+        "POST /runs", "GET /runs", "GET /runs/{id}", "GET /runs/{id}/versions", "POST /runs/{id}/versions",
+        "GET /runs/{id}/versions/{n}", "GET /runs/{id}/versions/{n}/comments", "POST /runs/{id}/versions/{n}/comments",
+        "GET /runs/{id}/versions/{n}/findings", "GET /runs/{id}/versions/{n}/status", "POST /runs/{id}/versions/{n}/signatures/{role}",
+        "POST /runs/{id}/versions/{n}/reject", "POST /runs/{id}/resume", "GET /runs/{id}/metrics",
+      ].sort(),
+    );
+  });
+  it("never exposes events, invocations, ping or a catch-all", () => {
+    for (const k of routeKeys()) {
+      expect(k).not.toMatch(/\/(events|invocations|ping)\b/);
+      expect(k).not.toContain("$default");
+      expect(k).not.toContain("+");
+    }
+  });
+  it("uses payload format 2.0 and an AWS_PROXY integration", () => {
+    t.hasResourceProperties("AWS::ApiGatewayV2::Integration", { IntegrationType: "AWS_PROXY", PayloadFormatVersion: "2.0" });
+  });
+  it("throttles the default stage", () => {
+    t.hasResourceProperties("AWS::ApiGatewayV2::Stage", {
+      StageName: "$default",
+      AutoDeploy: true,
+      DefaultRouteSettings: { ThrottlingBurstLimit: 50, ThrottlingRateLimit: 25 },
+    });
+  });
+  it("sets CORS from uiOrigins", () => {
+    const api = Object.values(t.findResources("AWS::ApiGatewayV2::Api"))[0] as any;
+    expect(api.Properties.ProtocolType).toBe("HTTP");
+    expect(api.Properties.CorsConfiguration.AllowOrigins).toEqual(["http://localhost:5173"]);
+    const t2 = build({ uiOrigins: ["https://app.example.org"] });
+    const api2 = Object.values(t2.findResources("AWS::ApiGatewayV2::Api"))[0] as any;
+    expect(api2.Properties.CorsConfiguration.AllowOrigins).toEqual(["https://app.example.org"]);
+  });
+  it("sets CORS from a uiOrigins string as the CLI passes it", () => {
+    const t3 = build({ uiOrigins: '["https://app.example.org"]' });
+    const api3 = Object.values(t3.findResources("AWS::ApiGatewayV2::Api"))[0] as any;
+    expect(api3.Properties.CorsConfiguration.AllowOrigins).toEqual(["https://app.example.org"]);
+  });
+  it("lets only the API invoke the function", () => {
+    t.hasResourceProperties("AWS::Lambda::Permission", { Principal: "apigateway.amazonaws.com" });
+  });
+});
+
+describe("outputs and hygiene", () => {
+  it("has api url and function name outputs", () => {
+    const o = t.toJSON().Outputs;
+    expect(o.APIURL).toBeDefined();
+    expect(o.FUNCTIONNAME).toBeDefined();
+  });
+  it("hard-codes no account id", () => {
+    // The concrete account only appears in the template when the env supplies it (ECR asset URI,
+    // execute-api ARN); with an environment-agnostic stack no account literal may remain.
+    const agnostic = JSON.stringify(build({}, null).toJSON());
+    expect(agnostic).not.toMatch(/\b\d{12}\b/);
+    expect(agnostic).not.toContain("111111111111");
+  });
+});

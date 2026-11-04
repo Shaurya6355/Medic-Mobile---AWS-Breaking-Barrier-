@@ -1,0 +1,23 @@
+{
+  "source_id": "synthetic_mini",
+  "doc_name": "synthetic-mini.pdf",
+  "doc_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "pages": [
+    {
+      "pdf_page": 7,
+      "blocks": [
+        { "block_id": "p7.b1", "text": "SICK BUT N O D ANGER S IGN" },
+        { "block_id": "p7.b2", "text": "Child age 2 months up to 5 years" },
+        { "block_id": "p7.b3", "text": " If cough, count breaths in 1 minute: ___ breaths per\nminute (bpm)." },
+        { "block_id": "p7.b4", "text": " Any danger sign: REFER URGENTLY to the health facility. Not able to drink or feed any-\nthing" }
+      ]
+    },
+    {
+      "pdf_page": 8,
+      "blocks": [
+        { "block_id": "p8.b1", "text": "Give twice daily for 5 days." },
+        { "block_id": "p8.b2", "text": "Age 2 months up to 12 months—1 tablet" }
+      ]
+    }
+  ]
+}

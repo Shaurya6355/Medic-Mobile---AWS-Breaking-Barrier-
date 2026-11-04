@@ -1,0 +1,16 @@
+{
+  "mode": "danger_signs_always",
+  "ok": true,
+  "modelSha": "3dcbacce7f6065dd4394c6cea1b1e4b268c607e8fc487d40ad4a67d804b22955",
+  "formSha256": "a9d1d8027b609dbb96ec04bcd83bb4dfa78048f7f76dfcc5d3e9e7c046e9c123",
+  "avgQuestions": 8.2,
+  "goldenAvgScreens": 8.2,
+  "golden": "15/15",
+  "edits": "4/4",
+  "gridPoints": 6400,
+  "gridMismatches": 0,
+  "shownMismatches": 0,
+  "partialMismatches": 0,
+  "mutation": "not run",
+  "seconds": 355.2
+}

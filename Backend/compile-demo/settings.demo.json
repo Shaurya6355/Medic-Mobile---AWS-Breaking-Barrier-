@@ -1,0 +1,8 @@
+{
+  "_note": "DEMO PLACEHOLDERS. Compiler settings live outside the logic model and are not part of modelSha. taskWindowDays is a team default used only while open question Q5 is unanswered. flowMode (full | minimal | danger_signs_always) is the clinician's choice; override per run with `npm run compile:demo -- --flow=<mode>`.",
+  "formTitle": "Cough and fast breathing (demo preview)",
+  "icon": "icon-healthcare",
+  "taskWindowDays": 7,
+  "contactTypes": { "person": true, "place": false },
+  "flowMode": "minimal"
+}

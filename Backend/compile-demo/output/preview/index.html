@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Form preview: Cough and fast breathing (PREVIEW BUILD)</title>
+  <link rel="stylesheet" href="assets/preview.css">
+</head>
+<body>
+  <div id="preview-banner" role="alert">PREVIEW BUILD, not approved, demo settings. Synthetic data only.</div>
+  <main class="layout">
+    <section class="phone" aria-label="Form as the health worker sees it">
+      <div class="phone-header">
+        <span class="phone-title">Cough and fast breathing (demo preview)</span>
+        <span id="page-indicator"></span>
+      </div>
+      <div class="phone-subject">Report for: <strong>Synthetic Child A</strong> (synthetic contact)</div>
+      <!-- Same structure as cht-core's enketo.component.html -->
+      <div id="form-wrap" class="enketo">
+        <div class="container pages"></div>
+        <div class="form-footer">
+          <button class="btn btn-default previous-page" type="button">Previous</button>
+          <button class="btn btn-primary next-page" type="button">Next</button>
+          <button class="btn submit btn-primary" type="button">Submit</button>
+        </div>
+        <div id="submit-result"></div>
+      </div>
+    </section>
+    <aside class="tooling" aria-label="Preview tooling">
+      <h2>Preview tooling, not part of the form</h2>
+      <p class="tooling-note">Health workers do not see this panel. It shows hidden calculate fields and the live form model.</p>
+      <table class="calcs">
+        <tr><th>fast_breathing</th><td id="calc-fast_breathing"></td></tr>
+        <tr><th>danger_sign</th><td id="calc-danger_sign"></td></tr>
+        <tr><th>outcome</th><td id="calc-outcome"></td></tr>
+      </table>
+      <p><button id="restart" type="button">Start again (empty form)</button></p>
+      <details open>
+        <summary>Model XML (live)</summary>
+        <pre id="model-xml"></pre>
+      </details>
+      <p class="tooling-note">Rendered with enketo-core 7.2.5 and openrosa-xpath-evaluator 2.0.13 (the CHT webapp's engine and config), from <code id="built-from"></code>, HTML from cht-core's XSL. Opened as if from a contact profile (inputs pre-filled with a synthetic contact).</p>
+    </aside>
+  </main>
+  <script src="assets/form-data.js"></script>
+  <script src="assets/preview.js"></script>
+</body>
+</html>

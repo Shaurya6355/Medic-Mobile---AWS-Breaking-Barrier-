@@ -7,7 +7,7 @@ import { DRAFT, SAMPLE_EVIDENCE, V3, clone, fnv, hashOf } from "./data";
 import { runChecks } from "./checks";
 import { agentPass, intro, respond } from "./agent";
 import { clean, classify, getO, grid } from "./logic";
-import type { ChatMsg, Check, Evidence, Flag, ItemId, Model, Patch, WfState, Workflow } from "./types";
+import type { ChatMsg, Check, Evidence, Flag, ItemId, Model, Patch, Remote, WfState, Workflow } from "./types";
 
 export { applyPatch };
 
@@ -30,7 +30,7 @@ export const checksOf = (w: Workflow): Check[] => runChecks(w.model, w.evidence)
 
 export function initialWorkflow(id: string, m: Model = DRAFT, evidence: Evidence = SAMPLE_EVIDENCE): Workflow {
   return { id, guideline: null, state: "none", rev: 0, model: clone(m), draft: clone(m), evidence, flags: flagsFrom(m), chat: [], agent: [], undo: [],
-    audit: [], versions: [], clock: 0, verify: null, approved: null, lastKey: null };
+    audit: [], versions: [], clock: 0, verify: null, approved: null, lastKey: null, remote: null };
 }
 
 /* ---------- Versions and audit ---------- */
@@ -64,10 +64,10 @@ export function gate(w: Workflow, checks: Check[]) {
 
 /* ---------- Transitions ---------- */
 /** `from` is a logic model loaded from the pipeline; without it the built-in sample draft is used. */
-export function createDraft(w: Workflow, g: { id: string; name: string; pathway: string; pages: number[] }, from?: { model: Model; event: string; note: string; evidence: Evidence }): Workflow {
+export function createDraft(w: Workflow, g: { id: string; name: string; pathway: string; pages: number[] }, from?: { model: Model; event: string; note: string; evidence: Evidence; remote?: Remote }): Workflow {
   expect(w, "none");
   let x: Workflow = { ...initialWorkflow(w.id), guideline: g };
-  if (from) x = { ...x, model: clone(from.model), flags: flagsFrom(from.model), evidence: from.evidence };
+  if (from) x = { ...x, model: clone(from.model), flags: flagsFrom(from.model), evidence: from.evidence, remote: from.remote ?? null };
   x = logged(x, "Clinician", "Started a workflow", "Pages " + g.pages.join(", ") + " of " + g.name);
   x = from ? logged(x, "System", from.event, from.note) : logged(x, "System", "Drafted by Bedrock (draft A and draft B)", "Every quote and number checked against the source in code");
   // The AI agent's pass: checks 1 to 3, safe fixes, then hand over.
@@ -105,13 +105,22 @@ export function undoEdit(w: Workflow): Workflow {
   return logged(y, "Clinician", "Undid last edit");
 }
 
-/** The clinician answers an open question: keep as drafted, or change it (they then edit the step). */
+/** The written answer stored on the open question. The backend requires at least 15 characters and three words. */
+export const resolutionText = (choice: "keep" | "change", note = "") =>
+  note.trim().length >= 15 ? note.trim() : choice === "keep" ? "Kept as drafted: the clinician reviewed this question and agreed with the draft." : "Changed by the clinician in this version: see the edited rules.";
+
+/** The clinician answers an open question: keep as drafted, or change it (they then edit the step).
+    The answer is written into the logic model, so it travels with the version that is signed. */
 export function answerFlag(w: Workflow, flagId: string, choice: "keep" | "change", note = ""): Workflow {
   expect(w, "clinician");
   const f = w.flags.find(z => z.id === flagId);
   if (!f) throw new Error("Question not found");
-  const y: Workflow = { ...w, flags: w.flags.map(z => z.id === flagId ? { ...z, res: { choice, note, by: "Clinician" } } : z) };
-  return logged(y, "Clinician", (choice === "keep" ? "Kept as drafted: " : "Will change: ") + flagId.slice(2), note);
+  const qid = flagId.slice(2);
+  const model = w.model.open_questions.some(q => q.id === qid)
+    ? applyPatch(applyPatch(w.model, { op: "set", path: ["open_questions", qid, "status"], value: "resolved" }), { op: "set", path: ["open_questions", qid, "resolution"], value: resolutionText(choice, note) })
+    : w.model;
+  const y: Workflow = { ...w, model, flags: w.flags.map(z => z.id === flagId ? { ...z, res: { choice, note, by: "Clinician" } } : z) };
+  return logged(y, "Clinician", (choice === "keep" ? "Kept as drafted: " : "Will change: ") + qid, note);
 }
 
 /** A message to the assistant. Its reply may propose changes; nothing changes until the clinician applies one. */
@@ -139,14 +148,16 @@ export function dismissProposal(w: Workflow, msgId: number): Workflow {
   return { ...w, chat: w.chat.map(c => c.id === msgId ? { ...c, proposals: c.proposals?.map(q => q.state === "open" ? { ...q, state: "dismissed" as const } : q) } : c) };
 }
 
-export function approveAll(w: Workflow): Workflow {
+/** `locked`: live mode, the backend version both signatures locked. */
+export function approveAll(w: Workflow, locked?: { n: number; modelSha: string }): Workflow {
   expect(w, "clinician");
   const g = gate(w, checksOf(w));
   if (g.blockIds.length) throw new Error("Blocking checks are open");
   if (g.asks.length) throw new Error("Open questions are not answered");
-  let y: Workflow = { ...w, state: "verify", approved: { ver: "v4." + (w.rev || 0), hash: hashOf(w.model) } };
+  let y: Workflow = { ...w, state: "verify", approved: { ver: locked ? "v" + locked.n : "v4." + (w.rev || 0), hash: locked ? locked.modelSha.slice(0, 12) : hashOf(w.model), ...(locked ? { locked } : {}) } };
   y = addVersion(y, "Approved by clinician", "Clinician");
-  return logged(y, "Clinician", "Approved", "Approval bound to " + y.approved!.hash);
+  if (locked) y = logged(y, "AI agent", "Signed as program officer (version " + locked.n + ")", "modelSha " + locked.modelSha.slice(0, 12));
+  return logged(y, "Clinician", locked ? "Signed; version " + locked.n + " locked on the backend" : "Approved", "Approval bound to " + y.approved!.hash);
 }
 
 /** Simulated: the real step builds with cht-conf and runs cht-conf-test-harness. Expected outcomes always come from classify(). */

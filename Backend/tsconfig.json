@@ -1,16 +1,15 @@
 {
   "compilerOptions": {
-    "target": "ES2023",
+    "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
-    "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true,
-    "resolveJsonModule": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["src", "scripts", "test", "../shared"]
+  "include": ["src", "tests", "scripts", "compile-demo/chtConf.ts", "pipeline-demo", "vitest.config.ts"]
 }

@@ -1,24 +1,17 @@
 /* The only place that reads or writes data.
-   Guidelines: with VITE_API_URL set ("live"), files go through the backend pipeline
-   (presigned upload to S3, S3 event, extract, digest, logic model) and drafts start from the pipeline's logic model JSON.
-   Without it, an in-memory store seeded with the mockup's sample data.
-   Workflow steps after the draft still run the domain state machine in memory. */
+   Live (VITE_API_URL set): the orchestrator API in Backend/src (contract: Backend/src/contract/routes.ts).
+     A guideline is a run: POST /runs gives a presigned S3 URL, the upload starts ingest -> extract -> fill_logic -> checks.
+     The review starts from the run's latest version. Approving saves the clinician's version and signs it twice:
+     the AI agent as program_officer, then the clinician (the backend's sign-off order and separation of duties).
+   Without VITE_API_URL: an in-memory store seeded with sample data.
+   Edits, the assistant and the checks run in the browser; nothing reaches the backend until approval. */
 import { clone, fnv, loadSpec } from "../domain/data";
 import * as wf from "../domain/workflow";
-import type { AuditRow, Guideline, GuidelineType, ItemId, Patch, Workflow } from "../domain/types";
+import type { AuditRow, Guideline, GuidelineType, ItemId, Patch, Spec, Workflow } from "../domain/types";
 
 export const API_URL: string | undefined = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || undefined;
 /** True when guidelines come from the backend pipeline rather than sample data. */
 export const LIVE = !!API_URL;
-
-async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  let r: Response;
-  try { r = await fetch(API_URL + path, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } }); }
-  catch { throw new Error("Can't reach the pipeline backend at " + API_URL + ". Is it running (cd Backend && npm run dev)?"); }
-  const body = await r.json().catch(() => null) as (T & { error?: string }) | null;
-  if (!r.ok) throw new Error(body?.error || "Backend returned " + r.status + " for " + path);
-  return body as T;
-}
 
 /** PUT to a presigned URL with upload progress (fetch has no upload progress). */
 function putFile(url: string, file: File, headers: Record<string, string>, onProgress?: (pct: number) => void): Promise<void> {
@@ -33,15 +26,48 @@ function putFile(url: string, file: File, headers: Record<string, string>, onPro
   });
 }
 
-interface LogicModelEnvelope {
-  builder: string; source: "placeholder" | "agent"; notes: string[];
-  quoteCheck: { found: number; total: number; onPage?: number };
-  /** Pathway spec JSON. Validated here again before use: the UI never trusts the wire. */
-  model: unknown;
-  /** Draft B for the cross check, when the builder produced one. */
-  draftB?: unknown;
+/* ---------- Orchestrator API shapes (Backend/src/domain/types.ts, signoff/signoff.ts) ---------- */
+type RunState = "created" | "ingesting" | "extracting" | "filling_logic" | "in_review" | "checking" | "awaiting_officer" | "awaiting_clinician" | "locked" | "failed";
+interface Run { runId: string; state: RunState; pages?: number[]; currentStep?: string; createdAt: number }
+interface StepRecord { step: string; attempt: number; status: "running" | "succeeded" | "failed"; startedAt: number; endedAt?: number; error?: string }
+interface VersionRec { n: number; author: string; authorRole?: string; createdAt: number; status?: string }
+interface FindingsView { modelSha: string; claimText: string; blocking: number; groups: { severity: "blocking" | "warning" | "info"; findings: { message: string; check: string }[] }[] }
+interface StatusView { n: number; modelSha: string; status: string; runState: RunState; nextStep: string }
+
+/** The AI agent's identity when it signs in the program officer's place. */
+const AGENT_ID = "ai-agent";
+const CLINICIAN_ID = (import.meta.env.VITE_CLINICIAN_ID as string | undefined) || "clinician";
+
+const WORK: [RunState, string][] = [["created", "Upload to S3"], ["ingesting", "Read pages"], ["extracting", "Extract"], ["filling_logic", "Draft logic model"], ["checking", "Backend checks"]];
+const READY: RunState[] = ["in_review", "awaiting_officer", "awaiting_clinician", "locked"];
+const names = (): Record<string, string> => { try { return JSON.parse(localStorage.getItem("runNames") || "{}"); } catch { return {}; } };
+const nameRun = (id: string, n: string) => { try { localStorage.setItem("runNames", JSON.stringify({ ...names(), [id]: n })); } catch { /* private mode */ } };
+
+function toGuideline(r: Run, steps?: StepRecord[]): Guideline {
+  const failed = r.state === "failed", ready = READY.includes(r.state);
+  const at = WORK.findIndex(([s]) => s === r.state);
+  const err = steps?.filter(s => s.status === "failed").pop()?.error;
+  return {
+    id: r.runId, name: names()[r.runId] ?? "Run " + r.runId.slice(0, 8), type: "PDF",
+    meta: new Date(r.createdAt).toLocaleString() + " · " + (r.pages ? r.pages.length + " pages" : "all pages") + " · " + r.state.replace(/_/g, " "),
+    status: failed ? "Failed" : ready ? "Indexed" : "Processing",
+    pages: r.pages?.length ?? null,
+    steps: WORK.map(([s, label], i) => ({ key: s, label, state: ready || i < at ? "done" : i === at ? (failed ? "failed" : "running") : failed && at < 0 && i === WORK.findIndex(([x]) => x === r.currentStep) ? "failed" : "pending" })),
+    ...(failed ? { error: "The backend run failed" + (r.currentStep ? " at " + r.currentStep : "") + (err ? ": " + err : "") + ". Resume it with POST /runs/" + r.runId + "/resume." } : {}),
+  };
 }
-interface DigestBody { blocks: { page: number; text: string }[] }
+/** A backend refusal in plain words: the error code, its message, and any blockers it lists. */
+async function call<T>(path: string, init?: RequestInit): Promise<T> {
+  let r: Response;
+  try { r = await fetch(API_URL + path, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } }); }
+  catch { throw new Error("Can't reach the backend API at " + API_URL + ". Check VITE_API_URL and that the API allows this origin (CORS)."); }
+  const body = await r.json().catch(() => null) as (T & { error?: string; message?: string; issues?: unknown[]; blockers?: { message?: string }[] }) | null;
+  if (!r.ok) {
+    const extra = [...(body?.issues ?? []).map(String), ...(body?.blockers ?? []).map(b => b.message ?? "")].filter(Boolean);
+    throw new Error((body?.message || body?.error || "Backend returned " + r.status) + " (" + path + ")" + (extra.length ? ": " + extra.join(" | ") : ""));
+  }
+  return body as T;
+}
 
 export const ACCEPT = ".pdf,.doc,.docx,.odt,.rtf,.xlsx,.xls,.csv,.ods,.png,.jpg,.jpeg,.tif,.tiff,.webp,.html,.htm,.txt,.md";
 const TYPE_BY_EXT: Record<string, GuidelineType> = {
@@ -52,7 +78,7 @@ const TYPE_BY_EXT: Record<string, GuidelineType> = {
 };
 
 /* ---------- In-memory store (sample data) ---------- */
-let guidelines: Guideline[] = LIVE ? [] : [
+let guidelines: Guideline[] = [
   { id: "g-imci", name: "IMCI chart booklet (sample).pdf", type: "PDF", meta: "80 pages · 6.1 MB · Textract", status: "Indexed", pages: 80 },
   { id: "g-nat", name: "National child health guideline 2025 (sample).pdf", type: "PDF", meta: "142 pages · 11.4 MB · Textract + model", status: "Indexed", pages: 142 },
   { id: "g-dak", name: "Child health DAK decision tables (sample).xlsx", type: "Spreadsheet", meta: "6 sheets · cells read directly", status: "Indexed", pages: null },
@@ -78,11 +104,11 @@ async function mutate(id: string, fn: (w: Workflow) => Workflow): Promise<Workfl
 /** Live: get a presigned URL, PUT the file to S3. The S3 event starts the pipeline; poll getGuideline for progress. */
 export async function uploadGuideline(file: File, onProgress?: (pct: number) => void): Promise<Guideline> {
   if (LIVE) {
-    const r = await http<{ guideline: Guideline; upload: { url: string; headers: Record<string, string> } }>("/guidelines/upload-url", {
-      method: "POST", body: JSON.stringify({ fileName: file.name, size: file.size, contentType: file.type || undefined }),
-    });
-    await putFile(r.upload.url, file, r.upload.headers, onProgress);
-    return r.guideline;
+    // pages omitted: the backend reads every page. The presigned URL is signed for application/pdf.
+    const r = await call<{ runId: string; uploadUrl: string }>("/runs", { method: "POST", body: JSON.stringify({ filename: file.name }) });
+    nameRun(r.runId, file.name);
+    await putFile(r.uploadUrl, file, { "Content-Type": "application/pdf" }, onProgress);
+    return toGuideline({ runId: r.runId, state: "created", createdAt: Date.now() });
   }
   const ext = (file.name.split(".").pop() || "").toLowerCase();
   const type = TYPE_BY_EXT[ext] || "Other";
@@ -96,30 +122,31 @@ export async function uploadGuideline(file: File, onProgress?: (pct: number) => 
   guidelines = guidelines.concat(g);
   return respond(g);
 }
-export const listGuidelines = (): Promise<Guideline[]> => (LIVE ? http<Guideline[]>("/guidelines") : respond(guidelines));
-export const getGuideline = (id: string): Promise<Guideline> => (LIVE ? http<Guideline>("/guidelines/" + id) : respond(guidelines.find(g => g.id === id)!));
+export const listGuidelines = async (): Promise<Guideline[]> => (LIVE ? (await call<Run[]>("/runs")).map(r => toGuideline(r)).reverse() : respond(guidelines));
+export const getGuideline = async (id: string): Promise<Guideline> => {
+  if (!LIVE) return respond(guidelines.find(g => g.id === id)!);
+  const r = await call<{ run: Run; steps: StepRecord[] }>("/runs/" + id);
+  return toGuideline(r.run, r.steps);
+};
 
 /* ---------- Workflow ---------- */
 export async function createDraft(args: { guidelineId: string; pathway: string; pages: number[] }): Promise<Workflow> {
   const id = "wf-" + seq++;
   if (LIVE) {
     const g = await getGuideline(args.guidelineId);
-    const env = await http<LogicModelEnvelope>("/guidelines/" + g.id + "/logic-model");
-    const model = loadSpec(env.model, "The pipeline's logic model");
-    const digest = await http<DigestBody>("/guidelines/" + g.id + "/digest").catch(() => null);
-    const byPage = new Map<number, string[]>();
-    digest?.blocks.forEach(b => byPage.set(b.page, [...(byPage.get(b.page) ?? []), b.text]));
-    const evidence = {
-      pages: digest ? [...byPage].map(([page, lines]) => ({ page, text: lines.join("\n") })) : null,
-      pagesFrom: g.name + " (text extracted by the pipeline" + (g.pages ? ", " + g.pages + " pages" : "") + ")",
-      draftB: env.draftB ? loadSpec(env.draftB, "The pipeline's draft B") : null,
-      draftBFrom: "Draft B from " + env.builder + (env.source === "placeholder" ? " (placeholder sample)" : ""),
-    };
-    const qc = env.quoteCheck.found + " of " + env.quoteCheck.total + " source quotes found in this file" + (env.quoteCheck.onPage !== undefined ? ", " + env.quoteCheck.onPage + " on the cited page" : "");
+    const vs = await call<VersionRec[]>("/runs/" + g.id + "/versions");
+    const last = vs[vs.length - 1];
+    if (!last) throw new Error("This run has no logic model version yet. Wait for the pipeline to finish.");
+    const v = await call<{ body: unknown }>("/runs/" + g.id + "/versions/" + last.n);
+    const model = loadSpec(v.body, "The backend's logic model (version " + last.n + ")");
+    const [fc, fo] = await Promise.all(["clinician", "program_officer"].map(a => call<FindingsView>("/runs/" + g.id + "/versions/" + last.n + "/findings?audience=" + a)));
+    const flat = (f: FindingsView, role: "clinician" | "program_officer") => f.groups.flatMap(gr => gr.findings.map(x => ({ severity: gr.severity, message: x.message, check: x.check, role })));
+    const remote = { runId: g.id, n: last.n, modelSha: fc.modelSha, base: clone(model), claimText: fc.claimText, findings: [...flat(fc, "clinician"), ...flat(fo, "program_officer")] };
+    const evidence = { pages: null, pagesFrom: "Guideline text stays in the backend; its own quote check is in the backend findings", draftB: null, draftBFrom: "The backend does not return a second draft" };
     workflows[id] = wf.createDraft(wf.initialWorkflow(id), { id: g.id, name: g.name, pathway: args.pathway, pages: args.pages }, {
-      model, evidence,
-      event: env.source === "placeholder" ? "Loaded placeholder logic model (no model connected yet)" : "Loaded logic model from " + env.builder,
-      note: (g.s3Uri ? g.s3Uri.replace(/\/uploads\/.*/, "/logic-models/" + g.id + "/logic-model.json") + " · " : "") + qc,
+      model, evidence, remote,
+      event: "Loaded logic model version " + last.n + " from the backend (run " + g.id + ")",
+      note: "modelSha " + fc.modelSha.slice(0, 12) + " · " + fc.claimText,
     });
     return clone(workflows[id]);
   }
@@ -135,7 +162,41 @@ export const chat = (id: string, text: string) => mutate(id, w => wf.chat(w, tex
 export const applyProposal = (id: string, msgId: number, i: number) => mutate(id, w => wf.applyProposal(w, msgId, i));
 export const dismissProposal = (id: string, msgId: number) => mutate(id, w => wf.dismissProposal(w, msgId));
 export const answer = (id: string, flagId: string, choice: "keep" | "change") => mutate(id, w => wf.answerFlag(w, flagId, choice));
-export const approve = (id: string) => mutate(id, wf.approveAll);
+export async function approve(id: string): Promise<Workflow> {
+  const w = load(id);
+  if (!LIVE || !w.remote) return mutate(id, x => wf.approveAll(x));
+  wf.approveAll(w); // the same local gate first: no blocking checks, every question answered
+  const locked = await signOnBackend(w);
+  return mutate(id, x => wf.approveAll(x, locked));
+}
+
+/** Save and sign on the backend. Each open question must be answered in a version saved by the role it is routed to,
+    so questions routed to the program officer are answered first in a version the AI agent saves in that role. */
+async function signOnBackend(w: Workflow): Promise<{ n: number; modelSha: string }> {
+  const r = w.remote!, base = "/runs/" + r.runId;
+  const vs = await call<VersionRec[]>(base + "/versions");
+  let n = vs[vs.length - 1].n;
+  const latest = (await call<{ body: Spec }>(base + "/versions/" + n)).body;
+  const save = async (body: Spec, author: string, authorRole: "program_officer" | "clinician", note: string) => {
+    const b: Spec = { ...body, meta: { ...body.meta, version: n + 1, parent_version: n, created_at: new Date().toISOString(), created_by: author, change_note: note } };
+    const res = await call<{ n: number; checks_status: string }>(base + "/versions", { method: "POST", body: JSON.stringify({ parentVersion: n, body: b, author, authorRole }) });
+    n = res.n;
+  };
+  const answer = (q: Spec["open_questions"][number]) => w.model.open_questions.find(x => x.id === q.id);
+  const forOfficer = latest.open_questions.filter(q => q.route_to === "program_officer" && q.status === "open" && answer(q)?.status === "resolved");
+  if (forOfficer.length) {
+    const body: Spec = { ...latest, open_questions: latest.open_questions.map(q => (forOfficer.includes(q) ? { ...q, status: "resolved", resolution: answer(q)!.resolution } : q)) };
+    await save(body, AGENT_ID, "program_officer", "AI agent recorded the answers to the program officer questions " + forOfficer.map(q => q.id).join(", ") + ", as the clinician confirmed them in review.");
+  }
+  const edits = w.versions.filter(v => v.event.startsWith("Edited")).length;
+  await save(w.model, CLINICIAN_ID, "clinician", "Clinician review in the app: " + edits + " edit" + (edits === 1 ? "" : "s") + " to the rules, open questions answered, checks reviewed.");
+  const st = await call<StatusView>(base + "/versions/" + n + "/status");
+  const sign = (role: "program_officer" | "clinician", userId: string) =>
+    call(base + "/versions/" + n + "/signatures/" + role, { method: "POST", body: JSON.stringify({ role, userId, modelSha: st.modelSha }) });
+  await sign("program_officer", AGENT_ID);
+  await sign("clinician", CLINICIAN_ID);
+  return { n, modelSha: st.modelSha };
+}
 export const runVerify = (id: string) => mutate(id, wf.runVerify);
 export const approveDeploy = (id: string) => mutate(id, wf.approveDeploy);
 export const getAudit = async (id: string): Promise<AuditRow[]> => respond(load(id).audit);
