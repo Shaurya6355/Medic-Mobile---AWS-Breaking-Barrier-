@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { Version } from "../../src/domain/types.js";
+import { Conflict, type Store } from "../../src/store/store.js";
 import { MemoryArtifactStore, artifactKey } from "../../src/artifacts/artifactStore.js";
 import type { StepContext } from "../../src/engine/step.js";
 import { createFillLogicStep } from "../../src/steps/fillLogic.js";
@@ -90,6 +92,73 @@ describe("fill_logic step", () => {
     const { ctx, artifacts } = await setup(false);
     await artifacts.put(outKey, "not json");
     await expect(step.run(ctx)).rejects.toThrow(/not valid JSON/);
+  });
+});
+
+function wrapStore(store: MemoryStore, over: Partial<Store>): Store {
+  return new Proxy(store as Store, {
+    get(t, prop, r) {
+      if (prop in over) return (over as Record<string | symbol, unknown>)[prop];
+      const v = Reflect.get(t, prop, r);
+      return typeof v === "function" ? v.bind(t) : v;
+    },
+  });
+}
+
+describe("fill_logic races and edge cases", () => {
+  it("on Conflict with a winner present, returns the winner key and adds no version", async () => {
+    const { ctx, store } = await setup();
+    const winnerKey = "winner/v1.json";
+    const wrapped = wrapStore(store, {
+      async addVersion() {
+        await store.addVersion({ runId: "r1", n: 1, parent: null, author: "ai", createdAt: 1, artifactKey: winnerKey });
+        throw new Conflict("chain");
+      },
+    });
+    const res = await step.run({ ...ctx, store: wrapped });
+    expect(res.artifactRefs).toEqual({ version: winnerKey });
+    expect(await store.listVersions("r1")).toHaveLength(1);
+  });
+
+  it("rethrows Conflict when version 1 still does not exist", async () => {
+    const { ctx, store } = await setup();
+    const wrapped = wrapStore(store, {
+      async addVersion() {
+        throw new Conflict("chain");
+      },
+    });
+    await expect(step.run({ ...ctx, store: wrapped })).rejects.toBeInstanceOf(Conflict);
+  });
+
+  it("fails clearly when versions exist but version 1 is missing", async () => {
+    const { ctx, store } = await setup();
+    const v2: Version = { runId: "r1", n: 2, parent: 1, author: "user", createdAt: 2, artifactKey: "k2" };
+    const wrapped = wrapStore(store, { listVersions: async () => [v2] });
+    await expect(step.run({ ...ctx, store: wrapped })).rejects.toThrow(/version 1 is missing/);
+  });
+
+  it("uses an empty unclear list when unclear_items is absent", async () => {
+    const { ctx, artifacts } = await setup(false);
+    await artifacts.put(outKey, JSON.stringify({ nodes: [] }));
+    await step.run(ctx);
+    expect(JSON.parse(await text(artifacts, v1Key)).unclear).toEqual([]);
+  });
+
+  it("re-checks before the artifact put and skips it when version 1 appeared", async () => {
+    const { ctx, store, artifacts } = await setup();
+    const winnerKey = "winner/v1.json";
+    const winner: Version = { runId: "r1", n: 1, parent: null, author: "ai", createdAt: 1, artifactKey: winnerKey };
+    let calls = 0;
+    const wrapped = wrapStore(store, { listVersions: async () => (++calls === 1 ? [] : [winner]) });
+    const puts: string[] = [];
+    const spy = {
+      put: (k: string, b: Uint8Array | string, c?: string) => (puts.push(k), artifacts.put(k, b, c)),
+      get: (k: string) => artifacts.get(k),
+      exists: (k: string) => artifacts.exists(k),
+    };
+    const res = await step.run({ ...ctx, store: wrapped, artifacts: spy });
+    expect(puts).toEqual([]);
+    expect(res.artifactRefs).toEqual({ version: winnerKey });
   });
 });
 

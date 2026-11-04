@@ -42,6 +42,12 @@ export function createFillLogicStep(opts: { validator: LogicModelValidator }): S
       const result = opts.validator.validate(body);
       if (!result.ok) throw new Error(`Logic model failed validation: ${result.issues.join("; ")}`);
 
+      // Re-check right before writing so we never overwrite an object a version already
+      // points at. The remaining window between this check and addVersion is accepted
+      // because the engine lease serialises a run's steps.
+      const raced = await existing();
+      if (raced !== undefined) return { artifactRefs: { version: raced } };
+
       // Artifact first, so a version never points at a missing object.
       const key = artifactKey(runId, "versions", "v1.json");
       await ctx.artifacts.put(key, JSON.stringify(body, null, 2), "application/json");
