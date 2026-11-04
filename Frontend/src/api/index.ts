@@ -5,7 +5,7 @@
    Workflow steps after the draft still run the domain state machine in memory. */
 import { clone, fnv, loadSpec } from "../domain/data";
 import * as wf from "../domain/workflow";
-import type { AuditRow, Decision, Guideline, GuidelineType, ItemId, Patch, SuggestionOutcome, Workflow } from "../domain/types";
+import type { AuditRow, Guideline, GuidelineType, ItemId, Patch, Workflow } from "../domain/types";
 
 export const API_URL: string | undefined = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || undefined;
 /** True when guidelines come from the backend pipeline rather than sample data. */
@@ -130,11 +130,11 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
 }
 export const getWorkflow = async (id: string) => respond(load(id));
 export const saveEdit = (id: string, patch: { item: ItemId; field: string; patch: Patch }) => mutate(id, w => wf.applyEdit(w, patch.item, patch.field, patch.patch));
-export const sendToClinician = (id: string) => mutate(id, wf.sendToClinician);
-export const submitReview = (id: string, itemId: ItemId, decision: Decision | null) => mutate(id, w => wf.submitReview(w, itemId, decision));
-export const decideFlag = (id: string, flagId: string, choice: number, note: string) => mutate(id, w => wf.decideFlag(w, flagId, choice, note));
-export const returnToPO = (id: string) => mutate(id, wf.returnToPO);
-export const decideSuggestion = (id: string, itemId: ItemId, outcome: SuggestionOutcome, patch?: Patch) => mutate(id, w => wf.decideSuggestion(w, itemId, outcome, patch));
+export const undo = (id: string) => mutate(id, wf.undoEdit);
+export const chat = (id: string, text: string) => mutate(id, w => wf.chat(w, text));
+export const applyProposal = (id: string, msgId: number, i: number) => mutate(id, w => wf.applyProposal(w, msgId, i));
+export const dismissProposal = (id: string, msgId: number) => mutate(id, w => wf.dismissProposal(w, msgId));
+export const answer = (id: string, flagId: string, choice: "keep" | "change") => mutate(id, w => wf.answerFlag(w, flagId, choice));
 export const approve = (id: string) => mutate(id, wf.approveAll);
 export const runVerify = (id: string) => mutate(id, wf.runVerify);
 export const approveDeploy = (id: string) => mutate(id, wf.approveDeploy);

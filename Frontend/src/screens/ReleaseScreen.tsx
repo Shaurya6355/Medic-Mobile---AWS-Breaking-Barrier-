@@ -76,11 +76,11 @@ export function ReleaseScreen({ w, role, act }: { w: Workflow | null; role: Role
       {w.state === "deploy" && role !== "it" ? <div className="note">Only the IT approver can approve the deploy. The clinician approved the content, so they can't also deploy it.</div> : null}
 
       {!v ? (
-        <div className="banner">The system builds the form with cht-conf, then runs every synthetic patient through (a) the approved rules in code and (b) the filled form in cht-conf-test-harness. Any mismatch returns the change to the program officer.</div>
+        <div className="banner">The system builds the form with cht-conf, then runs every synthetic patient through (a) the approved rules in code and (b) the filled form in cht-conf-test-harness. Any mismatch returns the change to the clinician.</div>
       ) : (
         <>
           <div className="checks">
-            {tile("Content approval", "Clinician · round " + a.round)}
+            {tile("Content approval", "Clinician · " + a.hash)}
             {tile("Rules vs form", v.match + " / " + v.total + " match", v.match === v.total ? "" : "bad")}
             {tile("Rule coverage", v.cov + " of " + v.covTotal + " rules fire", v.cov === v.covTotal ? "" : "bad")}
             {tile("Golden cases", golden(m).filter(g => g.ok).length + " of " + golden(m).length)}

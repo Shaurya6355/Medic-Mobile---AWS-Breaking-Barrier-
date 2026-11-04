@@ -1,11 +1,11 @@
 /* Workflow types. The logic model itself is the pathway spec (shared/pathway/types.ts), the same JSON the
    backend pipeline produces. Everything here must survive JSON round-trips (stored by the backend later). */
-import type { Answers, ItemId, Page, Patch, Path, Spec } from "../../../shared/pathway/index.ts";
+import type { Answers, ItemId, Page, Patch, Spec } from "../../../shared/pathway/index.ts";
 
 export type { Answers, ItemId, Patch, Spec };
 /** The logic model under review: a pathway spec. */
 export type Model = Spec;
-export type Role = "po" | "clinician" | "it";
+export type Role = "clinician" | "it";
 
 export interface Patient { id: string; answers: Answers }
 export interface Classification { out: string | null; rule: string | null }
@@ -21,37 +21,26 @@ export interface Evidence {
   draftB: Spec | null; draftBFrom: string;
 }
 
-export type FbType = "wording" | "value" | "logic" | "show" | "source" | "remove" | "add";
-export interface Decision { status: "approved" | "changes"; type?: FbType; note?: string; value?: string }
-export interface Review extends Decision { round: number }
-
-export type SuggestionOutcome = "accepted" | "edited" | "discarded";
-export type Suggestion =
-  | { kind: "clarify"; text: string; outcome?: SuggestionOutcome;
-      /** The field the feedback is about, so the PO can type the change and accept it. */
-      target?: { label: string; path: Path; kind: string; value: string; page?: number } }
-  | { kind: "change"; field: string; from: string; to: string; patch: Patch; outcome?: SuggestionOutcome };
-
-export interface FlagOption {
-  label: string;
-  /** Turns the decision into a change request on `about`; the decider's note becomes the request. */
-  fb?: { type?: FbType };
-  escalate?: boolean;
-  /** Sending on or requesting a change needs a note; keeping or agreeing does not. */
-  needsNote?: boolean;
-}
+/** An open question from the logic model, put to the clinician by the AI agent. */
 export interface Flag {
-  id: string; clinical: boolean; kind: string; about: ItemId; title: string; src: string; why: string;
-  opts: FlagOption[];
-  res?: { choice: string; note: string; by: string; round: number };
-  escalated?: boolean;
-  /** The JSON suggested the clinician; the PO still decides whether to send it. */
-  suggested?: boolean;
-  /** The PO's note when sending it to the clinician. */
-  poNote?: string;
+  id: string; about: ItemId; title: string; src: string; why: string;
+  res?: { choice: "keep" | "change"; note: string; by: string };
 }
 
-export type WfState = "none" | "po_draft" | "clinician" | "po_revise" | "verify" | "deploy" | "done";
+/** A change the assistant proposes; applied only when the clinician clicks Apply. */
+export interface Proposal { label: string; item: ItemId; field: string; patch: Patch; impact: string; state: "open" | "applied" | "dismissed" }
+export interface ChatMsg {
+  id: number; from: "agent" | "clinician"; text: string;
+  /** Step to show on the flow. */
+  select?: ItemId;
+  proposals?: Proposal[];
+  /** An open question the clinician answers from the chat. */
+  ask?: string;
+}
+/** Something the AI agent fixed or checked on its own, before the clinician sees the draft. */
+export interface AgentFix { item: ItemId; check: CheckKey; text: string }
+
+export type WfState = "none" | "clinician" | "verify" | "deploy" | "done";
 
 export interface AuditRow { t: string; actor: string; event: string; ver: string; hash: string; note: string }
 export interface VersionRow { ver: string; event: string; meta: string }
@@ -61,23 +50,21 @@ export interface Workflow {
   id: string;
   guideline: { id: string; name: string; pathway: string; pages: number[] } | null;
   state: WfState;
-  round: number;
   rev: number;
   model: Model;
   evidence: Evidence;
-  /** The logic model as first drafted, before any hand edit. "Edited" markers compare against it. */
+  /** The logic model as the AI agent handed it over, before any clinician edit. "Edited" markers compare against it. */
   draft: Model;
-  sent: Model | null;
-  required: ItemId[];
-  reviews: Record<ItemId, Review>;
-  sug: Record<ItemId, Suggestion>;
-  fixed: Record<ItemId, boolean>;
   flags: Flag[];
+  chat: ChatMsg[];
+  agent: AgentFix[];
+  /** Models before each clinician edit, newest last. */
+  undo: Model[];
   audit: AuditRow[];
   versions: VersionRow[];
   clock: number;
   verify: VerifyResult | null;
-  approved: { ver: string; hash: string; round: number } | null;
+  approved: { ver: string; hash: string } | null;
   lastKey: string | null;
 }
 

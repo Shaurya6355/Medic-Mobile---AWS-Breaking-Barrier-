@@ -15,21 +15,19 @@ Mock-up for the No-Code CHT Configuration build (AWS Breaking Barriers 2026, Med
 
 | Role | Can do | Cannot do |
 |---|---|---|
-| Program officer (PO) | Add guideline files, pick pages, create the workflow draft, edit questions, accept/edit/discard AI revisions, send and resend to the clinician | Approve content or deploy |
-| Clinician | Approve or reject each question with structured feedback, resolve flags, return to PO, approve all | Edit questions directly, deploy |
+| AI agent (system) | Run checks 1 to 3 (schema, quotes, numbers, logic), fix what is safe to fix in code (cited page, rule priorities), put the open questions to the clinician, answer the clinician in the assistant and propose changes | Change the rules without the clinician applying it; approve or deploy |
+| Clinician | Start a workflow from guideline pages; View tab (flowchart, test patients, six checks); Edit tab (rule table, flow redraws live); answer open questions; apply assistant proposals; undo; approve | Deploy |
 | IT approver | Approve deploy after the synthetic patient check | Approve content |
 
 No single person drafts, approves and deploys (brief, design rule 2).
 
 ## End-to-end flow
 
-1. **Guidelines.** PO clicks **Add files…** (standard file dialog with a *Files of type* filter), selects a file, picks a pathway and pages, clicks **Create workflow draft**.
-2. **Extraction (system).** Index pages (Textract; images via the model) → two Bedrock passes (inputs, then rules) with verbatim quotes → quote and number checks → cross-check pass → logic checks and golden cases. Output: `pathway.json` draft `v3.1`.
-3. **PO workflow.** PO reviews every question (change tag, condition, guideline quote), edits if needed, **Send to clinician**.
-4. **Clinician review (round N).** Per changed/added/removed question: **Approve**, or **Reject with feedback** (type + note + optional new value). Resolve flags. Then **Return to PO with feedback** (if any rejected) or **Approve all** (all approved, flags resolved).
-5. **AI revision (system).** For each rejected question, Bedrock turns the feedback into a structured change, or returns *needs clarification* if the feedback is vague. Code re-runs all checks on the proposed change.
-6. **PO revise.** PO sees feedback plus the AI suggestion card: **Accept**, **Edit before accepting**, or **Discard**. Nothing applies until accepted. **Resend to clinician (round N+1)** unlocks when every rejected question is resolved. Loop back to step 4.
-7. **Verify.** After clinician approval: build the form, then run synthetic patients through (a) the approved rules in code and (b) the filled form via cht-conf-test-harness. All must match; any mismatch returns to the PO.
+1. **Guidelines.** Clinician uploads a file, picks a pathway and pages, clicks **Create workflow draft**.
+2. **Extraction (system).** Index pages → Bedrock drafts A and B with verbatim quotes.
+3. **AI agent.** Runs checks 1 Schema, 2a Quote, 2b Number, 3 Logic; fixes a quote cited on the wrong page and gaps in rule priorities; everything else it reports. Puts every open question to the clinician in the assistant.
+4. **Clinician.** View tab: flowchart only, test patients (golden cases) in plain words, the six checks as header widgets (hover to expand). Edit tab: the rule table; every edit redraws the flow and re-runs the checks. The assistant answers what-if patients, explains rules, and proposes changes with their effect on sample and test patients; nothing changes until the clinician clicks Apply. **Approve and send to IT** unlocks when no check is blocking and every question is answered.
+7. **Verify.** After clinician approval: build the form, then run synthetic patients through (a) the approved rules in code and (b) the filled form via cht-conf-test-harness. All must match; any mismatch returns to the clinician.
 8. **Changes.** PR-style diff of the XLSForm rows (old v2 vs new), test report. **IT approver** clicks **Approve deploy**.
 9. **Audit.** Append-only log of every step.
 

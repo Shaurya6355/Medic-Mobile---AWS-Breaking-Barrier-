@@ -127,10 +127,19 @@ Related: INT-004, DEC-006
 
 
 ### DEC-008 | Everything reaches the clinician through the PO
-Status: decided
+Status: superseded by DEC-009
 Date: 2026-11-04
 Decided by: Vishnu Athreya
 Feature or area: Review workflow
 Decision: Open questions marked route_to clinician are flags for the PO first. The clinician sees only what the PO sent. Notes are required only to send something on or to request a change.
 Why: Human asked that nothing go to the clinician directly and that approvals not need a note.
 Related: INT-007
+
+### DEC-009 | No program officer: an AI agent checks the draft, the clinician reviews and edits
+Status: decided
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Review workflow
+Decision: The PO role is removed. An AI agent runs checks 1 to 3, fixes what is safe to fix, and sends everything to the clinician, open questions included. The clinician has a View tab (flowchart, test patients, six check widgets) and an Edit tab (rule table, live flow) plus an assistant chat. IT approves the deploy at the end.
+Why: Human asked for the architecture change.
+Related: DEC-008, INT-011

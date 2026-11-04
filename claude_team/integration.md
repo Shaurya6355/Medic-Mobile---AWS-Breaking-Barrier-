@@ -125,3 +125,10 @@ Files or resources touched: shared/pathway/samples/{cough_fast_breathing.v1.json
 What others must do or know: Re-upload the sample PDF to see 36 of 36 quotes on page. All checks pass on it except the cross check, which flags the placeholder draft B on purpose.
 Open items: none new.
 Related: INT-009
+
+### INT-011 | 2026-11-04 | Vishnu Athreya (agent) | AI agent replaces the PO; clinician View/Edit tabs and assistant
+What changed: Workflow is none -> clinician -> verify -> deploy -> done. Roles are clinician and IT approver. createDraft runs the AI agent's pass (domain/agent.ts: checks 1 to 3, fixes a quote's cited page when it is found on exactly one other page, renumbers rule priorities) and opens the assistant with its report and one message per open question. Review screen: six check widgets side by side in the header (hover or focus expands; #check-<key> pins one), View tab (flowchart plus test patients in plain words, no table), Edit tab (rule table plus live flow), assistant on the right (what-if patients, explain a rule or derived value, propose a number change with its effect, list checks or test patients, undo). Removed: PO draft/revise states, per-step approvals, change requests, AI suggestions, flag deck, step card, tray.
+Files or resources touched: Frontend/src/domain/{agent,types,workflow,checks,data,logic}.ts, Frontend/src/components/{Checks,Chat,Golden,NextStrip,RuleTable,panels}.tsx (FeedbackCard, ReviewControls, Tray, NodeEditor deleted), Frontend/src/screens/{Review,Guidelines,Release}Screen.tsx, Frontend/src/{App.tsx,actions.ts,api/index.ts,styles.css}, Frontend/docs/SPEC.md.
+What others must do or know: api has undo, chat, applyProposal, dismissProposal, answer; sendToClinician, submitReview, decideFlag, returnToPO and decideSuggestion are gone. The assistant is deterministic for now; respond() in domain/agent.ts is where a Bedrock call goes.
+Open items: Connect the assistant to Bedrock. Decide whether IT also sees the agent's report.
+Related: DEC-009, INT-010

@@ -5,7 +5,7 @@ import draftJson from "../../../shared/pathway/samples/cough_fast_breathing.v1.j
 import draftBJson from "../../../shared/pathway/samples/cough_fast_breathing.v1.draftB.json";
 import pagesJson from "../../../shared/pathway/samples/cough-guideline.pages.json";
 import { validateSpec, type Answers, type Spec } from "../../../shared/pathway/index.ts";
-import type { Evidence, FbType } from "./types";
+import type { Evidence } from "./types";
 
 export const clone = <T,>(o: T): T => JSON.parse(JSON.stringify(o));
 export const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -70,8 +70,6 @@ export const GOLDEN: Record<string, [id: string, answers: Answers, expected: str
   ],
 };
 
-export const FB_TYPES: [FbType, string][] = [["wording", "Wording"], ["value", "Threshold or value"], ["logic", "Rule logic"], ["show", "Show condition"], ["source", "Wrong source"], ["remove", "Remove"], ["add", "Add missing question"]];
-export const fbLabel = (t?: FbType) => (FB_TYPES.find(x => x[0] === t) || ["", ""])[1];
 
 /** Outcome colour by severity (1 = most severe). */
 export const sevColor = (s: number) => (s <= 2 ? "pink" : s === 3 ? "yellow" : "green");

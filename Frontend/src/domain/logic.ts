@@ -243,7 +243,7 @@ export function nodeTitle(id: ItemId): string {
   return id;
 }
 export function itemLabel(id: ItemId): string {
-  if (id.startsWith("F-")) return "Flag " + id.slice(2);
+  if (id.startsWith("F-")) return "Question " + id.slice(2);
   const [k, key] = splitItem(id);
   return k === "scope" ? "Applies to" : k === "rule" ? "Rule " + key : k === "q" ? "Question " + key : words(key);
 }
@@ -257,7 +257,7 @@ export function srcOf(m: Spec, id: ItemId): [quote: string, where: string] {
 }
 
 /** Checks and open flags that touch any of the given items: what the rule table shows on each row. */
-export function rowIssues(checks: Check[], flags: { id: string; about: ItemId; res?: unknown; clinical: boolean; title: string }[], ids: ItemId[]) {
+export function rowIssues(checks: Check[], flags: { id: string; about: ItemId; res?: unknown; title: string }[], ids: ItemId[]) {
   const cs = checks.filter(c => ids.includes(c.id));
   const fs = flags.filter(f => !f.res && ids.includes(f.about));
   const status: "edit" | "check" | "ok" = cs.some(c => c.sev === "blocking") ? "edit" : cs.length || fs.length ? "check" : "ok";

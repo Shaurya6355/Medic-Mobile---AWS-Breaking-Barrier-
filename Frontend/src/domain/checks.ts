@@ -1,5 +1,5 @@
 /* The check pipeline the draft goes through, in order:
-     1 Schema check (gate)  2a Quote check  2b Number check  3 Logic checks (sample patients)   <- program officer fixes
+     1 Schema check (gate)  2a Quote check  2b Number check  3 Logic checks (sample patients)   <- the AI agent checks and fixes
      4 Golden cases  5 Cross check (draft A vs draft B)                                         <- clinician looks
    Every stage is deterministic. Both roles see every stage; each stage lists its errors with the step they are on. */
 import { analyze, applyPatch, item, crossCheck, literals, numberResults, quoteResults, type ItemId, type Spec } from "../../../shared/pathway/index.ts";
@@ -10,15 +10,15 @@ import type { Check, CheckKey, Evidence } from "./types";
 export type StageStatus = "pass" | "warn" | "fail" | "skipped" | "missing";
 export interface Part { name: string; ok: boolean; text: string }
 export interface Stage {
-  key: CheckKey; n: string; name: string; asks: string; owner: "po" | "clinician";
+  key: CheckKey; n: string; name: string; asks: string; owner: "agent" | "clinician";
   status: StageStatus; summary: string; issues: Check[]; parts?: Part[]; uses?: string;
 }
 
-export const STAGES: { key: CheckKey; n: string; name: string; asks: string; owner: "po" | "clinician" }[] = [
-  { key: "schema", n: "1", name: "Schema check", asks: "Gate: does the draft have every box, with valid values?", owner: "po" },
-  { key: "quote", n: "2a", name: "Quote check", asks: "Does each quoted passage exist in the guideline, on the page it cites?", owner: "po" },
-  { key: "number", n: "2b", name: "Number check", asks: "Does each number in a rule match the quote it cites?", owner: "po" },
-  { key: "logic", n: "3", name: "Logic checks", asks: "Run generated sample patients through the rules: four checks.", owner: "po" },
+export const STAGES: { key: CheckKey; n: string; name: string; asks: string; owner: "agent" | "clinician" }[] = [
+  { key: "schema", n: "1", name: "Schema check", asks: "Gate: does the draft have every box, with valid values?", owner: "agent" },
+  { key: "quote", n: "2a", name: "Quote check", asks: "Does each quoted passage exist in the guideline, on the page it cites?", owner: "agent" },
+  { key: "number", n: "2b", name: "Number check", asks: "Does each number in a rule match the quote it cites?", owner: "agent" },
+  { key: "logic", n: "3", name: "Logic checks", asks: "Run generated sample patients through the rules: four checks.", owner: "agent" },
   { key: "golden", n: "4", name: "Golden cases", asks: "Do the hand-made test cases get the expected classification?", owner: "clinician" },
   { key: "cross", n: "5", name: "Cross check", asks: "Do two independent drafts (A and B) agree?", owner: "clinician" },
 ];

@@ -1,9 +1,10 @@
 import { item, print, srcList, type Rule, type Sources } from "../../../shared/pathway/index.ts";
 import { sevColor } from "../domain/data";
 import { getO, rowIssues } from "../domain/logic";
-import type { Check, ItemId, Model, Workflow } from "../domain/types";
+import type { Check, ItemId, Model, Patch, Workflow } from "../domain/types";
+
+export type EditFn = (item: ItemId, field: string, patch: Patch) => void;
 import type { Markers } from "./Flow";
-import type { EditFn } from "./NodeEditor";
 import { CommitInput, CondInput } from "./inputs";
 import { IssueLine } from "./Checks";
 
@@ -13,7 +14,7 @@ function Issues({ checks, flags }: ReturnType<typeof rowIssues>) {
   return (
     <ul className="rissues">
       {checks.map((c, i) => <IssueLine key={i} c={c} />)}
-      {flags.map(f => <li key={f.id} className="flag"><b>{"Flag " + f.id.slice(2)}</b>{(f.clinical ? "Clinician decides: " : "You decide: ") + f.title}</li>)}
+      {flags.map(f => <li key={f.id} className="flag"><b>{"Question " + f.id.slice(2)}</b>{f.title}</li>)}
     </ul>
   );
 }
@@ -56,7 +57,7 @@ export function RuleTable({ w, canEdit, checks, sel, onSelect, edit, markers }: 
       </div>
       <div className="tw">
         <table className="rtable">
-          <colgroup><col style={{ width: 52 }} /><col style={{ width: 118 }} /><col /><col style={{ width: 230 }} /><col style={{ width: 118 }} /><col style={{ width: 128 }} />{canEdit ? <col style={{ width: 44 }} /> : null}</colgroup>
+          <colgroup><col style={{ width: 44 }} /><col style={{ width: 100 }} /><col /><col style={{ width: 200 }} /><col style={{ width: 96 }} /><col style={{ width: 112 }} />{canEdit ? <col style={{ width: 44 }} /> : null}</colgroup>
           <thead><tr>{["#", "Rule", "If", "Then", "Follow-up", "Status"].map(t => <th key={t}>{t}</th>)}{canEdit ? <th /> : null}</tr></thead>
           {rules.map((r, i) => {
             const id = item.rule(r.id), o = getO(m, r.outcome), fu = o?.follow_up;

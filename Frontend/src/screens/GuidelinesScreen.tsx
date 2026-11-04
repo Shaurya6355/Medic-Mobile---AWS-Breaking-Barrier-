@@ -109,7 +109,7 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
   const pages = f?.pages ? parsePages(pageText, maxPages) : [];
   const wrongPath = path !== PATHWAYS[0];
   const sampleOnly = wrongPath || (!api.LIVE && selId !== "g-imci");
-  const canCreate = role === "po" && !!f && f.status === "Indexed" && pages.length > 0 && !sampleOnly && !creating;
+  const canCreate = role === "clinician" && !!f && f.status === "Indexed" && pages.length > 0 && !sampleOnly && !creating;
 
   const create = async () => {
     if (!f) return;
@@ -124,7 +124,7 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
         <div className="ph"><h2>Guideline library</h2><span className="ver">{lib.length} files{api.LIVE ? " · live pipeline" : " · sample data"}</span></div>
         <input ref={fileInput} type="file" multiple accept={api.ACCEPT} hidden onChange={onPick} />
         <div className="btnrow">
-          <button type="button" className="btn primary" disabled={role !== "po"} onClick={() => fileInput.current?.click()}>Upload guideline</button>
+          <button type="button" className="btn primary" disabled={role !== "clinician"} onClick={() => fileInput.current?.click()}>Upload guideline</button>
           <span className="note">{api.LIVE ? "Local mode reads PDF (with a text layer), TXT, MD, CSV and HTML" : "PDF, Word, spreadsheet, image or web page"}</span>
         </div>
         {loadErr ? <div className="banner" role="alert">{loadErr}</div> : null}
@@ -172,13 +172,13 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
           {!w || w.state === "none" ? (
             <div className="actions">
               <span className="note">
-                {role !== "po" ? "Only the program officer can create a workflow draft."
+                {role !== "clinician" ? "Only the clinician can start a workflow."
                   : wrongPath && api.LIVE ? "The logic model format covers only the cough pathway for now."
                   : sampleOnly ? "Sample data covers only the IMCI booklet and the cough pathway."
                   : BUSY(f) ? "Waiting for the pipeline to finish."
                   : f.status !== "Indexed" ? "This file did not make it through the pipeline."
                   : api.LIVE ? "Loads the logic model JSON the pipeline built for this file."
-                  : "Indexes the pages and drafts questions and rules with verbatim quotes."}
+                  : "Drafts questions and rules with verbatim quotes; the AI agent checks them before you see them."}
               </span>
               <button type="button" className="btn primary" disabled={!canCreate} onClick={create}>
                 {creating ? <><span className="spin" aria-hidden="true" />Loading logic model...</> : "Create workflow draft"}
