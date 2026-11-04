@@ -3,12 +3,12 @@
 PREVIEW BUILD, not approved, demo settings. Synthetic data only. The golden outcomes are proposed from v1.json and the booklet, not clinically confirmed (awaiting Medic).
 
 Overall: **PASS**  
-Form under test: `compile-demo/output/project/forms/app/cough_fast_breathing.xml` (cht-conf 6.6.1 output), sha256 `c6d6c7fb5cc40af65bb667f243d2682fd4b34f657406be33295d3f4b9ace0d37`  
+Form under test: `compile-demo/output/project/forms/app/cough_fast_breathing.xml` (cht-conf 6.6.1 output), sha256 `3f6d958695ee4eb4937492086bcf77b7b33bee82de31ef6fcf7ca9e4b926cd71`  
 Model: `tests/fixtures/logic/v1.json` (cough_fast_breathing v1); interpreter: `src/logic` evaluate()  
 Engine: enketo-core 7.2.5 + openrosa-xpath-evaluator 2.0.13 in headless Google Chrome, CHT webapp enketo config (excludeNonRelevant: true, validatePage: true), CHT's enketo-core patch (/inputs always relevant), HTML and model made with cht-core's XSL (as cht-core api does). Opened as from a contact profile with a synthetic contact.  
 Flow: **flowMode minimal** (from `output/manifest.json`; flow derivation `flow-2-is_no`)  
-**Average questions asked: 3.19 per grid point in the CHT engine** (flow prediction 3.19, all questions 8.92); 6.20 screens per golden case typed in the UI.  
-Run time: 1157.7 s. Re-run: `cd Backend && npm run compile:verify` (after `npm run compile:demo -- --flow=<mode>` for another mode).
+**Average questions asked: 4.67 per grid point in the CHT engine** (flow prediction 4.67, all questions 8.92); 6.75 screens per golden case typed in the UI.  
+Run time: 745.3 s. Re-run: `cd Backend && npm run compile:verify` (after `npm run compile:demo -- --flow=<mode>` for another mode).
 
 ## 1. Golden cases (UI level)
 
@@ -23,16 +23,21 @@ Each case was typed into the real form inputs (radio clicks, number fields), the
 | g05 | Exactly 12 months, 40 breaths | treat_fast_breathing_at_home | treat_fast_breathing_at_home | treat_fast_breathing_at_home | 9 / 9 | yes/yes | no/no | outcome_treat_fast_breathing_at_home, outcome_treat_fast_breathing_at_home_dose_1_2 | PASS |
 | g06 | 12 months, 39 breaths | cough_no_fast_breathing | cough_no_fast_breathing | cough_no_fast_breathing | 9 / 9 | no/no | no/no | outcome_cough_no_fast_breathing | PASS |
 | g07 | 59 months, 40 breaths | treat_fast_breathing_at_home | treat_fast_breathing_at_home | treat_fast_breathing_at_home | 9 / 9 | yes/yes | no/no | outcome_treat_fast_breathing_at_home, outcome_treat_fast_breathing_at_home_dose_1_2 | PASS |
-| g08 | 60 months, no cough | refer_outside_age_range | refer_outside_age_range | refer_outside_age_range | 1 / 1 | no/no | no/no | outcome_refer_outside_age_range | PASS |
-| g09 | 1 month, no cough | refer_outside_age_range | refer_outside_age_range | refer_outside_age_range | 1 / 1 | no/no | no/no | outcome_refer_outside_age_range | PASS |
+| g08 | 60 months, no cough | refer_outside_age_range | refer_outside_age_range | refer_outside_age_range | 7 / 7 | no/no | no/no | outcome_refer_outside_age_range | PASS |
+| g09 | 1 month, no cough | refer_outside_age_range | refer_outside_age_range | refer_outside_age_range | 7 / 7 | no/no | no/no | outcome_refer_outside_age_range | PASS |
 | g10 | Cough 14 days, no fast breathing | refer_urgent | refer_urgent | refer_urgent | 5 / 5 | no/no | yes/yes | outcome_refer_urgent | PASS |
 | g11 | Cough 14 days with fast breathing | refer_urgent_with_antibiotic | refer_urgent_with_antibiotic | refer_urgent_with_antibiotic | 5 / 5 | yes/yes | yes/yes | outcome_refer_urgent_with_antibiotic, outcome_refer_urgent_with_antibiotic_dose_1_2 | PASS |
 | g12 | Chest indrawing alone | refer_urgent_with_antibiotic | refer_urgent_with_antibiotic | refer_urgent_with_antibiotic | 6 / 6 | no/no | yes/yes | outcome_refer_urgent_with_antibiotic, outcome_refer_urgent_with_antibiotic_dose_1_2 | PASS |
 | g13 | No cough, convulsions | refer_urgent | refer_urgent | refer_urgent | 4 / 4 | no/no | yes/yes | outcome_refer_urgent | PASS |
 | g14 | No cough, no signs | no_cough | no_cough | no_cough | 7 / 7 | no/no | no/no | outcome_no_cough | PASS |
-| g15 | KNOWN HAZARD: 1 month old with convulsions | refer_outside_age_range | refer_outside_age_range | refer_outside_age_range | 1 / 1 | no/no | no/no | outcome_refer_outside_age_range | PASS |
+| g15 | Outside the age range with a danger sign: 1 month old with convulsions | refer_urgent_outside_age_range | refer_urgent_outside_age_range | refer_urgent_outside_age_range | 3 / 3 | no/no | yes/yes | outcome_refer_urgent_outside_age_range | PASS |
+| g16 | 6 months, convulsions and 55 breaths (danger sign with fast breathing in an infant) | refer_urgent_with_antibiotic | refer_urgent_with_antibiotic | refer_urgent_with_antibiotic | 6 / 6 | yes/yes | yes/yes | outcome_refer_urgent_with_antibiotic, outcome_refer_urgent_with_antibiotic_dose_1_1 | PASS |
+| g17 | Outside the age range with a danger sign: 1 month old with chest indrawing | refer_urgent_outside_age_range | refer_urgent_outside_age_range | refer_urgent_outside_age_range | 6 / 6 | no/no | yes/yes | outcome_refer_urgent_outside_age_range | PASS |
+| g18 | 60 months with convulsions (outside the age range, danger sign) | refer_urgent_outside_age_range | refer_urgent_outside_age_range | refer_urgent_outside_age_range | 4 / 4 | no/no | yes/yes | outcome_refer_urgent_outside_age_range | PASS |
+| g19 | 1 month, cough 14 days (outside the age range, danger sign from long cough) | refer_urgent_outside_age_range | refer_urgent_outside_age_range | refer_urgent_outside_age_range | 3 / 3 | no/no | yes/yes | outcome_refer_urgent_outside_age_range | PASS |
+| g20 | 2 months, 49 breaths, no signs (youngest covered age) | cough_no_fast_breathing | cough_no_fast_breathing | cough_no_fast_breathing | 9 / 9 | no/no | no/no | outcome_cough_no_fast_breathing | PASS |
 
-Golden: 15/15 pass (interpreter equals expected in 15/15).
+Golden: 20/20 pass (interpreter equals expected in 20/20).
 
 Note text shown for g01 (exactly as on screen):
 
@@ -62,11 +67,12 @@ Edit scenarios: 4/4 pass.
 
 Points: 6400 from enumerateAnswers(model) (exact: true; every integer cut point of every threshold and constraint bound, every yes/no combination, hidden questions omitted). Each point: a fresh enketo form, values set on the model nodes, enketo's evaluation cascade run, calculate nodes and relevant result notes read. Every answer of the point is set, including questions the flow hides: enketo (excludeNonRelevant, as in CHT) treats hidden questions as blank. Outcome and notes are compared with evaluate() on the FULL answers (so the short form must give the outcome of answering everything); fast_breathing and danger_sign with evaluate() on the shown answers; the questions enketo shows with the flow's sequence.
 
-Compared: 6400. **Mismatches: 0** (of which shown-question differences: 0). Average questions shown: 3.19.
+Compared: 6400. **Mismatches: 0** (of which shown-question differences: 0). Average questions shown: 4.67.
 
 | outcome (interpreter) | points |
 | --- | --- |
-| refer_outside_age_range | 3200 |
+| refer_urgent_outside_age_range | 3148 |
+| refer_outside_age_range | 52 |
 | refer_urgent_with_antibiotic | 2344 |
 | refer_urgent | 804 |
 | cough_no_fast_breathing | 24 |
@@ -79,17 +85,7 @@ Every grid point again with one shown question left empty (6400 points, the drop
 
 ## 5. Mutation self-check (can the grid fail?)
 
-Known build-stage bugs were planted in a temporary copy of the compiled XForm (the real one is untouched) and the full grid was re-run on each copy. Every mutation that changes an answer must produce mismatches; mutants marked equivalent for flowMode minimal change the XPath but no answer (reason in the row) and must produce none, which shows the grid reports real behaviour, not text differences. Result: 4/4 caught, 3 equivalent as expected.
-
-| mutation | planted bug | mismatching grid points | first example | result |
-| --- | --- | --- | --- | --- |
-| m1 | fast-breathing boundary off by one: breaths >= 50 emitted as > 50 | 128 | age_months=2, cough=yes, cough_days=0, convulsions=yes, not_able_to_drink_or_feed=yes, vomits_everything=yes, chest_indrawing=no, breaths_per_minute=50, unusually_sleepy=yes: outcome form=refer_urgent interpreter=refer_urgent_with_antibiotic; fast_breathing form=no interpreter(shown)=yes; notes form=outcome_refer_urgent expected=outcome_refer_urgent_with_antibiotic+outcome_refer_urgent_with_antibiotic_dose_1_1 | CAUGHT |
-| m2 | age band edge: age < 12 emitted as <= 12 in fast_breathing (EQUIVALENT mutant: at 12 months with 50+ breaths the 12-59 band, 40+, already holds, so no answer changes and no test can catch it) | 0 | - | EQUIVALENT (no change, as expected) |
-| m2b | age band edge: age >= 12 emitted as > 12 in the 12-59 month fast-breathing band | 256 | age_months=12, cough=yes, cough_days=0, convulsions=yes, not_able_to_drink_or_feed=yes, vomits_everything=yes, chest_indrawing=no, breaths_per_minute=40, unusually_sleepy=yes: outcome form=refer_urgent interpreter=refer_urgent_with_antibiotic; fast_breathing form=no interpreter(shown)=yes; notes form=outcome_refer_urgent expected=outcome_refer_urgent_with_antibiotic+outcome_refer_urgent_with_antibiotic_dose_1_2 | CAUGHT |
-| m3 | rule order: danger_sign checked before the age range rule (R1/R3 swapped). EQUIVALENT under minimal: the swap only matters for a child outside the age range with a danger sign, and the minimal flow asks such a child no danger-sign question (danger_sign stays no): the Q2 hazard made silent | 0 | - | EQUIVALENT (no change, as expected) |
-| m4 | flow is_no emitted with the wrong value: convulsions = 'no' emitted as = 'yes' in every relevance (drink, vomit, sleepy screens follow the wrong answer) | 1664 | age_months=2, cough=yes, cough_days=0, convulsions=yes, not_able_to_drink_or_feed=yes, vomits_everything=yes, chest_indrawing=yes, breaths_per_minute=10, unusually_sleepy=yes: shown form=age_months+cough+cough_days+convulsions+not_able_to_drink_or_feed+chest_indrawing flow=age_months+cough+cough_days+convulsions+chest_indrawing | CAUGHT |
-| m5 | flow is_no emitted so that blank counts as no: cough/convulsions/... = 'no' emitted as != 'yes'. EQUIVALENT for v1: every is_no atom sits next to the conditions that show its question, so the question is answered whenever the atom is read | 0 | - | EQUIVALENT (no change, as expected) |
-| m6 | flow threshold off by one: cough_days < 14 emitted as < 13 in the relevance of the danger-sign screens (a child coughing 13 days is not asked about convulsions) | 768 | age_months=2, cough=yes, cough_days=13, convulsions=yes, not_able_to_drink_or_feed=yes, vomits_everything=yes, chest_indrawing=yes, breaths_per_minute=10, unusually_sleepy=yes: shown form=age_months+cough+cough_days+chest_indrawing flow=age_months+cough+cough_days+convulsions+chest_indrawing | CAUGHT |
+Not run this time (`npm run compile:verify -- --mutation-check` to run it).
 
 ## What this proves
 
@@ -113,6 +109,6 @@ Each row is the latest `compile:verify` for that flow mode (kept in `output/veri
 
 | flowMode | overall | avg questions (grid, CHT engine) | screens per golden case | golden | edits | grid mismatches (shown diffs) | partial | mutation check | modelSha |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| danger_signs_always | PASS | 8.20 | 8.20 | 15/15 | 4/4 | 0 (0) | 0 | not run | current |
-| full | PASS | 8.92 | 8.20 | 15/15 | 4/4 | 0 (0) | 0 | not run | current |
-| minimal (this run) | PASS | 3.19 | 6.20 | 15/15 | 4/4 | 0 (0) | 0 | 4/4 caught, 3 equivalent as expected | current |
+| danger_signs_always | PASS | 8.20 | 8.20 | 15/15 | 4/4 | 0 (0) | 0 | not run | STALE |
+| full | PASS | 8.92 | 8.20 | 15/15 | 4/4 | 0 (0) | 0 | not run | STALE |
+| minimal (this run) | PASS | 4.67 | 6.75 | 20/20 | 4/4 | 0 (0) | 0 | not run | current |

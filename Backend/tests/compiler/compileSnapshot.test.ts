@@ -83,6 +83,7 @@ describe("compileSnapshot (preview) on the v1 fixture", () => {
     const m = await compileSnapshot(v1(), { projectDir: fresh(), buildKind: "preview", settings: demoSettings() });
     expect(m.warnings.some((w) => w.startsWith("TEAM_DEFAULT_USED") && w.includes("Q5"))).toBe(true);
     expect(m.notCompiled.map((x) => x.item)).toEqual([
+      "outcomes.refer_urgent_outside_age_range.follow_up",
       "outcomes.refer_outside_age_range.follow_up",
       "outcomes.refer_urgent_with_antibiotic.follow_up",
       "outcomes.refer_urgent.follow_up",

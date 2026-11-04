@@ -136,8 +136,8 @@ const sign = (n: number, role: "program_officer" | "clinician", userId: string, 
   call("POST", routes.sign(RUN, n, endpoint), { role, userId, modelSha });
 const status = async (n: number): Promise<Json> => (await call("GET", routes.status(RUN, n))).body;
 const body = async (n: number): Promise<Model> => (await call("GET", routes.version(RUN, n))).body["body"] as Model;
-const saveVersion = async (parent: number, author: string, m: Model): Promise<number> => {
-  const r = await call("POST", routes.versions(RUN), { parentVersion: parent, author, body: m });
+const saveVersion = async (parent: number, author: string, authorRole: "program_officer" | "clinician", m: Model): Promise<number> => {
+  const r = await call("POST", routes.versions(RUN), { parentVersion: parent, author, authorRole, body: m });
   expectThat(r.status === 201, `POST versions -> ${r.status} (new version ${r.body["n"]}, author ${author})`);
   return r.body["n"] as number;
 };
@@ -206,7 +206,7 @@ const c1 = await compile(1);
 expectThat(c1.status === "refused", `compile of v1 refused (${c1.reason ?? c1.status})`);
 
 heading("Second pass: the program officer fixes their items (new version 2)");
-const n2 = await saveVersion(1, OFFICER, resolveForDemo(await body(1), "program_officer"));
+const n2 = await saveVersion(1, OFFICER, "program_officer", resolveForDemo(await body(1), "program_officer"));
 const s2 = await status(n2);
 say(`   v${n2}: status ${s2["status"]}, run ${s2["runState"]}, modelSha ${short(s2["modelSha"])}`);
 say(`   gates: ${s2["gates"]["summary"]}`);
@@ -219,7 +219,7 @@ showSign(`clinician signs v${n2}`, k2);
 expectThat(k2.status === 422 && k2.body["error"] === "blocked", `clinician refused with 422: ${(k2.body["blockers"] as Json[] | undefined)?.length ?? 0} open question(s) routed to the clinician`);
 
 heading("The clinician answers their questions (new version 3): signatures start over (AR-04)");
-const n3 = await saveVersion(n2, CLINICIAN, resolveForDemo(await body(n2), "clinician"));
+const n3 = await saveVersion(n2, CLINICIAN, "clinician", resolveForDemo(await body(n2), "clinician"));
 const s3 = await status(n3);
 const s2b = await status(n2);
 say(`   v${n2}: status ${s2b["status"]}; its officer signature stays in the history (${(s2b["signatures"] as Json[]).length} stored)`);
@@ -261,7 +261,7 @@ edited.meta.parent_version = edited.meta.version;
 edited.meta.version += 1;
 edited.meta.change_note = "TEST-ONLY demo edit after the lock: question wording reviewed.";
 edited.questions[0]!.label = `${edited.questions[0]!.label} (reviewed)`;
-const n4 = await saveVersion(n3, OFFICER, edited);
+const n4 = await saveVersion(n3, OFFICER, "program_officer", edited);
 const s4 = await status(n4);
 const s3b = await status(n3);
 say(`   v${n3}: ${s3b["status"]}; v${n4}: ${s4["status"]} with ${(s4["signatures"] as Json[]).length} signatures; latest releasable version: ${s4["latestLocked"]}`);

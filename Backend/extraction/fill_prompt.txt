@@ -82,8 +82,12 @@ RULES FOR THE DRAFT
 - Severity: 1 is the MOST urgent, 9 the least. Urgent referral is 1.
 - Rules: priority 1 is checked first; the first rule that holds decides.
   Put more urgent outcomes at lower priority numbers. Priorities must be unique.
-- Code always adds a rule for children outside the guideline's age range and a
-  final catch-all rule. Use "otherwise" only for the result of children no
+- Code always adds the rules for children outside the guideline's age range
+  (two when you define a derived item with id "danger_sign": urgent with a
+  danger sign, routine without; otherwise one) at the top of the rule list,
+  and a final catch-all rule. Do not write rules for the age range, and do not
+  use the ids "outside_age_range", "refer_outside_age_range" or
+  "refer_urgent_outside_age_range". Use "otherwise" only for the result of children no
   other rule covers (for example the main symptom is absent).
 - cite: list the extraction ids (nodes, actions) whose text says why the item
   exists. Leave cite empty when the guideline does not say it; code then marks

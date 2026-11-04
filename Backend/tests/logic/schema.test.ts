@@ -27,8 +27,8 @@ describe("parseModel on v1.json", () => {
 
   it("collectFieldRefs lists every field once in order", () => {
     const m = v1();
-    expect(collectFieldRefs(m.rules[1]!.when as never)).toEqual(["danger_sign", "fast_breathing", "chest_indrawing"]);
-    expect(collectFieldRefs(m.derived[0]!.definition)).toEqual(["cough", "age_months", "breaths_per_minute"]);
+    expect(collectFieldRefs(m.rules[2]!.when as never)).toEqual(["danger_sign", "fast_breathing", "chest_indrawing"]);
+    expect(collectFieldRefs(m.derived[1]!.definition)).toEqual(["cough", "age_months", "breaths_per_minute"]);
   });
 });
 
@@ -52,16 +52,16 @@ describe("parseModel rejects structural errors", () => {
     expect(mutate((m) => (m.rules[2].when.op = "equals")).join()).toContain("rules[2].when");
   });
   it("missing otherwise", () => {
-    expect(mutate((m) => (m.rules[5].when = { field: "cough", op: "is_yes" })).join()).toContain("otherwise");
+    expect(mutate((m) => (m.rules[6].when = { field: "cough", op: "is_yes" })).join()).toContain("otherwise");
   });
   it("two otherwise", () => {
-    expect(mutate((m) => (m.rules[4].when = "otherwise")).join()).toContain("otherwise");
+    expect(mutate((m) => (m.rules[5].when = "otherwise")).join()).toContain("otherwise");
   });
   it("otherwise not the highest priority", () => {
     expect(
       mutate((m) => {
-        m.rules[5].priority = 1;
-        m.rules[0].priority = 6;
+        m.rules[6].priority = 1;
+        m.rules[0].priority = 7;
       }).join(),
     ).toContain("otherwise");
   });
@@ -76,7 +76,7 @@ describe("parseModel rejects structural errors", () => {
     expect(mutate((m) => delete m.questions[1].source).join()).toContain("questions[1]");
   });
   it("origin team may omit source", () => {
-    expect(mutate((m) => delete m.outcomes[4].source)).toEqual([]);
+    expect(mutate((m) => delete m.outcomes[5].source)).toEqual([]);
   });
   it("integer constraint min > max", () => {
     expect(mutate((m) => (m.questions[0].constraint.min = 500)).join()).toContain("constraint");
@@ -90,11 +90,11 @@ describe("parseModel rejects structural errors", () => {
     expect(mutate((m) => (m.rules[2].when.value = 3)).length).toBeGreaterThan(0);
   });
   it("at_least without value", () => {
-    expect(mutate((m) => (m.derived[1].definition.any[0].all[1] = { field: "cough_days", op: "at_least" })).length).toBeGreaterThan(0);
+    expect(mutate((m) => (m.derived[2].definition.any[0].all[1] = { field: "cough_days", op: "at_least" })).length).toBeGreaterThan(0);
   });
   it("non-finite value", () => {
     const raw = rawV1();
-    raw.derived[1].definition.any[0].all[1].value = Number.POSITIVE_INFINITY;
+    raw.derived[2].definition.any[0].all[1].value = Number.POSITIVE_INFINITY;
     expect(issuesOf(raw).length).toBeGreaterThan(0);
   });
   it("bad sha", () => {

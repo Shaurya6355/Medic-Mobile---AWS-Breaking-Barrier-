@@ -1,4 +1,4 @@
-import type { Model } from "../logic/schema.js";
+import type { Model, Origin } from "../logic/schema.js";
 import type { Subject } from "./finding.js";
 import { clip } from "./text.js";
 
@@ -57,7 +57,7 @@ export type Cited = {
   subject: Subject;
   item: string;
   /** "guideline" or "team" as the model states it; open questions have none. */
-  origin?: "guideline" | "team";
+  origin?: Origin;
   sources: readonly { page: number; quote: string }[];
 };
 

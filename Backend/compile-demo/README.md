@@ -152,9 +152,9 @@ What verify proves:
 - That is the check for build-stage logic bugs. The mutation self-check shows it fails when such a bug is
   planted in the XForm: an off-by-one boundary, a wrong band edge, rule order, an `is_no` emitted with the
   wrong value, or an off-by-one threshold in a flow condition. Equivalent mutants (they change the XPath but
-  no answer) must not be flagged. One is the R1/R3 swap under the minimal flow: the swap only matters for an
-  out-of-range child with a danger sign, and the minimal flow asks such a child no danger-sign question.
-  That is the Q2 hazard made visible.
+  no answer) must not be flagged. The rule-order mutation (R2, the out-of-range rule, checked before R1, outside
+  the age range with a danger sign) is NOT equivalent under the final model: a child outside the age range with a
+  danger sign is asked the danger signs and the swap changes that child's outcome, so it must be caught.
 
 Found by the preview (fixed in `src/compiler`, test first): the compiled form had no `style: pages`
 setting, so pyxform emitted `<h:body>` without `class="pages"` and enketo/CHT would show the whole form
@@ -179,8 +179,8 @@ otherwise identical. The screenshots `02` to `06` show consecutive screens and t
 ## Question flow (flowMode)
 
 By default the form asks only the questions that can still change the outcome: the smarter flow that
-`deriveFlow` (src/logic/flow.ts) computes from the rule table. A 1-month-old gets the age screen and
-then the Result. A child with cough and convulsions = yes gets age, cough, cough days, convulsions,
+`deriveFlow` (src/logic/flow.ts) computes from the rule table. A 1-month-old with convulsions gets age,
+cough, cough days and convulsions, then the Result (refer urgently, R1). A child with cough and convulsions = yes gets age, cough, cough days, convulsions,
 chest indrawing and breaths, then the Result. The drink/feed, vomiting and sleepy screens are skipped
 because they can no longer change the outcome.
 
@@ -195,18 +195,18 @@ as answering everything) and refuses on any mismatch.
 
 | flowMode | what is asked | average questions (6400-point grid) |
 | --- | --- | --- |
-| `minimal` (default) | only questions that can still change the outcome | 3.19 |
+| `minimal` (default) | only questions that can still change the outcome | 4.67 |
 | `danger_signs_always` | as minimal, plus every danger-sign question always | 8.20 |
 | `full` | every question its authored shown_when allows (the earlier behaviour) | 8.92 |
 
 Per golden case, see `output/flow.md`. The grid weights every answer combination equally, and half of
 them have an out-of-range age, so these averages do not describe real patients.
 
-**Clinician's choice, said plainly:** the minimal flow never asks danger-sign questions of a child
-outside the 2 to 59 month range. The outcome is already decided (refer: outside the age range), so a
-1-month-old with convulsions is referred without anyone being asked about convulsions. That is open
-question Q2's hazard, and the minimal flow makes it silent. `danger_signs_always` exists for exactly this
-reason: it asks every danger-sign question in every case and gives the same outcomes. Which one to deploy
+**Clinician's choice, said plainly:** under the final 7-rule model the minimal flow still asks a
+child outside the 2 to 59 month range about cough and the danger signs, because rule R1 refers such a child
+with a danger sign urgently and R2 only applies when there is none. A 1-month-old with convulsions is asked about
+convulsions and referred urgently, so the old Q2 hazard (a danger sign hidden by the out-of-range result) is gone.
+`danger_signs_always` asks every danger-sign question in every case and gives the same outcomes. Which one to deploy
 is a clinical decision, not a technical one. Screenshots `12` to `14` show the shortened flow, and `15`
 and `16` show flow.html.
 

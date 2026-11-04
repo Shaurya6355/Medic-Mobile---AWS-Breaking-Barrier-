@@ -83,8 +83,29 @@ export function ageGroups(ctx: CheckContext): Finding[] {
   for (const d of months === undefined ? [] : model.derived) {
     const bands = bandsOf(d.definition, months as string);
     if (bands.length === 0) continue;
+    const where = `the age bands of "${d.label}"`;
+    if (bands.every((b) => b.hi <= min || b.lo >= below)) {
+      // An out-of-range value ("outside the covered ages"): none of its bands touches the covered ages, so it cannot
+      // split them. It must instead be the exact complement of the covered ages, on each side it covers.
+      for (const p of outsideProblems(bands, min, below)) {
+        const c = citation(d);
+        out.push(
+          makeFinding({
+            check: CHECK,
+            code: "OUTSIDE_AGE_BANDS_MISMATCH",
+            severity: "blocking",
+            audience: ["clinician", "program_officer"],
+            decidedBy: "clinician",
+            subjects: [derivedSubject(d), scopeSubject],
+            params: { where, lo: min, hi: below, range: p, ...c.params },
+            source: c.source,
+          }),
+        );
+      }
+      continue;
+    }
     derivedBands.push({ id: d.id, bands });
-    report(partitionProblems(bands, min, below), `the age bands of "${d.label}"`, derivedSubject(d), d);
+    report(partitionProblems(bands, min, below), where, derivedSubject(d), d);
   }
 
   for (const o of model.outcomes) {
@@ -139,4 +160,28 @@ const DOSE_ROW = /\d+\s*(?:months?|years?)\s+up\s+to\s+\d+\s*(?:months?|years?)\
 function hasDoseRows(act: { text: string; source?: readonly { quote: string }[] | undefined }): boolean {
   const texts = [act.text, ...(act.source ?? []).map((x) => x.quote)];
   return texts.some((t) => DOSE_ROW.test(t.replace(/\s+/g, " ")));
+}
+
+/**
+ * Ages an out-of-range value leaves out, as plain words. The bands below the covered ages must reach down to 0
+ * and up to the covered ages; the bands from the top of the covered ages must start there and have no upper end.
+ * A side the value has no band on is not required (a value only for children that are too young is fine).
+ * Overlaps between its bands are harmless (any one of them is enough) and are not reported.
+ */
+function outsideProblems(bands: readonly Band[], min: number, below: number): string[] {
+  const out: string[] = [];
+  const low = bands.filter((b) => b.hi <= min);
+  const high = bands.filter((b) => b.lo >= below);
+  const TOP = Number.MAX_SAFE_INTEGER;
+  if (low.length > 0) {
+    for (const p of partitionProblems(low.map((b) => ({ lo: Math.max(b.lo, 0), hi: b.hi })), 0, min)) {
+      if (p.kind === "gap") out.push(`${p.from} up to ${p.to} months`);
+    }
+  }
+  if (high.length > 0) {
+    for (const p of partitionProblems(high, below, TOP)) {
+      if (p.kind === "gap") out.push(p.to === TOP ? `${p.from} months and over` : `${p.from} up to ${p.to} months`);
+    }
+  }
+  return out;
 }

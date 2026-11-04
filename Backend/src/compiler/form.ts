@@ -109,7 +109,7 @@ export function buildForm(model: Model, settings: CompileSettings, version: stri
     survey.push(r);
     return survey.length + 1; // worksheet row (header is row 1)
   };
-  const map = (row: number, name: string, kind: SourcemapEntry["kind"], item: string, origin: "guideline" | "team", sources: Source[] | undefined, extra: Partial<SourcemapEntry> = {}): void => {
+  const map = (row: number, name: string, kind: SourcemapEntry["kind"], item: string, origin: SourcemapEntry["origin"], sources: Source[] | undefined, extra: Partial<SourcemapEntry> = {}): void => {
     sourcemap.push({ target: { file: xlsx, sheet: "survey", row, name }, kind, item, origin, sources: srcs(sources), ...extra });
   };
 

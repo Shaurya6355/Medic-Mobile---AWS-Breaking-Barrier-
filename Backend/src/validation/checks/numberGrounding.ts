@@ -1,4 +1,4 @@
-import type { Condition, Model } from "../../logic/schema.js";
+import type { Condition, Model, Origin } from "../../logic/schema.js";
 import { makeFinding } from "../finding.js";
 import type { CheckContext, Finding, Subject } from "../finding.js";
 import {
@@ -39,6 +39,8 @@ type Use = {
   freq?: boolean;
   /** Origin "team" and no source: the number claims no guideline backing. */
   team: boolean;
+  /** Origin "clinician" and no source: decided by the clinician, not checked against the booklet, listed as information. */
+  clinician?: boolean;
   sources: readonly Source[];
   /** Numbers of one group (one age band with its cut-off or dose) must all be written in the same passage. */
   group?: string;
@@ -155,8 +157,13 @@ export const phrase = (op: Cmp["op"], v: string): string => (op === "at_least" ?
 function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjects: Subject[] } {
   const uses: Use[] = [];
   const questions = new Map(model.questions.map((q) => [q.id, q]));
-  const isTeam = (origin: "guideline" | "team", sources: readonly Source[] | undefined): boolean =>
+  // Only an item the team wrote itself ("team", no quote) is a team value to confirm. An item with origin "clinician" and no
+  // quote is a value the clinician decided: not checked against the booklet, listed once as information. A clinician item that
+  // does cite a quote is checked like a guideline item.
+  const isTeam = (origin: Origin, sources: readonly Source[] | undefined): boolean =>
     origin === "team" && (sources === undefined || sources.length === 0);
+  const isClinician = (origin: Origin, sources: readonly Source[] | undefined): boolean =>
+    origin === "clinician" && (sources === undefined || sources.length === 0);
 
   const ageField = model.questions.find((q) => /month/.test(q.unit ?? "") && /\bage|^age|age_/i.test(`${q.id} ${q.label}`))?.id;
   let groupNo = 0;
@@ -165,7 +172,7 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
     subject: Subject,
     item: string,
     when: Condition,
-    origin: "guideline" | "team",
+    origin: Origin,
     sources: readonly Source[] | undefined,
   ): void => {
     // An "all" group that compares the age with numbers and also another number is one age band: its numbers go together.
@@ -198,6 +205,7 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
         ...(unit !== undefined ? { unit } : {}),
         usage: `${phrase(c.op, `${c.value}${unit !== undefined ? " " + unit.replace(/_/g, " ") : ""}`)} for "${clip(q?.label ?? c.field, 60)}"`,
         team: isTeam(origin, sources),
+        clinician: isClinician(origin, sources),
         sources: sources ?? [],
         concept,
         conceptText: `"${clip(q?.label ?? c.field, 60)}"`,
@@ -243,6 +251,7 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
           ...(q.unit !== undefined ? { unit: q.unit } : {}),
           usage: `${word} ${v}`,
           team: isTeam(q.origin, q.source),
+          clinician: isClinician(c.origin, q.source),
           sources: q.source ?? [],
           concept: conceptOf(q),
           conceptText: `"${clip(q.label, 60)}"`,
@@ -260,12 +269,13 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
       const subject = actionSubject(o, i);
       const item = describeAction(o, i);
       const team = isTeam(a.origin, a.source);
+      const clinician = isClinician(a.origin, a.source);
       const sources = a.source ?? [];
       (a.dose_by_age ?? []).forEach((d, di) => {
         const range = `${d.age_months_min} up to ${d.age_months_below} months`;
         const group = `${subject.id}#dose${di}`;
         for (const v of [d.age_months_min, d.age_months_below]) {
-          uses.push({ owner: subject.id, subjects: [subject], item, value: v, unit: "months", usage: `an age limit of ${v} months in the dose table (${range})`, team, sources, group });
+          uses.push({ owner: subject.id, subjects: [subject], item, value: v, unit: "months", usage: `an age limit of ${v} months in the dose table (${range})`, team, clinician, sources, group });
         }
         for (const [what, text] of [["a dose", d.dose], ["a total", d.total]] as const) {
           if (text === undefined) continue;
@@ -278,6 +288,7 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
               ...(n.unit !== undefined ? { unit: n.unit } : {}),
               usage: `${what} of ${text} for age ${range}`,
               team,
+              clinician,
               sources,
               group,
             });
@@ -290,10 +301,11 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
       const subject = followUpSubject(o);
       const item = describeFollowUp(o);
       const team = isTeam(f.origin, f.source);
+      const clinician = isClinician(f.origin, f.source);
       const sources = f.source ?? [];
       const fc = { concept: FOLLOW_UP_CONCEPT, conceptText: "a follow-up or return visit" };
       if (f.due_in_days !== null) {
-        uses.push({ owner: o.id, subjects: [subject], item, value: f.due_in_days, unit: "days", usage: `a follow-up due after ${f.due_in_days} days`, team, sources, ...fc });
+        uses.push({ owner: o.id, subjects: [subject], item, value: f.due_in_days, unit: "days", usage: `a follow-up due after ${f.due_in_days} days`, team, clinician, sources, ...fc });
       }
       if (f.task_window_days_after_due !== null) {
         uses.push({
@@ -304,6 +316,7 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
           unit: "days",
           usage: `a follow-up task that stays open for ${f.task_window_days_after_due} days after it is due`,
           team,
+          clinician,
           sources,
           ...fc,
         });
@@ -364,10 +377,32 @@ export function numberGrounding(ctx: CheckContext): Finding[] {
     );
   }
 
+  const textResult = textNumbers(model);
+  const textClinician = textResult.clinician;
+  // Clinician-decided numbers: not checked against the booklet, but listed once so reviewers see what rests on the clinician's word.
+  const clinicianByOwner = new Map<string, Use[]>();
+  for (const u of [...uses, ...textClinician]) if (u.clinician === true && !u.team) clinicianByOwner.set(u.owner, [...(clinicianByOwner.get(u.owner) ?? []), u]);
+  for (const list of clinicianByOwner.values()) {
+    const first = list[0] as Use;
+    const subjects = [...new Map(list.flatMap((u) => u.subjects).map((s) => [s.kind + s.id, s])).values()];
+    out.push(
+      makeFinding({
+        check: CHECK,
+        code: "CLINICIAN_VALUE",
+        severity: "info",
+        audience: CLINICIAN_FIRST,
+        decidedBy: "clinician",
+        subjects,
+        params: { item: first.item, usage: [...new Set(list.map((u) => u.usage))].join("; ") },
+        source: [],
+      }),
+    );
+  }
+
   let needsDocument = false;
   const grounded = new Set<Use>();
   for (const u of uses) {
-    if (u.team) continue;
+    if (u.team || u.clinician === true) continue;
     if (doc === undefined) {
       needsDocument = true;
       continue;
@@ -485,7 +520,7 @@ export function numberGrounding(ctx: CheckContext): Finding[] {
   }
   if (doc !== undefined) out.push(...pairing(uses, grounded));
   out.push(...teamThresholds(model, teamByOwner));
-  out.push(...textNumbers(model));
+  out.push(...textResult.findings);
   if (needsDocument) {
     out.push(
       makeFinding({
@@ -510,7 +545,7 @@ export function numberGrounding(ctx: CheckContext): Finding[] {
  */
 function pairing(uses: readonly Use[], grounded: ReadonlySet<Use>): Finding[] {
   const groups = new Map<string, Use[]>();
-  for (const u of uses) if (u.group !== undefined && !u.team) groups.set(u.group, [...(groups.get(u.group) ?? []), u]);
+  for (const u of uses) if (u.group !== undefined && !u.team && u.clinician !== true) groups.set(u.group, [...(groups.get(u.group) ?? []), u]);
   const out: Finding[] = [];
   for (const list of groups.values()) {
     if (list.length < 2 || !list.every((u) => grounded.has(u))) continue;
@@ -630,17 +665,18 @@ function teamThresholds(model: Model, teamByOwner: ReadonlyMap<string, Use[]>): 
  * Numbers in words the health worker reads (question labels, labels of calculated values, result titles, action texts)
  * must be in a quote of that item; for a result, its own quotes and those of its actions and follow-up count.
  */
-function textNumbers(model: Model): Finding[] {
-  type T = { subject: Subject; item: string; text: string; sources: readonly Source[] };
+function textNumbers(model: Model): { findings: Finding[]; clinician: Use[] } {
+  type T = { subject: Subject; owner: string; origin: Origin; item: string; text: string; sources: readonly Source[] };
   const texts: T[] = [];
-  for (const q of model.questions) texts.push({ subject: questionSubject(q), item: describeQuestion(q), text: q.label, sources: q.source ?? [] });
-  for (const d of model.derived) texts.push({ subject: derivedSubject(d), item: describeDerived(d), text: d.label, sources: d.source ?? [] });
+  for (const q of model.questions) texts.push({ subject: questionSubject(q), owner: q.id, origin: q.origin, item: describeQuestion(q), text: q.label, sources: q.source ?? [] });
+  for (const d of model.derived) texts.push({ subject: derivedSubject(d), owner: d.id, origin: d.origin, item: describeDerived(d), text: d.label, sources: d.source ?? [] });
   for (const o of model.outcomes) {
     const all = [...(o.source ?? []), ...o.actions.flatMap((a) => a.source ?? []), ...(o.follow_up?.source ?? [])];
-    texts.push({ subject: outcomeSubject(o), item: describeOutcome(o), text: o.title, sources: all });
-    o.actions.forEach((a, i) => texts.push({ subject: actionSubject(o, i), item: describeAction(o, i), text: a.text, sources: a.source ?? [] }));
+    texts.push({ subject: outcomeSubject(o), owner: o.id, origin: o.origin, item: describeOutcome(o), text: o.title, sources: all });
+    o.actions.forEach((a, i) => texts.push({ subject: actionSubject(o, i), owner: actionSubject(o, i).id, origin: a.origin, item: describeAction(o, i), text: a.text, sources: a.source ?? [] }));
   }
   const out: Finding[] = [];
+  const clinician: Use[] = [];
   for (const t of texts) {
     const toks = tokenize(t.sources.map((s) => s.quote), true);
     const bad: string[] = [];
@@ -649,6 +685,20 @@ function textNumbers(model: Model): Finding[] {
       if (!passes(groundNumber(toks, n.value, unit))) bad.push(unit !== undefined ? `${n.value} ${n.unit}` : String(n.value));
     }
     if (bad.length === 0) continue;
+    // Words the clinician wrote with no quote are not checked against the booklet; they are listed as information.
+    if (t.origin === "clinician" && t.sources.length === 0) {
+      clinician.push({
+        owner: t.owner,
+        subjects: [t.subject],
+        item: t.item,
+        value: 0,
+        usage: `the numbers ${[...new Set(bad)].join(", ")} in the text "${clip(t.text, 120)}"`,
+        team: false,
+        clinician: true,
+        sources: [],
+      });
+      continue;
+    }
     const first = t.sources[0];
     out.push(
       makeFinding({
@@ -669,5 +719,5 @@ function textNumbers(model: Model): Finding[] {
       }),
     );
   }
-  return out;
+  return { findings: out, clinician };
 }

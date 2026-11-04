@@ -148,6 +148,11 @@ describe("http api", () => {
     const api2 = Object.values(t2.findResources("AWS::ApiGatewayV2::Api"))[0] as any;
     expect(api2.Properties.CorsConfiguration.AllowOrigins).toEqual(["https://app.example.org"]);
   });
+  it("sets CORS from a uiOrigins string as the CLI passes it", () => {
+    const t3 = build({ uiOrigins: '["https://app.example.org"]' });
+    const api3 = Object.values(t3.findResources("AWS::ApiGatewayV2::Api"))[0] as any;
+    expect(api3.Properties.CorsConfiguration.AllowOrigins).toEqual(["https://app.example.org"]);
+  });
   it("lets only the API invoke the function", () => {
     t.hasResourceProperties("AWS::Lambda::Permission", { Principal: "apigateway.amazonaws.com" });
   });

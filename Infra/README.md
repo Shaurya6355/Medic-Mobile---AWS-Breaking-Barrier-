@@ -23,7 +23,7 @@ AWS CDK v2 (TypeScript) for the data layer (`OrchestratorDataStack`) and the Lam
 | `modelId` | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | Bedrock inference profile ID |
 | `region` | `AWS_REGION`, else `us-west-2` | Target region |
 
-Example: `npx cdk synth -c 'uiOrigins=["https://app.example.org"]'`. `CDK_DEFAULT_REGION` is ignored on purpose, because the CDK CLI fills it with us-east-1 when no profile region is set.
+`uiOrigins` can be set in `cdk.json` as an array, or on the command line as one origin, a comma separated list or a JSON array string: `npx cdk synth -c uiOrigins=https://app.example.org` or `-c 'uiOrigins=["https://a.example","https://b.example"]'`. An entry must be `http(s)://host` with no path; a wildcard or a malformed value fails the synth (it never silently falls back to localhost). Only an unset or empty value gives the localhost default. `CDK_DEFAULT_REGION` is ignored on purpose, because the CDK CLI fills it with us-east-1 when no profile region is set.
 
 ## Commands
 
@@ -95,7 +95,7 @@ Extra context keys: `prices` (object or JSON string; becomes `PRICES_JSON`). `ui
 2. `aws sso login --profile <your profile>` and export the profile.
 3. `AWS_REGION=us-west-2 npx cdk bootstrap` (once per account/region).
 4. `AWS_REGION=us-west-2 npx cdk deploy --all`.
-5. Read `APIURL` and `FUNCTIONNAME` from the outputs. Set the UI origin with `-c 'uiOrigins=["https://app.example.org"]'` on every synth/deploy.
+5. Read `APIURL` and `FUNCTIONNAME` from the outputs. Set the UI origin with `-c uiOrigins=https://app.example.org` on every synth/deploy (or once in `cdk.json`). Check the synthesized CORS `AllowOrigins` before deploying.
 
 CI (`.github/workflows/ci.yml`) runs Infra `tsc`, tests and `cdk synth` with a dummy account and no credentials; it never deploys.
 
