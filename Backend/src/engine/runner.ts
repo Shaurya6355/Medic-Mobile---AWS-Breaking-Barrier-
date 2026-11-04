@@ -7,6 +7,9 @@ export interface RunStepOptions {
   backoffMs: (attempt: number) => number;
   sleep: (ms: number) => Promise<void>;
   prices: PriceTable;
+  // Number of the first attempt in this call (default 1), so a resumed step
+  // does not reuse attempt numbers already stored for it.
+  firstAttempt?: number;
 }
 
 const MAX_ERROR_CHARS = 500;
@@ -18,8 +21,10 @@ function errorText(e: unknown): string {
 export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions): Promise<StepRecord> {
   const { store, run } = ctx;
   let last: StepRecord | undefined;
+  const first = opts.firstAttempt ?? 1;
+  const lastAttempt = first + opts.maxAttempts - 1;
 
-  for (let attempt = 1; attempt <= opts.maxAttempts; attempt++) {
+  for (let attempt = first; attempt <= lastAttempt; attempt++) {
     const startedAt = ctx.now();
     const base: StepRecord = {
       runId: run.runId,
@@ -85,14 +90,14 @@ export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions
       type: "step_failed",
       detail: { step: step.name, attempt, error: (last.error ?? "").slice(0, MAX_ERROR_CHARS) },
     });
-    if (!transient || attempt >= opts.maxAttempts) return last;
+    if (!transient || attempt >= lastAttempt) return last;
 
     await store.appendAudit(run.runId, {
       at: ctx.now(),
       type: "step_retry",
       detail: { step: step.name, attempt, nextAttempt: attempt + 1 },
     });
-    await opts.sleep(opts.backoffMs(attempt));
+    await opts.sleep(opts.backoffMs(attempt - first + 1));
   }
   return last!;
 }

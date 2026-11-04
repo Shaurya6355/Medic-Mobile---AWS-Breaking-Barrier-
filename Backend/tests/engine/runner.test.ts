@@ -144,4 +144,13 @@ describe("runStep", () => {
     expect(sleeps).toEqual([100, 200]);
     expect(await store.listSteps("r1")).toHaveLength(3);
   });
+  it("numbers attempts from firstAttempt, still capped at maxAttempts per call", async () => {
+    const { store, ctx, opts, sleeps } = await setup();
+    const step = stepFrom([transient]);
+    const rec = await runStep(step, ctx, { ...opts, firstAttempt: 4 });
+    expect(rec).toMatchObject({ attempt: 6, status: "failed" });
+    expect(step.calls).toBe(3);
+    expect(sleeps).toEqual([100, 200]);
+    expect((await store.listSteps("r1")).map((s) => s.attempt)).toEqual([4, 5, 6]);
+  });
 });
