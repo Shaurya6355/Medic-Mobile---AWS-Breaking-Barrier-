@@ -111,3 +111,17 @@ Other options considered (and why not):
 Revisit if: AgentCore integration starts, or the logic model format is generalised beyond the cough pathway.
 Related: INT-003, DEC-001
 
+### DEC-007 | Logic model is a pathway spec, compiled by shared code
+Status: decided
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Logic drafting, review UI, compiler
+Decision: The logic model is the pathway spec JSON (schema_version 1.0) the human supplied. One dependency-free compiler in shared/pathway does validation, evaluation, flow graph and XLSForm for both Backend and Frontend.
+Assumptions: Hit policy is first match by priority with exactly one final otherwise rule. A comparison on a hidden or unanswered field is false. Show conditions may only use earlier questions. Derived values are yes/no.
+Why: Human asked for the JSON to drive the flow as a logical, compiler-like rule set, keeping the user flow. Sharing the code keeps backend validation and UI behaviour identical.
+Other options considered (and why not):
+- Map the JSON onto the old fixed d1/d2/d3 model: lossy, breaks for any other pathway.
+- Separate Zod schema in Backend and hand-written checks in Frontend: two copies drift.
+Revisit if: A pathway needs a different hit policy, numeric derived values, or select-multiple questions.
+Related: INT-004, DEC-006
+

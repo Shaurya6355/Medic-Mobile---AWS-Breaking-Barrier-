@@ -24,14 +24,28 @@ Tests: `npm test` (end to end through the HTTP API). Types: `npm run typecheck`.
 3. Worker polls the queue (visibility timeout, 3 receives, then dead-letter) and runs:
    - extract: PDF text layer, TXT, MD, CSV, HTML -> `extracted/<id>/pages.json`. Other types end `Unsupported` (need Textract).
    - digest: labelled blocks with page, kind, numbers with units, decision words -> `digested/<id>/digest.json`.
-   - logic model: `LogicModelBuilder` -> Zod check (`src/pipeline/schema.ts`) -> quote check against the digest -> `logic-models/<id>/logic-model.json`.
+   - logic model: `LogicModelBuilder` -> shared compiler checks (`validateSpec`, structure + semantics) -> quote check against the digest (found, and on the cited page) -> `logic-models/<id>/logic-model.json`.
 4. UI polls `GET /guidelines` for step progress, then reads `GET /guidelines/<id>/logic-model` to start the draft.
 
 Also: `GET /guidelines/<id>`, `/guidelines/<id>/digest`, `/guidelines/<id>/extracted`, `/health`.
 
 ## Logic model step
 
-`placeholderBuilder` runs no model. It returns `src/pipeline/templates/logic-model.template.json` (the sample cough pathway) so the review screen works. Replace it with an AgentCore-backed `LogicModelBuilder`; its output is validated against `ModelSchema` before it is stored. `ModelSchema` mirrors `Model` in `Frontend/src/domain/types.ts`; keep them in step.
+The logic model is a pathway spec (`schema_version` 1.0): questions, derived values, outcomes, rules (first match by priority) and open questions. Format: `shared/pathway/types.ts`; sample: `shared/pathway/samples/cough_fast_breathing.v1.json`.
+
+`placeholderBuilder` runs no model. It returns that sample spec. Replace it with an AgentCore-backed `LogicModelBuilder` that returns the same format; `buildLogicModel` rejects anything with compiler errors before it is stored. Warnings are kept in the envelope's `diagnostics`.
+
+## Pathway compiler (`shared/pathway`)
+
+Shared by this service and the review UI (no dependencies, plain TypeScript):
+
+- `cond.ts`: condition AST, readable text form (`danger_sign is yes and (fast_breathing is yes or chest_indrawing is yes)`), parser, XPath.
+- `analyze.ts`: structural check, then semantics: unknown fields, yes/no vs number operators, derived-value cycles, show conditions that use later questions, duplicate priorities, missing or misplaced `otherwise`, unknown outcomes, unused questions.
+- `evaluate.ts`: the interpreter. Hidden questions are unanswered; a comparison on an unanswered field is false; first matching rule wins.
+- `compile.ts`: flow graph, XLSForm survey rows, source quotes, boundary-value test patients and threshold mutants.
+- `patch.ts`: edits as data (`set`/`unset` by path, `addQ`, `removeQ`).
+
+Tests: `test/pathway.test.ts`.
 
 ## Moving to AWS
 

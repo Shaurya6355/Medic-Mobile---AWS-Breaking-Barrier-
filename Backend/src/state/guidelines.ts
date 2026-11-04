@@ -19,7 +19,7 @@ export interface GuidelineRecord {
   keys: { upload: string; extracted?: string; digested?: string; logicModel?: string };
   error?: string;
   blocks?: number;
-  logicModel?: { source: "placeholder" | "agent"; builder: string; quotesFound: number; quotesTotal: number };
+  logicModel?: { source: "placeholder" | "agent"; builder: string; quotesFound: number; quotesTotal: number; quotesOnPage: number };
 }
 
 export const STEP_LABELS: Record<StepKey, string> = {

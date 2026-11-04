@@ -1,40 +1,32 @@
 /* Workflow state machine: none -> po_draft -> clinician -> (po_revise -> clinician)* -> verify -> deploy -> done.
    Every transition is a pure function returning a new Workflow. The api layer persists the result. */
-import { AI_DRAFT, COND, GRID, NODE_IDS, V3, clone, fnv, hashOf } from "./data";
-import { changedVs, classify, nodeSig, qStatus, runChecks, trayIds, usesOf, isNode } from "./logic";
-import type { Check, CondKey, Decision, Flag, ItemId, Model, Patch, Review, Suggestion, SuggestionOutcome, WfState, Workflow } from "./types";
+import { applyPatch, CondSyntaxError, itemOf, mutationScore, parse, print, splitItem, type Path, type Source } from "../../../shared/pathway/index.ts";
+import { DRAFT, V3, clone, fnv, hashOf } from "./data";
+import { allItems, changedVs, classify, getO, getQ, grid, nodeSig, qStatus, runChecks, slots, srcOf, trayIds, usesOf, type Slot } from "./logic";
+import type { Check, Decision, FbType, Flag, ItemId, Model, Patch, Review, Suggestion, SuggestionOutcome, WfState, Workflow } from "./types";
 
-const PASS_B: Model = (() => { const x = clone(AI_DRAFT); x.d2.conds = ["ci", "stridor"]; return x; })();
-const PASS_DISAGREE = GRID.filter(p => classify(AI_DRAFT, p).out !== classify(PASS_B, p).out).length;
+export { applyPatch };
 
-export const FLAGS0: Flag[] = [
-  { id: "F-1", clinical: true, kind: "Ambiguity", about: "d3", title: "Does exactly 12 months use 50/min or 40/min?",
-    src: "2 months up to 12 months · 12 months up to 5 years", why: "A child of exactly 12 months fits both bands as written. The draft uses 40/min at 12 months.",
-    opts: [{ label: "40/min at 12 months (as drafted)" }, { label: "50/min at 12 months", fb: { type: "value", note: "Age cut-off: exactly 12 months should use the younger threshold, so the cut-off moves to 13 months", value: "13" } }] },
-  { id: "F-2", clinical: true, kind: "Cross-check", about: "d3", title: "Chest indrawing: pneumonia or severe?",
-    src: "Chest indrawing or fast breathing", why: "Pass B kept chest indrawing under severe, as in the 2008 edition. The two passes give different outcomes for " + PASS_DISAGREE + " of " + GRID.length + " synthetic patients.",
-    opts: [{ label: "Pneumonia (pass A, 2014 text)" }, { label: "Severe (pass B)", fb: { type: "value", about: "d2", note: "Add chest indrawing back to the severe signs", value: "chest indrawing" } }] },
-  { id: "F-3", clinical: false, kind: "Uncited passage", about: "q:wheeze", title: "Wheeze passage not used by any rule",
-    src: "If wheezing with either fast breathing or chest indrawing: give a trial of rapid acting inhaled bronchodilator...", why: "It has decision words, but no rule cites it. The wheeze question is asked but unused.",
-    opts: [{ label: "Out of scope for CHWs (keep the question, note why)" }, { label: "Escalate to clinician", escalate: true }] },
-];
-
-export function initialWorkflow(id: string): Workflow {
-  return { id, guideline: null, state: "none", round: 0, rev: 0, model: clone(AI_DRAFT), draft: clone(AI_DRAFT), sent: null, required: [], reviews: {}, sug: {}, fixed: {},
-    flags: clone(FLAGS0), audit: [], versions: [], clock: 0, verify: null, approved: null, lastKey: null };
+/** Flags come from the logic model's open_questions: clinician questions block approval, PO questions block sending. */
+export function flagsFrom(m: Model): Flag[] {
+  return m.open_questions.filter(q => q.status === "open").map(q => {
+    const clinical = q.route_to === "clinician";
+    return {
+      id: "F-" + q.id, clinical, kind: clinical ? "Clinical question" : "Open question",
+      about: q.affects.map(a => itemOf(m, a)).find(Boolean) ?? "scope",
+      title: q.question,
+      src: q.source ? "p. " + q.source.page + ": " + q.source.quote : "No guideline passage",
+      why: "Raised while drafting. Affects " + q.affects.join(", ") + ".",
+      opts: clinical
+        ? [{ label: "Keep as drafted" }, { label: "Change it (say how in the note)", fb: {} }]
+        : [{ label: "Keep as drafted" }, { label: "Escalate to clinician", escalate: true }],
+    };
+  });
 }
 
-/* ---------- Patches: the only way the model changes ---------- */
-export function applyPatch(m: Model, p: Patch): Model {
-  const x = clone(m);
-  switch (p.op) {
-    case "set": (x[p.node] as unknown as Record<string, unknown>)[p.key] = p.value; break;
-    case "setQ": if (x.questions[p.q]) x.questions[p.q][p.key] = p.value; break;
-    case "removeQ": delete x.questions[p.q]; break;
-    case "addQ": x.questions[p.q] = clone(p.question); break;
-    case "setSrc": x.src[p.node] = p.value; break;
-  }
-  return x;
+export function initialWorkflow(id: string, m: Model = DRAFT): Workflow {
+  return { id, guideline: null, state: "none", round: 0, rev: 0, model: clone(m), draft: clone(m), sent: null, required: [], reviews: {}, sug: {}, fixed: {},
+    flags: flagsFrom(m), audit: [], versions: [], clock: 0, verify: null, approved: null, lastKey: null };
 }
 
 /* ---------- Versions and audit ---------- */
@@ -53,70 +45,101 @@ function addVersion(w: Workflow, event: string, by: string): Workflow {
   return { ...w, versions: w.versions.concat({ ver: verLabel(w), event, meta: hashOf(w.model) + " · " + by + " · " + fmtTime(w.clock) }) };
 }
 function requiredFor(m: Model): ItemId[] {
-  const ids: ItemId[] = NODE_IDS.filter(id => changedVs(m, id));
-  trayIds(m).forEach(q => { if (qStatus(m, q) !== "same") ids.push("q:" + q); });
-  return ids;
+  const tray = new Set(trayIds(m));
+  return allItems(m, V3).filter(id => {
+    const [k, key] = splitItem(id);
+    return k === "q" && tray.has(key) ? qStatus(m, key) !== "same" : changedVs(m, id);
+  });
 }
 function expect(w: Workflow, ...states: WfState[]) {
   if (!states.includes(w.state)) throw new Error("Not allowed in state " + w.state);
 }
 
 /* ---------- AI revision from structured feedback (simulated Bedrock call). Output is a Patch, applied only if the PO accepts. ---------- */
+const show = (v: unknown) => (v === undefined || v === null ? "(none)" : typeof v === "object" ? print(v as never) : String(v));
+const tokens = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length > 2);
+function bestSlot(cands: Slot[], text: string): Slot | undefined {
+  const want = new Set(tokens(text));
+  let best: Slot | undefined, score = -1;
+  cands.forEach(s => { const n = tokens(s.label).filter(t => want.has(t)).length; if (n > score) { best = s; score = n; } });
+  return best;
+}
+function sourcePath(m: Model, id: ItemId): Path | null {
+  const [k, key] = splitItem(id);
+  switch (k) {
+    case "scope": return ["scope", "source"];
+    case "q": return ["questions", key, "source"];
+    case "d": return ["derived", key, "source"];
+    case "rule": return ["rules", key, "source"];
+    case "out": return ["outcomes", key, "source"];
+    case "fu": return getO(m, key)?.follow_up ? ["outcomes", key, "follow_up", "source"] : null;
+  }
+  return null;
+}
+
 export function suggest(m: Model, id: ItemId, fb: Review): Suggestion {
   const note = (fb.note || "").trim(), val = (fb.value || "").trim(), lower = (note + " " + val).toLowerCase();
   const clar = (text: string): Suggestion => ({ kind: "clarify", text });
-  const mk = (field: string, from: unknown, to: unknown, patch: Patch): Suggestion => ({ kind: "change", field, from: String(from), to: String(to), patch });
+  const mk = (field: string, from: unknown, to: unknown, patch: Patch): Suggestion => ({ kind: "change", field, from: show(from), to: show(to), patch });
   if (!val && note.length < 25) return clar("Needs clarification: the note does not say what to change. Ask the clinician for the exact wording or value, or edit it yourself.");
-  const isQ = id.startsWith("q:"), q = isQ ? id.slice(2) : "";
-  if (isQ && !m.questions[q]) return clar("This question is not in v4. Restore it first, then apply the change.");
-  const node = isNode(id) ? id : null;
+  const [k, key] = splitItem(id);
+  if (k === "q" && !getQ(m, key)) return clar("This question is not in v4. Restore it first, then apply the change.");
+  const sl = slots(m, id);
+  const condFrom = (text: string): Suggestion | ReturnType<typeof parse> => {
+    try { return parse(text); } catch (e) { return clar("Couldn't read the condition: " + (e instanceof CondSyntaxError ? e.message : String(e)) + ". Write it like: danger_sign is yes and fast_breathing is yes"); }
+  };
+  const isSug = (x: unknown): x is Suggestion => !!x && typeof x === "object" && "kind" in x;
   switch (fb.type) {
-    case "wording":
+    case "wording": {
       if (!val) return clar("Needs clarification: no new wording was given.");
-      if (isQ) return mk("Question label", m.questions[q].label, val, { op: "setQ", q, key: "label", value: val });
-      if (node === "d1" || node === "d2" || node === "d3") return mk("Question", m[node].q, val, { op: "set", node, key: "q", value: val });
-      if (node === "o1" || node === "o2" || node === "o3")
-        return /name|title|classif/.test(note.toLowerCase())
-          ? mk("Classification name", m[node].title, val, { op: "set", node, key: "title", value: val })
-          : mk("Note shown to the CHW", m[node].note, val, { op: "set", node, key: "note", value: val });
-      if (node === "f1") return mk("Task title", m.f1.title, val, { op: "set", node, key: "title", value: val });
-      return clar("Wording does not apply to this box. Say what should change.");
+      const texts = sl.filter(s => s.kind === "text" || s.kind === "area");
+      const s = k === "out" ? (/name|title|classif/.test(note.toLowerCase()) ? texts[0] : texts.find(t => t.kind === "area") ?? texts[0]) : bestSlot(texts, note);
+      if (!s) return clar("Wording does not apply to this box. Say what should change.");
+      return mk(s.label, s.value, val, { op: "set", path: s.path, value: val });
+    }
     case "value": {
-      const num = parseFloat(val.replace(/[^\d.]/g, ""));
-      if ((node === "d2" || node === "d3") && isNaN(num) && /indrawing|stridor|fast/.test(lower)) {
-        const key: CondKey = /indrawing/.test(lower) ? "ci" : /stridor/.test(lower) ? "stridor" : "fast";
-        const rem = /remove|drop|\bnot\b|without|shouldn/.test(lower);
-        const next = rem ? m[node].conds.filter(c => c !== key) : [...new Set([...m[node].conds, key])];
-        return mk("Yes if any of", m[node].conds.map(c => COND[c]).join(", "), next.map(c => COND[c]).join(", "), { op: "set", node, key: "conds", value: next });
-      }
+      const nums = (val || note).match(/-?\d+(?:\.\d+)?/g);
+      const num = nums ? Number(nums[nums.length - 1]) : NaN;
+      const cands = sl.filter(s => s.kind === "number" || s.kind === "numberOrNull");
+      if (!cands.length) return clar("This box has no numeric value. Say which value should change, or request a wording or rule logic change.");
       if (isNaN(num)) return clar("Needs clarification: no number was given.");
-      if (node === "d3") {
-        const f = /cut-?off|age/.test(note.toLowerCase()) ? "cut" : /older|over|after/.test(lower) ? "old" : "young";
-        const label = { cut: "Age cut-off (months)", young: "Threshold under the cut-off (/min)", old: "Threshold at or over the cut-off (/min)" }[f];
-        return mk(label, m.d3[f], num, { op: "set", node, key: f, value: num });
-      }
-      if (node === "f1") { const f = /open|until|end|close/.test(lower) ? "end" : "due"; return mk(f === "due" ? "Due on day" : "Open until day", m.f1[f], num, { op: "set", node, key: f, value: num }); }
-      if (node === "start") { const f = /youngest|from|min/.test(lower) ? "ageMin" : "ageMax"; return mk(f === "ageMin" ? "Youngest age (months)" : "Up to age (months)", m.start[f], num, { op: "set", node, key: f, value: num }); }
-      return clar("This box has no numeric value. Say which value should change.");
+      const s = bestSlot(cands, note)!;
+      return mk(s.label, s.value, num, { op: "set", path: s.path, value: num });
+    }
+    case "logic": {
+      const s = sl.find(x => x.kind === "cond" && x.key !== "show");
+      if (!s) return clar("This box has no rule logic. Pick the rule or derived value to change.");
+      if (!val) return clar("Needs clarification: give the new condition, for example: danger_sign is yes and fast_breathing is yes");
+      const c = condFrom(val);
+      if (isSug(c)) return c;
+      return mk(s.label, s.value, c, { op: "set", path: s.path, value: c });
     }
     case "show": {
-      if (!val) return clar("Needs clarification: give the new show condition, for example cough = yes.");
-      const target = isQ ? q : (usesOf(m, id).find(k => lower.includes(k.replace("_", " "))) || usesOf(m, id)[0]);
+      if (!val) return clar("Needs clarification: give the new show condition, for example: cough is yes");
+      const qs = usesOf(m, id);
+      const target = k === "q" ? key : qs.find(q => lower.includes(q.replace(/_/g, " ")) || lower.includes(q)) || qs[0];
       if (!target) return clar("Show conditions belong to questions. Pick the question.");
-      return mk("Shown when (" + target + ")", m.questions[target].showIf || "always", val, { op: "setQ", q: target, key: "showIf", value: val });
+      const c = condFrom(val);
+      if (isSug(c)) return c;
+      return mk("Shown when (" + target + ")", getQ(m, target)?.shown_when, c, { op: "set", path: ["questions", target, "shown_when"], value: c });
     }
-    case "source":
+    case "source": {
       if (!val) return clar("Needs clarification: say which passage to cite instead.");
-      if (isQ) return mk("Cited quote", m.questions[q].quote, val, { op: "setQ", q, key: "quote", value: val });
-      if (!node) return clar("This box has no citation.");
-      return mk("Cited quote", m.src[node][0], val, { op: "setSrc", node, value: [val, m.src[node][1]] });
+      const p = sourcePath(m, id);
+      if (!p) return clar("This box has no citation.");
+      const [old, where] = srcOf(m, id);
+      const page = Number((where.match(/page (\d+)/) || [])[1]) || Number((note.match(/page (\d+)/i) || [])[1]) || 1;
+      const src: Source = { page, quote: val };
+      return mk("Cited quote", old, val, { op: "set", path: p, value: src });
+    }
     case "remove":
-      if (isQ) return mk("Question " + q, m.questions[q].label, "(removed)", { op: "removeQ", q });
+      if (k === "q") return mk("Question " + key, getQ(m, key)!.label, "(removed)", { op: "removeQ", q: key });
       return clar("Removing a whole step changes the decision table. Ask what should replace it.");
     default: {
       const label = val || note;
-      const key = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 24) || "new_question";
-      return mk("New question " + key, "(none)", label, { op: "addQ", q: key, question: { type: "yesno", label, showIf: "cough = yes", quote: "From clinician feedback; no guideline quote yet" } });
+      const qid = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").replace(/^(\d)/, "q_$1").slice(0, 24) || "new_question";
+      const order = Math.max(0, ...m.questions.map(q => q.order)) + 1;
+      return mk("New question " + qid, "(none)", label, { op: "addQ", question: { id: qid, order, label, answer_type: "yes_no", required: true, origin: "team" } });
     }
   }
 }
@@ -146,7 +169,7 @@ export function gate(w: Workflow, checks: Check[]) {
 export function createDraft(w: Workflow, g: { id: string; name: string; pathway: string; pages: number[] }, from?: { model: Model; event: string; note: string }): Workflow {
   expect(w, "none");
   let x: Workflow = { ...initialWorkflow(w.id), state: "po_draft", guideline: g };
-  if (from) x = { ...x, model: clone(from.model), draft: clone(from.model) };
+  if (from) x = { ...x, model: clone(from.model), draft: clone(from.model), flags: flagsFrom(from.model) };
   x = logged(x, "Program officer", "Created workflow draft", "Pages " + g.pages.join(", ") + " of " + g.name);
   x = from ? logged(x, "System", from.event, from.note)
     : logged(x, "System", "Drafted by Bedrock (inputs pass, rules pass, cross-check pass)", "Every quote and number checked against the source in code");
@@ -183,7 +206,7 @@ export function sendToClinician(w: Workflow): Workflow {
   } else {
     if (g.unresolved.length) throw new Error("Clinician feedback is not resolved");
     const sent = w.sent || V3;
-    const ids: ItemId[] = [...NODE_IDS, ...Object.keys({ ...w.model.questions, ...V3.questions }).map(q => "q:" + q)];
+    const ids = allItems(w.model, sent);
     const changed = ids.filter(id => nodeSig(w.model, id) !== nodeSig(sent, id));
     const prevReq = Object.keys(w.reviews).filter(k => w.reviews[k].status === "changes");
     const required = [...new Set(changed.concat(prevReq))];
@@ -218,8 +241,9 @@ export function decideFlag(w: Workflow, flagId: string, choice: number, note: st
   }
   let y: Workflow = { ...w, flags: w.flags.map(z => z.id === flagId ? { ...z, res: { choice: o.label, note, by, round: w.round } } : z) };
   if (o.fb && f.clinical) {
-    const about = o.fb.about || f.about;
-    y = { ...y, reviews: { ...w.reviews, [about]: { status: "changes", type: o.fb.type, note: o.fb.note + " (flag " + flagId + ")", value: o.fb.value, round: w.round } } };
+    const [k] = splitItem(f.about);
+    const type: FbType = o.fb.type ?? (/\d/.test(note) ? "value" : k === "out" ? "wording" : "logic");
+    y = { ...y, reviews: { ...w.reviews, [f.about]: { status: "changes", type, note: note + " (flag " + flagId + ")", value: "", round: w.round } } };
   }
   return logged(y, by, "Decided flag " + flagId + ": " + o.label, note);
 }
@@ -262,15 +286,16 @@ export function approveAll(w: Workflow): Workflow {
 /** Simulated: the real step builds with cht-conf and runs cht-conf-test-harness. Expected outcomes always come from classify(). */
 export function runVerify(w: Workflow): Workflow {
   expect(w, "verify");
-  const m = w.model, mut = clone(m); mut.d3.young += 1;
+  const m = w.model, ps = grid(m), res = ps.map(p => classify(m, p));
+  const mu = mutationScore(m, ps);
   const v = {
-    match: GRID.length, total: GRID.length,
-    cov: new Set(GRID.map(p => classify(m, p).rule).filter(r => r !== "start")).size,
-    tasks: GRID.filter(p => classify(m, p).out === "o2").length,
-    mut: GRID.filter(p => classify(mut, p).out !== classify(m, p).out).length,
+    match: ps.length, total: ps.length,
+    cov: new Set(res.map(r => r.rule)).size, covTotal: m.rules.length,
+    tasks: res.filter(r => r.out && getO(m, r.out)?.follow_up).length,
+    mut: mu.killed, mutTotal: mu.total,
   };
   let y: Workflow = { ...w, verify: v, state: "deploy" };
-  y = logged(y, "System", "cht-conf build passed; synthetic check passed", v.match + "/" + v.total + " match · mutation caught " + v.mut);
+  y = logged(y, "System", "cht-conf build passed; synthetic check passed", v.match + "/" + v.total + " match · " + v.mut + " of " + v.mutTotal + " threshold mutants caught");
   return logged(y, "System", "Sent to IT approver");
 }
 

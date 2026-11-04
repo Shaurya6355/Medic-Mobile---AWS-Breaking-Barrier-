@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { NODE_IDS, V3, hashOf, same } from "../domain/data";
-import { changedVs, nodeSig, nodeTitle, qStatus, srcOf, trayIds } from "../domain/logic";
+import { V3, hashOf, same } from "../domain/data";
+import { allItems, changedVs, getQ, nodeSig, nodeTitle, qStatus, srcOf } from "../domain/logic";
 import { verLabel } from "../domain/workflow";
 import type { Check, Role, Workflow } from "../domain/types";
 import type { Actions } from "../actions";
@@ -15,9 +15,9 @@ function markersFor(w: Workflow, role: Role, checks: Check[]) {
   const mk: Markers = {}, tone: Tone = {};
   const add = (id: string, cls: string, label: string) => { (mk[id] = mk[id] || []).push([cls, label]); };
   const m = w.model;
-  [...NODE_IDS, ...trayIds(m).map(q => "q:" + q)].forEach(id => {
+  allItems(m, V3, w.draft).forEach(id => {
     if (!id.startsWith("q:") && changedVs(m, id)) { tone[id] = "changed"; add(id, "changed", "Changed"); }
-    if ((w.state === "po_draft" || w.state === "po_revise") && role === "po" && !id.startsWith("q:") && !same(nodeSig(m, id), nodeSig(w.draft, id))) add(id, "ed", "Edited");
+    if ((w.state === "po_draft" || w.state === "po_revise") && role === "po" && !same(nodeSig(m, id), nodeSig(w.draft, id))) add(id, "ed", "Edited");
     const r = w.reviews[id];
     if (r?.status === "approved") add(id, "ok", "Approved");
     else if (r?.status === "changes" && r.round === w.round) {
@@ -38,9 +38,9 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
   const canEdit = role === "po" && (w.state === "po_draft" || w.state === "po_revise");
   const canReview = role === "clinician" && w.state === "clinician";
   const { mk, tone } = markersFor(w, role, checks);
-  const nChanged = NODE_IDS.filter(id => changedVs(m, id)).length;
-  const qAdded = Object.keys(m.questions).filter(q => qStatus(m, q) === "added").length;
-  const qRemoved = Object.keys(V3.questions).filter(q => !m.questions[q]).length;
+  const nChanged = allItems(m, V3).filter(id => !id.startsWith("q:") && changedVs(m, id)).length;
+  const qAdded = m.questions.filter(q => qStatus(m, q.id) === "added").length;
+  const qRemoved = V3.questions.filter(q => !getQ(m, q.id)).length;
   const title = role === "clinician" ? "Clinical review" + (w.round ? " · round " + w.round : "") : role === "it" ? "Workflow (read-only)" : "Program officer workflow";
 
   let banner: string | null = null, bcls = "banner";
@@ -57,7 +57,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
       <div className="top">
         <div>
           <h1>{title}</h1>
-          <div className="ver">{verLabel(w) + " · " + hashOf(m) + " · " + nChanged + " steps changed · " + qAdded + " question added · " + qRemoved + " removed"}</div>
+          <div className="ver">{verLabel(w) + " · " + hashOf(m) + " · " + nChanged + " steps changed · " + qAdded + " question" + (qAdded === 1 ? "" : "s") + " added · " + qRemoved + " removed · " + m.meta.pathway_id + " spec v" + m.meta.version}</div>
         </div>
       </div>
       {banner ? <div className={bcls}>{banner}</div> : null}
@@ -87,7 +87,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
             </div>
             {w.state === "po_revise" ? <FeedbackCard w={w} id={sel} onSug={act.sug} /> : null}
             {canEdit ? <NodeEditor key={sel} m={m} id={sel} edit={act.edit} /> : <><Facts m={m} id={sel} /><QuestionsRead m={m} id={sel} /></>}
-            <div className="quote">{"“" + src[0] + "”"}<small>{"WHO IMCI 2014 · " + src[1]}</small></div>
+            <div className="quote">{"“" + src[0] + "”"}<small>{m.meta.guideline.publisher + ", " + m.meta.guideline.title + " · " + src[1]}</small></div>
             {canReview ? (
               <ReviewControls key={sel + ":" + w.round + ":" + (r ? r.status : "none")} id={sel}
                 review={r && (r.round === w.round || r.status === "approved") ? r : null}

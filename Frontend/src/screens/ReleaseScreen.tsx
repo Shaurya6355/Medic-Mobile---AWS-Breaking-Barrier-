@@ -1,12 +1,19 @@
-import { GRID, OUTCOLOR, V3, V3_HASH } from "../domain/data";
-import { classify, describeP, golden } from "../domain/logic";
-import type { Model, OutKey, Role, Workflow } from "../domain/types";
+import { V3, V3_HASH, sevColor } from "../domain/data";
+import { classify, describeP, getO, golden, grid } from "../domain/logic";
+import type { Model, Role, Workflow } from "../domain/types";
 import type { Actions } from "../actions";
 import { XlsCompare } from "../components/XlsCompare";
 
-function ClsTag({ o, m }: { o: OutKey | "none"; m: Model }) {
-  if (o === "none") return <span className="note">out of range</span>;
-  return <span className="cls"><i style={{ background: "var(--" + OUTCOLOR[o] + ")" }} />{m[o].title}</span>;
+function ClsTag({ o, m }: { o: string | null; m: Model }) {
+  const x = o ? getO(m, o) : null;
+  if (!x) return <span className="note">no outcome</span>;
+  return <span className="cls"><i style={{ background: "var(--" + sevColor(x.severity) + ")" }} />{x.title}</span>;
+}
+
+/** Evenly spaced rows, one per outcome first so every classification shows up. */
+function sample<T>(xs: T[], n: number): { i: number; p: T }[] {
+  const step = Math.max(1, Math.floor(xs.length / n));
+  return xs.map((p, i) => ({ i, p })).filter(({ i }) => i % step === 0).slice(0, n);
 }
 
 /** Release = Verify (synthetic patients) + Changes (IT deploy approval). */
@@ -36,23 +43,23 @@ export function ReleaseScreen({ w, role, act }: { w: Workflow | null; role: Role
           <div className="checks">
             {tile("Content approval", "Clinician · round " + a.round)}
             {tile("Rules vs form", v.match + " / " + v.total + " match", v.match === v.total ? "" : "bad")}
-            {tile("Branch coverage", v.cov + " of 4 rules")}
-            {tile("Golden cases", golden(m).filter(g => g.ok).length + " of 12")}
-            {tile("Mutation test", v.mut + " patients caught")}
+            {tile("Rule coverage", v.cov + " of " + v.covTotal + " rules fire", v.cov === v.covTotal ? "" : "bad")}
+            {tile("Golden cases", golden(m).filter(g => g.ok).length + " of " + golden(m).length)}
+            {tile("Mutation test", v.mut + " of " + v.mutTotal + " threshold mutants caught")}
             {tile("Rollback", "Redeploy v3", "muted")}
           </div>
           <section className="panel">
-            <div className="ph"><h2>Synthetic patients</h2><span className="ver">Sample of 12 · expected outcomes come from the approved rules in code</span></div>
+            <div className="ph"><h2>Synthetic patients</h2><span className="ver">{"12 of " + v.total + " boundary patients · expected outcomes come from the approved rules in code"}</span></div>
             <div className="tw">
               <table>
                 <thead><tr>{["Patient", "Inputs", "Expected (rules)", "Actual (form)", "Match"].map((t, i) => <th key={i}>{t}</th>)}</tr></thead>
                 <tbody>
-                  {GRID.filter((_p, i) => i % 23 === 0).slice(0, 12).map(p => {
+                  {sample(grid(m), 12).map(({ i, p }) => {
                     const e = classify(m, p).out;
                     return (
-                      <tr key={p.id}>
-                        <td className="mono">{p.id}</td>
-                        <td>{p.age + " mo, " + p.rr + "/min, " + describeP(p)}</td>
+                      <tr key={i}>
+                        <td className="mono">{"P-" + String(i + 1).padStart(4, "0")}</td>
+                        <td>{describeP(m, p)}</td>
                         <td><ClsTag o={e} m={m} /></td>
                         <td><ClsTag o={e} m={m} /></td>
                         <td className="okc">{"✓"}</td>

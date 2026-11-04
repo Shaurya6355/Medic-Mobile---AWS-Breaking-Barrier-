@@ -45,13 +45,18 @@ test("PDF goes upload -> S3 event -> queue -> extract -> digest -> logic model",
   const id = await upload("Cough guideline (sample).pdf", await readFile(SAMPLE));
   const g = await waitFor(id, s => s === "Indexed" || s === "Failed" || s === "Unsupported");
   assert.equal(g.status, "Indexed", g.error);
-  assert.equal(g.pages, 2);
+  assert.equal(g.pages, 12);
   assert.deepEqual(g.steps.map(s => s.state), ["done", "done", "done", "done", "done"]);
 
-  const env = await (await fetch(`${base}/guidelines/${id}/logic-model`)).json() as { source: string; quoteCheck: { found: number; total: number }; model: { questions: Record<string, unknown> } };
+  const env = await (await fetch(`${base}/guidelines/${id}/logic-model`)).json() as { source: string; quoteCheck: { found: number; total: number; onPage: number; missing: unknown[]; wrongPage: unknown[] }; model: { schema_version: string; questions: unknown[]; rules: unknown[] } };
   assert.equal(env.source, "placeholder");
-  assert.ok(Object.keys(env.model.questions).length > 0);
-  assert.deepEqual([env.quoteCheck.found, env.quoteCheck.total], [8, 8]);
+  assert.equal(env.model.schema_version, "1.0");
+  assert.equal(env.model.questions.length, 9);
+  assert.equal(env.model.rules.length, 6);
+  assert.deepEqual(env.quoteCheck.missing, []);
+  assert.deepEqual(env.quoteCheck.wrongPage, []);
+  assert.equal(env.quoteCheck.found, env.quoteCheck.total);
+  assert.equal(env.quoteCheck.onPage, env.quoteCheck.total);
 
   const digest = await (await fetch(`${base}/guidelines/${id}/digest`)).json() as { stats: { blocks: number } };
   assert.ok(digest.stats.blocks > 10);

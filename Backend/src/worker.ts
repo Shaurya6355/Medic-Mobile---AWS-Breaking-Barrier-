@@ -51,7 +51,7 @@ export async function processUpload(d: WorkerDeps, key: string): Promise<void> {
     await d.store.put(digestedKey, JSON.stringify(dg, null, 2));
 
     const env = await run("logic_model", () => buildLogicModel(d.builder, { guideline: { id, name: g.name }, digest: dg }),
-      x => `${x.builder} (${x.source}); ${Object.keys(x.model.questions).length} questions; ${x.quoteCheck.found} of ${x.quoteCheck.total} quotes found in this file`);
+      x => `${x.builder} (${x.source}); ${x.model.questions.length} questions, ${x.model.rules.length} rules; ${x.quoteCheck.found} of ${x.quoteCheck.total} quotes found, ${x.quoteCheck.onPage} on the cited page`);
     const modelKey = `logic-models/${id}/logic-model.json`;
     await d.store.put(modelKey, JSON.stringify(env, null, 2));
 
@@ -60,7 +60,7 @@ export async function processUpload(d: WorkerDeps, key: string): Promise<void> {
       r.pages = extracted.totalPages;
       r.blocks = dg.stats.blocks;
       r.keys = { ...r.keys, extracted: extractedKey, digested: digestedKey, logicModel: modelKey };
-      r.logicModel = { source: env.source, builder: env.builder, quotesFound: env.quoteCheck.found, quotesTotal: env.quoteCheck.total };
+      r.logicModel = { source: env.source, builder: env.builder, quotesFound: env.quoteCheck.found, quotesTotal: env.quoteCheck.total, quotesOnPage: env.quoteCheck.onPage };
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -17,7 +17,7 @@ const EMPTY = initialWorkflow("none");
 export default function App() {
   const [role, setRole] = useState<Role>("po");
   const [w, setW] = useState<Workflow | null>(null);
-  const [sel, setSel] = useState("d3");
+  const [sel, setSel] = useState("scope");
   const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
   const { pathname } = useLocation();
@@ -62,7 +62,7 @@ export default function App() {
     runVerify: () => { if (w) run(api.runVerify(w.id)); },
     approveDeploy: () => { if (w) run(api.approveDeploy(w.id)); },
     setRole,
-    reset: () => { setW(null); setSel("d3"); setError(null); nav("/guidelines"); },
+    reset: () => { setW(null); setSel("scope"); setError(null); nav("/guidelines"); },
   };
 
   const stage = STAGES.find(s => s.key === cur.state)!;

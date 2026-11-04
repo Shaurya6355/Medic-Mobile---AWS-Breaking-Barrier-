@@ -41,7 +41,7 @@ Status: current
 Created: 2026-11-03 by Vishnu Athreya (agent)
 Type: sample data
 What it shows or is for: Two-page synthetic guideline PDF with a text layer, for testing upload, extraction and the quote check (all 8 template quotes appear in it). Plus the sample logic model JSON the review screen renders.
-Location: committed (Backend/samples/cough-guideline-sample.pdf, Frontend/docs/samples/logic-model.sample.json, Backend/src/pipeline/templates/logic-model.template.json)
+Location: committed (Backend/samples/cough-guideline-sample.pdf, 12 pages; logic model sample moved to shared/pathway/samples/cough_fast_breathing.v1.json, see INT-004)
 How to regenerate or open it: cd Backend && npm run sample-pdf. Not clinical advice.
 Related system: Guideline intake
 Related: INT-003, DEC-006

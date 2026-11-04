@@ -47,8 +47,8 @@ function PipelineLoader({ g }: { g: Guideline }) {
       </ol>
       {g.status === "Indexed" && g.logicModel?.source === "placeholder" ? (
         <div className="banner muted">
-          No model is connected yet, so the logic model is the sample cough-pathway template, not content drafted from this file.
-          {" " + g.logicModel.quotesFound + " of " + g.logicModel.quotesTotal} of its source quotes appear in this file.
+          No model is connected yet, so the logic model is the hardcoded sample spec (cough_fast_breathing v1), not content drafted from this file.
+          {" Quote check: " + g.logicModel.quotesFound + " of " + g.logicModel.quotesTotal + " source quotes appear in this file" + (g.logicModel.quotesOnPage !== undefined ? ", " + g.logicModel.quotesOnPage + " on the page they cite" : "") + "."}
         </div>
       ) : null}
       {g.error && g.status !== "Indexed" ? <div className="banner" role="alert">{g.error}</div> : null}

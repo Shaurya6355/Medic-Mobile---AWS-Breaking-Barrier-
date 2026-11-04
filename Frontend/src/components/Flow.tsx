@@ -1,48 +1,108 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import dagre from "dagre";
-import { COND } from "../domain/data";
-import { usesOf } from "../domain/logic";
-import type { Model, NodeId } from "../domain/types";
+import { toGraph, type GKind } from "../../../shared/pathway/index.ts";
+import { sevColor } from "../domain/data";
+import { condText, getO, getR, usesOf } from "../domain/logic";
+import type { Model } from "../domain/types";
 
 export type Badge = [cls: string, label: string];
 export type Markers = Record<string, Badge[]>;
 export type Tone = Record<string, "changed" | "bad">;
 
-type Kind = "start" | "decision" | "outcome" | "task";
-interface FlowNode { id: NodeId; type: Kind; color?: string; text: string; sub?: string }
+type Kind = GKind;
+interface FlowNode { id: string; type: Kind; color?: string; text: string; sub?: string }
 
-const EDGES: [NodeId, NodeId, string][] = [["start", "d1", ""], ["d1", "o1", "yes"], ["d1", "d2", "no"], ["d2", "o1", "yes"], ["d2", "d3", "no"], ["d3", "o2", "yes"], ["d3", "o3", "no"], ["o2", "f1", "task"]];
-const WIDTH: Record<Kind, number> = { start: 230, decision: 230, outcome: 230, task: 210 };
-const KICK: Record<Kind, string> = { decision: "Question", outcome: "Classify", task: "Follow-up task", start: "Applies to" };
+const WIDTH: Record<Kind, number> = { start: 230, decision: 240, outcome: 230, task: 210 };
+const KICK: Record<Kind, string> = { decision: "Rule", outcome: "Classify", task: "Follow-up task", start: "Applies to" };
 
-function toNodes(m: Model): FlowNode[] {
-  const yrs = m.start.ageMax % 12 === 0 ? m.start.ageMax / 12 + " years" : m.start.ageMax + " months";
-  const yes = (id: "d2" | "d3") => "Yes if: " + (m[id].conds.map(c => COND[c].toLowerCase()).join(" or ") || "no condition set");
-  return [
-    { id: "start", type: "start", text: "Child " + m.start.ageMin + " months up to " + yrs + " with cough or difficult breathing", sub: "Asks " + usesOf(m, "start").length + " questions" },
-    { id: "d1", type: "decision", text: m.d1.q, sub: "Yes if any of " + m.d1.signs.length + " danger signs" },
-    { id: "d2", type: "decision", text: m.d2.q, sub: yes("d2") },
-    { id: "d3", type: "decision", text: m.d3.q, sub: yes("d3") + (m.d3.conds.includes("fast") ? ". Fast: " + m.d3.young + "/min or more under " + m.d3.cut + " months, " + m.d3.old + " or more after" : "") },
-    { id: "o1", type: "outcome", color: "pink", text: m.o1.title, sub: m.o1.note },
-    { id: "o2", type: "outcome", color: "yellow", text: m.o2.title, sub: m.o2.note },
-    { id: "o3", type: "outcome", color: "green", text: m.o3.title, sub: m.o3.note },
-    { id: "f1", type: "task", text: m.f1.title + ": due day " + m.f1.due + ", open until day " + m.f1.end },
-  ];
+/** The compiled flow graph, with text for each box. */
+function toNodes(m: Model) {
+  const g = toGraph(m);
+  const nodes: FlowNode[] = g.nodes.map(n => {
+    switch (n.kind) {
+      case "start": {
+        const below = m.scope.age_months_below;
+        const yrs = below % 12 === 0 ? below / 12 + " years" : below + " months";
+        return { id: n.id, type: n.kind, text: "Child " + m.scope.age_months_min + " months up to " + yrs, sub: m.questions.length + " questions · " + m.rules.length + " rules, first match wins" };
+      }
+      case "decision": {
+        const r = getR(m, n.key)!;
+        const c = r.when === "otherwise" ? "otherwise" : condText(m, r.when);
+        const qs = usesOf(m, n.id);
+        return { id: n.id, type: n.kind, text: c[0].toUpperCase() + c.slice(1) + "?", sub: r.id + " · reads " + (qs.length ? qs.length + " question" + (qs.length > 1 ? "s" : "") : "no questions") };
+      }
+      case "outcome": {
+        const o = getO(m, n.key)!;
+        return { id: n.id, type: n.kind, color: sevColor(o.severity), text: o.title, sub: o.actions.map(a => a.text).join(" ") };
+      }
+      case "task": {
+        const f = getO(m, n.key)!.follow_up!;
+        return { id: n.id, type: n.kind, text: (f.kind === "scheduled" ? "Follow-up visit" : "Follow up on return") + (f.due_in_days !== null ? ": due day " + f.due_in_days : "") + (f.task_window_days_after_due !== null ? ", open " + f.task_window_days_after_due + " more days" : "") };
+      }
+    }
+  });
+  return { nodes, edges: g.edges.map(e => [e.from, e.to, e.label] as [string, string, string]) };
 }
-function estHeight(n: FlowNode): number {
-  const w = WIDTH[n.type] - 22;
+function estHeight(n: FlowNode, width: number = WIDTH[n.type]): number {
+  const w = width - 22;
   const main = Math.max(1, Math.ceil(n.text.length / Math.floor(w / (n.type === "outcome" ? 7.6 : 7.3))));
   const sub = n.sub ? Math.ceil(n.sub.length / Math.floor(w / 6.6)) : 0;
   return 16 + 16 + main * 18 + sub * 16 + (sub ? 4 : 0) + (n.type === "outcome" ? 6 : 0) + 8;
 }
-function layout(nodes: FlowNode[]) {
-  const g = new dagre.graphlib.Graph<{ n: FlowNode }>();
-  g.setGraph({ rankdir: "TB", nodesep: 28, ranksep: 34, marginx: 6, marginy: 6 });
-  g.setDefaultEdgeLabel(() => ({}));
-  nodes.forEach(n => g.setNode(n.id, { width: WIDTH[n.type], height: estHeight(n), n }));
-  EDGES.forEach(([a, b, l]) => g.setEdge(a, b, { label: l, width: l ? l.length * 6.5 + 10 : 0, height: l ? 16 : 0, labelpos: "c" }));
-  dagre.layout(g);
-  return g;
+interface Pt { x: number; y: number }
+interface LNode { x: number; y: number; width: number; height: number; n: FlowNode }
+interface LEdge { points: Pt[]; label?: string; width?: number; x?: number; y?: number }
+
+/** Decision-table layout: rules stacked in priority order, each rule's outcome beside it, its follow-up task beside that.
+    The compiler always emits a first-match chain, so this reads like the rule table it is. */
+function layout(nodes: FlowNode[], edges: [string, string, string][]) {
+  const GAP_X = 40, GAP_Y = 34, M = 6;
+  const W = { decision: 230, outcome: 220, task: 160 };
+  const col: Record<string, number> = {}, row: Record<string, number> = {};
+  const chain = nodes.filter(n => n.type === "start" || n.type === "decision").map(n => n.id);
+  chain.forEach((id, i) => { col[id] = 0; row[id] = i; });
+  let nextRow = chain.length;
+  edges.forEach(([a, b, l]) => {
+    if (b in row) return;
+    if (l === "yes") { col[b] = 1; row[b] = row[a]; }
+    else if (l === "no" || l === "") { col[b] = 0; row[b] = nextRow++; }
+  });
+  nodes.filter(n => n.type === "outcome" && !(n.id in row)).forEach(n => { col[n.id] = 1; row[n.id] = nextRow++; });
+  edges.forEach(([a, b, l]) => { if (l === "task" && !(b in row)) { col[b] = col[a] + 1; row[b] = row[a]; } });
+
+  const colW = [W.decision, W.outcome, W.task].map((w, c) => (c === 0 ? w : Math.max(w, ...nodes.filter(n => col[n.id] === c).map(n => (n.type === "task" ? W.task : W.outcome)))));
+  const colX: number[] = []; let x = M;
+  colW.forEach((w, c) => { colX[c] = x + w / 2; x += w + GAP_X; });
+  const rowH: number[] = Array(nextRow).fill(0);
+  const width = (n: FlowNode) => (col[n.id] === 0 ? W.decision : n.type === "task" ? W.task : W.outcome);
+  nodes.forEach(n => { rowH[row[n.id]] = Math.max(rowH[row[n.id]], estHeight(n, width(n))); });
+  const rowY: number[] = []; let y = M;
+  rowH.forEach((h, r) => { rowY[r] = y; y += h + GAP_Y; });
+
+  const L = new Map<string, LNode>();
+  nodes.forEach(n => {
+    const w = width(n), h = estHeight(n, w);
+    L.set(n.id, { x: colX[col[n.id]], y: rowY[row[n.id]] + h / 2, width: w, height: h, n });
+  });
+  const E: { v: string; w: string; e: LEdge }[] = edges.filter(([a, b]) => L.has(a) && L.has(b)).map(([a, b, l]) => {
+    const A = L.get(a)!, B = L.get(b)!;
+    let pts: Pt[];
+    if (col[a] === col[b]) pts = [{ x: A.x, y: A.y + A.height / 2 }, { x: B.x, y: B.y - B.height / 2 }];
+    else {
+      // Boxes are top-aligned per row; leave and enter every side edge at the same height so arrows stay level.
+      const ya = rowY[row[a]] + 28, yb = rowY[row[b]] + 28, mx = A.x + A.width / 2 + GAP_X / 2;
+      pts = row[a] === row[b] ? [{ x: A.x + A.width / 2, y: ya }, { x: B.x - B.width / 2, y: yb }]
+        : [{ x: A.x + A.width / 2, y: ya }, { x: mx, y: ya }, { x: mx, y: yb }, { x: B.x - B.width / 2, y: yb }];
+    }
+    const mid = pts.length === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : { x: pts[1].x, y: (pts[1].y + pts[2].y) / 2 };
+    return { v: a, w: b, e: { points: pts, label: l === "task" ? "" : l, width: l ? l.length * 6.5 + 10 : 0, x: mid.x, y: mid.y } };
+  });
+  return {
+    graph: () => ({ width: x - GAP_X + M, height: y - GAP_Y + M }),
+    nodes: () => [...L.keys()],
+    node: (id: string) => L.get(id)!,
+    edges: () => E.map(({ v, w }) => ({ v, w })),
+    edge: (k: { v: string; w: string }) => E.find(e => e.v === k.v && e.w === k.w)!.e,
+  };
 }
 function smooth(p: { x: number; y: number }[]): string {
   let d = "M" + p[0].x + "," + p[0].y;
@@ -58,10 +118,10 @@ function smooth(p: { x: number; y: number }[]): string {
 interface Props { m: Model; selected?: string; onSelect?: (id: string) => void; markers?: Markers; tone?: Tone; label: string }
 
 export function Flow({ m, selected, onSelect, markers = {}, tone = {}, label }: Props) {
-  const nodes = toNodes(m);
-  const key = JSON.stringify(nodes);
+  const { nodes, edges } = toNodes(m);
+  const key = JSON.stringify([nodes, edges]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const g = useMemo(() => layout(nodes), [key]);
+  const g = useMemo(() => layout(nodes, edges), [key]);
   const W = Math.ceil(g.graph().width || 0), H = Math.ceil(g.graph().height || 0);
   const ref = useRef<HTMLDivElement>(null);
   const mk = "ah" + useId().replace(/[^a-zA-Z0-9]/g, "");
@@ -84,10 +144,10 @@ export function Flow({ m, selected, onSelect, markers = {}, tone = {}, label }: 
             </marker>
           </defs>
           {g.edges().map((e, i) => {
-            const ed = g.edge(e) as dagre.GraphEdge & { label?: string; width?: number };
+            const ed = g.edge(e);
             return (
               <g key={i}>
-                <path className="edge" d={smooth(ed.points)} markerEnd={"url(#" + mk + ")"} strokeDasharray={e.w === "f1" ? "5 4" : undefined} />
+                <path className="edge" d={smooth(ed.points)} markerEnd={"url(#" + mk + ")"} strokeDasharray={e.w.startsWith("fu:") ? "5 4" : undefined} />
                 {ed.label ? (
                   <g className="elbl">
                     <rect x={(ed.x || 0) - (ed.width || 0) / 2} y={(ed.y || 0) - 8} width={ed.width} height={16} rx={4} />

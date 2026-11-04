@@ -3,9 +3,9 @@
    (presigned upload to S3, S3 event, extract, digest, logic model) and drafts start from the pipeline's logic model JSON.
    Without it, an in-memory store seeded with the mockup's sample data.
    Workflow steps after the draft still run the domain state machine in memory. */
-import { clone, fnv } from "../domain/data";
+import { clone, fnv, loadSpec } from "../domain/data";
 import * as wf from "../domain/workflow";
-import type { AuditRow, Decision, Guideline, GuidelineType, ItemId, Model, Patch, SuggestionOutcome, Workflow } from "../domain/types";
+import type { AuditRow, Decision, Guideline, GuidelineType, ItemId, Patch, SuggestionOutcome, Workflow } from "../domain/types";
 
 export const API_URL: string | undefined = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || undefined;
 /** True when guidelines come from the backend pipeline rather than sample data. */
@@ -35,8 +35,9 @@ function putFile(url: string, file: File, headers: Record<string, string>, onPro
 
 interface LogicModelEnvelope {
   builder: string; source: "placeholder" | "agent"; notes: string[];
-  quoteCheck: { found: number; total: number; missing: string[] };
-  model: Model;
+  quoteCheck: { found: number; total: number; onPage?: number };
+  /** Pathway spec JSON. Validated here again before use: the UI never trusts the wire. */
+  model: unknown;
 }
 
 export const ACCEPT = ".pdf,.doc,.docx,.odt,.rtf,.xlsx,.xls,.csv,.ods,.png,.jpg,.jpeg,.tif,.tiff,.webp,.html,.htm,.txt,.md";
@@ -101,9 +102,10 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
   if (LIVE) {
     const g = await getGuideline(args.guidelineId);
     const env = await http<LogicModelEnvelope>("/guidelines/" + g.id + "/logic-model");
-    const qc = env.quoteCheck.found + " of " + env.quoteCheck.total + " source quotes found in this file";
+    const model = loadSpec(env.model, "The pipeline's logic model");
+    const qc = env.quoteCheck.found + " of " + env.quoteCheck.total + " source quotes found in this file" + (env.quoteCheck.onPage !== undefined ? ", " + env.quoteCheck.onPage + " on the cited page" : "");
     workflows[id] = wf.createDraft(wf.initialWorkflow(id), { id: g.id, name: g.name, pathway: args.pathway, pages: args.pages }, {
-      model: env.model,
+      model,
       event: env.source === "placeholder" ? "Loaded placeholder logic model (no model connected yet)" : "Loaded logic model from " + env.builder,
       note: (g.s3Uri ? g.s3Uri.replace(/\/uploads\/.*/, "/logic-models/" + g.id + "/logic-model.json") + " · " : "") + qc,
     });

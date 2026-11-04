@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { V3_HASH } from "../domain/data";
-import { golden } from "../domain/logic";
+import { golden, grid, itemLabel } from "../domain/logic";
 import type { Check, Flag, Model, Role, Workflow } from "../domain/types";
 
 export function FlagsPanel({ w, role, onFlag, onSelect }: { w: Workflow; role: Role; onFlag: (id: string, choice: number, note: string) => void; onSelect: (id: string) => void }) {
@@ -21,7 +21,7 @@ function FlagItem({ f, w, role, onFlag, onSelect }: { f: Flag; w: Workflow; role
       <div className="ih">
         <span className="sev">{f.res ? "Decided" : f.kind}</span>
         <b>{f.title}</b>
-        <button type="button" className="lnk" onClick={() => onSelect(f.about)}>{f.about}</button>
+        <button type="button" className="lnk" onClick={() => onSelect(f.about)}>{itemLabel(f.about)}</button>
       </div>
       <div className="quote">{f.src}</div>
       <div className="note">{f.why}</div>
@@ -45,18 +45,20 @@ function FlagItem({ f, w, role, onFlag, onSelect }: { f: Flag; w: Workflow; role
 
 export function ChecksPanel({ checks, m, onSelect }: { checks: Check[]; m: Model; onSelect: (id: string) => void }) {
   const g = golden(m), ok = g.filter(x => x.ok).length;
+  const p = grid(m).length;
   const blocking = checks.filter(c => c.sev === "blocking").length;
   return (
     <section className="panel">
       <h2>Automatic checks</h2>
       <div className="kv"><span>Golden cases</span><b className={ok === g.length ? "okc" : "badc"}>{ok} / {g.length} match</b></div>
+      <div className="kv"><span>Boundary patients run</span><b>{p}</b></div>
       <div className="kv"><span>Blocking problems</span><b className={blocking ? "badc" : "okc"}>{blocking}</b></div>
       {checks.length ? (
         <ul className="clist">
           {checks.map((c, i) => (
             <li key={i} className={c.sev}>
               <span className="sev">{c.sev[0].toUpperCase() + c.sev.slice(1)}</span>{" "}
-              <button type="button" className="lnk" onClick={() => onSelect(c.id)}>{c.id}</button>: {c.text}
+              <button type="button" className="lnk" onClick={() => onSelect(c.id)}>{itemLabel(c.id)}</button>: {c.text}
             </li>
           ))}
         </ul>
