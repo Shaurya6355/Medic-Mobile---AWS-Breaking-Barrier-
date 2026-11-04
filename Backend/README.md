@@ -11,6 +11,7 @@ npx tsc --noEmit      # typecheck
 npm run build         # emits dist/ (tests excluded)
 npm start             # node dist/index.js
 npm run dev           # tsx watch src/index.ts
+npm run dev:local     # the API with no AWS: in memory, fake model, CORS for the UI on :5173 (scripts/devLocal.ts)
 npm run compile:demo  # logic model fixture -> CHT project -> real cht-conf (see compile-demo/README.md)
 npm run pipeline:demo # whole chain with sign-off rules, in memory, FakeModelClient (see "Sign-off" below)
 npm run compile:locked -- --run <id> --version <n> --settings <file> [--out <dir>]  # compile job (DynamoDB + S3)
