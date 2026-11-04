@@ -5,7 +5,7 @@ export interface Run {
   state: RunState;
   pages?: number[];
   currentStep?: string;
-  createdAt: string;
+  createdAt: number;
   docSha256?: string;
   lease?: { owner: string; expiresAt: number };
 }
@@ -16,8 +16,8 @@ export interface StepRecord {
   versionId?: string;
   attempt: number;
   status: "running" | "succeeded" | "failed";
-  startedAt: string;
-  endedAt?: string;
+  startedAt: number;
+  endedAt?: number;
   latencyMs?: number;
   inputTokens: number;
   outputTokens: number;
@@ -32,7 +32,7 @@ export interface Version {
   n: number;
   parent: number | null;
   author: string;
-  createdAt: string;
+  createdAt: number;
   artifactKey: string;
 }
 
@@ -42,5 +42,5 @@ export interface Comment {
   itemRef: string;
   author: string;
   text: string;
-  createdAt: string;
+  createdAt: number;
 }
