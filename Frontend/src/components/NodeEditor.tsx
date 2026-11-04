@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
-import { parse, print, splitItem, type Cond } from "../../../shared/pathway/index.ts";
+import { print, splitItem, type Cond } from "../../../shared/pathway/index.ts";
 import { V3, clone } from "../domain/data";
 import { anyQ, facts, getQ, qStatus, slots, usesOf, type Slot } from "../domain/logic";
 import type { ItemId, Model, Patch } from "../domain/types";
-import { CommitInput, CommitTextarea, Field } from "./inputs";
+import { CommitInput, CommitTextarea, CondInput, Field } from "./inputs";
 
 export type EditFn = (item: ItemId, field: string, patch: Patch) => void;
 
@@ -22,27 +21,6 @@ export function Facts({ m, id }: { m: Model; id: ItemId }) {
         );
       })}
     </dl>
-  );
-}
-
-/** A condition in the text form. Parsed on commit; a syntax error is shown and nothing is saved. */
-function CondInput({ id, value, optional, onCommit }: { id: string; value: Cond | undefined; optional?: boolean; onCommit: (c: Cond | null) => void }) {
-  const text = value ? print(value) : "";
-  const [v, setV] = useState(text);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { setV(text); setErr(null); }, [text]);
-  const commit = () => {
-    if (v.trim() === text) { setErr(null); return; }
-    if (!v.trim()) { if (optional) { setErr(null); onCommit(null); } else setErr("A condition is required."); return; }
-    try { const c = parse(v); setErr(null); onCommit(c); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-  };
-  return (
-    <>
-      <textarea id={id} className="mono" rows={Math.min(5, 1 + Math.ceil(v.length / 48))} value={v} placeholder={optional ? "always" : ""}
-        aria-invalid={!!err} onChange={e => setV(e.target.value)} onBlur={commit}
-        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); } }} />
-      {err ? <span className="note badc" role="alert">{err}</span> : null}
-    </>
   );
 }
 

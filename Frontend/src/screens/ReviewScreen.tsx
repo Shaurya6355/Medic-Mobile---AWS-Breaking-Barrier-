@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { V3, hashOf, same } from "../domain/data";
 import { allItems, changedVs, getQ, nodeSig, nodeTitle, qStatus, srcOf } from "../domain/logic";
@@ -10,6 +11,11 @@ import { Facts, NodeEditor, QuestionsRead } from "../components/NodeEditor";
 import { ReviewControls } from "../components/ReviewControls";
 import { FeedbackCard } from "../components/FeedbackCard";
 import { ChecksPanel, FlagsPanel } from "../components/panels";
+import { RuleTable } from "../components/RuleTable";
+
+type View = "table" | "both" | "flow";
+const VIEWS: [View, string][] = [["table", "Table"], ["both", "Table + flow"], ["flow", "Flow"]];
+const readView = (): View => { try { const v = localStorage.getItem("reviewView"); return v === "table" || v === "flow" ? v : "both"; } catch { return "both"; } };
 
 function markersFor(w: Workflow, role: Role, checks: Check[]) {
   const mk: Markers = {}, tone: Tone = {};
@@ -33,6 +39,8 @@ function markersFor(w: Workflow, role: Role, checks: Check[]) {
 interface Props { w: Workflow | null; role: Role; sel: string; setSel: (id: string) => void; act: Actions; checks: Check[] }
 
 export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
+  const [view, setView] = useState<View>(readView);
+  const pickView = (v: View) => { setView(v); try { localStorage.setItem("reviewView", v); } catch { /* per-viewer convenience only */ } };
   if (!w || w.state === "none") return <div className="banner">No workflow yet. The program officer creates one from <Link to="/guidelines">Guidelines</Link>.</div>;
   const m = w.model;
   const canEdit = role === "po" && (w.state === "po_draft" || w.state === "po_revise");
@@ -61,13 +69,29 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
         </div>
       </div>
       {banner ? <div className={bcls}>{banner}</div> : null}
+      <section className="panel">
+        <div className="ph">
+          <h2>{view === "flow" ? "Rules" : "Rules (IR) · " + m.rules.length + " rules"}</h2>
+          <div className="viewtgl" role="group" aria-label="View">
+            {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => pickView(k)}>{l}</button>)}
+          </div>
+        </div>
+        {view !== "flow"
+          ? <RuleTable w={w} canEdit={canEdit} checks={checks} sel={sel} onSelect={setSel} edit={act.edit} markers={mk} />
+          : <p className="note" style={{ margin: 0 }}>The flow below is read-only. Switch to Table to edit the rules.</p>}
+      </section>
+
       <div className="editgrid">
         <section className="panel">
-          <div className="ph">
-            <h2>Decision flow</h2>
-            <span className="ver">{canEdit ? "Click a box to edit it" : canReview ? "Click a box to review it" : "Click a box to see it"}</span>
-          </div>
-          <Flow m={m} selected={sel} onSelect={setSel} markers={mk} tone={tone} label="Decision flow" />
+          {view !== "table" ? (
+            <>
+              <div className="ph">
+                <h2>Decision flow</h2>
+                <span className="ver">Read-only · drawn from the rule table{canEdit ? " · updates as you edit" : ""}</span>
+              </div>
+              <div className="flowro"><Flow m={m} selected={sel} onSelect={setSel} markers={mk} tone={tone} label="Decision flow (read-only)" /></div>
+            </>
+          ) : null}
           <Tray m={m} selected={sel} onSelect={setSel} markers={mk} />
           <div className="legend">
             <span><span className="badge changed">Changed</span> differs from live</span>

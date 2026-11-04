@@ -82,3 +82,10 @@ What others must do or know: AgentCore output must be a pathway spec; run valida
 Open items: Pathway and page choice still not passed to the logic model step. Golden cases exist only for cough_fast_breathing. dagre is still a Frontend dependency but unused. The verify step still compares rules with themselves (cht-conf-test-harness not wired).
 Related: DEC-007
 
+
+### INT-005 | 2026-11-04 | Vishnu Athreya (agent) | Review UI: rule table
+What changed: Review screen now leads with an editable rule table (the IR): one row per rule in priority order with condition (text form, saved as you type once it parses), outcome, follow-up day, source and status. Rows can be reordered, added (before otherwise) and deleted. A second table edits derived values. Each row's status is Edit required (blocking check), Check (warning or open flag) or OK, with the reasons listed. New drafting-quality checks: rules and outcomes written by the team rather than the guideline, and guideline items with no cited passage. View toggle: Table, Table + flow, Flow. The flow is read-only, drawn from the same model, and redraws as the table changes.
+Files or resources touched: Frontend/src/components/{RuleTable,inputs,NodeEditor}.tsx, Frontend/src/screens/ReviewScreen.tsx, Frontend/src/domain/logic.ts, Frontend/src/styles.css.
+What others must do or know: Live edits use the same Patch path as before, so audit and versions are unchanged (consecutive edits to one field merge into one version).
+Open items: Questions are still edited from the list below the flow, not in a table.
+Related: INT-004, DEC-007

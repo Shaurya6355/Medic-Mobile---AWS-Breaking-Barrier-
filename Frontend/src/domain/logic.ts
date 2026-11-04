@@ -261,6 +261,16 @@ export function runChecks(m: Spec): Check[] {
   });
   m.outcomes.forEach(o => { if (o.follow_up?.origin === "guideline") num(item.fu(o.id), o.follow_up.due_in_days); });
 
+  // How the drafting step did: every rule and outcome should trace back to the guideline.
+  m.rules.forEach(r => {
+    if (r.origin === "team") out.push({ sev: "warning", id: item.rule(r.id), text: "Written by the team, not taken from the guideline. Confirm it or cite a passage." });
+    else if (!r.source) out.push({ sev: "warning", id: item.rule(r.id), text: "Marked as from the guideline but cites no passage." });
+  });
+  m.outcomes.forEach(o => {
+    if (o.origin === "team") out.push({ sev: "warning", id: item.out(o.id), text: "Outcome written by the team, not the guideline. Confirm the advice." });
+    o.actions.forEach((a, i) => { if (a.origin === "guideline" && !a.source) out.push({ sev: "warning", id: item.out(o.id), text: "Action " + (i + 1) + " cites no passage." }); });
+  });
+
   golden(m).filter(x => !x.ok).forEach(x => out.push({
     sev: "blocking", id: x.rule ? item.rule(x.rule) : item.scope,
     text: "Golden case " + x.id + " (" + describeP(m, x.a) + ") expected " + outName(m, x.exp) + ", got " + outName(m, x.got) + ".",
@@ -293,3 +303,12 @@ export function srcOf(m: Spec, id: ItemId): [quote: string, where: string] {
   if ("source" in x && x.source) return [x.source.quote, "page " + x.source.page];
   return ["Team decision: no guideline quote.", "origin: " + ("origin" in x ? x.origin : "team")];
 }
+
+/** Checks and open flags that touch any of the given items: what the rule table shows on each row. */
+export function rowIssues(checks: Check[], flags: { id: string; about: ItemId; res?: unknown; clinical: boolean; title: string }[], ids: ItemId[]) {
+  const cs = checks.filter(c => ids.includes(c.id));
+  const fs = flags.filter(f => !f.res && ids.includes(f.about));
+  const status: "edit" | "check" | "ok" = cs.some(c => c.sev === "blocking") ? "edit" : cs.length || fs.length ? "check" : "ok";
+  return { checks: cs, flags: fs, status };
+}
+
