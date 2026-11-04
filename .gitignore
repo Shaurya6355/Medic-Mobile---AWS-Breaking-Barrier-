@@ -6,6 +6,10 @@ flow.html
 system_prompt.txt
 Backend/extraction/pages
 Backend/cross-check/pages
+# Model run outputs are never committed (extraction, cross-check and validation runs)
+Backend/**/raw_response.txt
+Backend/**/run_metrics.json
+Backend/validation/flags.json
 Docs/superpowers
 .superpowers
 .env
