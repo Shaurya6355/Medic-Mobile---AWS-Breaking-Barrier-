@@ -3,14 +3,14 @@
   "flow": {
     "mode": "minimal",
     "derivationVersion": "flow-2-is_no",
-    "nodes": 105,
-    "leaves": 54,
+    "nodes": 153,
+    "leaves": 78,
     "maxDepth": 9,
     "questionsAlwaysAsked": [
-      "age_months"
+      "age_months",
+      "cough"
     ],
     "questionsSometimesSkipped": [
-      "cough",
       "cough_days",
       "convulsions",
       "not_able_to_drink_or_feed",
@@ -21,7 +21,7 @@
     ],
     "neverAsked": [],
     "points": 6400,
-    "avgQuestions": 3.19125,
+    "avgQuestions": 4.675,
     "avgQuestionsFullForm": 8.92,
     "treeMismatches": 0,
     "compiledMismatches": 0,
@@ -99,8 +99,8 @@
     {
       "path": "forms/app/cough_fast_breathing.xml",
       "exists": true,
-      "bytes": 25264,
-      "sha256": "c6d6c7fb5cc40af65bb667f243d2682fd4b34f657406be33295d3f4b9ace0d37"
+      "bytes": 29863,
+      "sha256": "3f6d958695ee4eb4937492086bcf77b7b33bee82de31ef6fcf7ca9e4b926cd71"
     },
     {
       "path": "app_settings.json",

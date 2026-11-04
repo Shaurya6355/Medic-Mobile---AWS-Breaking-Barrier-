@@ -7,8 +7,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "9b1e88cf28f62727118f95d3e1bb6202ef884b1170b3735d590527bd9467cb9c",
-      "bytes": 2462
+      "sha256": "c1b557549023ae9d9a13cc796028928411e8cffb609ddd8b3c990ba607f5fcce",
+      "bytes": 2664
     },
     {
       "path": "app_settings/base_settings.json",
@@ -27,8 +27,8 @@
     },
     {
       "path": "forms/app/cough_fast_breathing.xlsx",
-      "sha256": "9915aa917725f813ab42e55cd8c87efd79ad85778ff9cc999213791473a252ac",
-      "bytes": 10472
+      "sha256": "d6a06eea2c357bb5774a182720eeb0879f67ac76451e78ea1caab57bec927d9f",
+      "bytes": 10648
     },
     {
       "path": "package.json",
@@ -37,8 +37,8 @@
     },
     {
       "path": "sourcemap.json",
-      "sha256": "c740e8b6d24fa927f65f02272a21eff4ba937247590c5af22eda0e1b5cdf47e3",
-      "bytes": 10779
+      "sha256": "b8f74d8b5534b46b81fb4a801cdb43f2e1b84c4e03d4050007e39c4908f73d77",
+      "bytes": 11998
     },
     {
       "path": "targets.js",
@@ -47,7 +47,7 @@
     },
     {
       "path": "tasks.js",
-      "sha256": "f66ce75e638dea7a04d5f0970c6f17cd126b1a3425f0c5fad7a422769f373f75",
+      "sha256": "194be1ad3611c398a574a7b667071216aae8aa26c3ea9800655e3d8413329d97",
       "bytes": 1752
     },
     {
@@ -57,16 +57,21 @@
     }
   ],
   "formId": "cough_fast_breathing",
-  "modelSha": "3dcbacce7f6065dd4394c6cea1b1e4b268c607e8fc487d40ad4a67d804b22955",
+  "modelSha": "ade819699397846e36390e803232c81226724585d68b0d7c61deb6d0e1852deb",
   "buildKind": "preview",
-  "version": "preview-3dcbacce",
+  "version": "preview-ade81969",
   "warnings": [
     "TEAM_DEFAULT_USED: outcomes.treat_fast_breathing_at_home.follow_up.task_window_days_after_due is null; used settings.taskWindowDays = 7 (open question Q5)",
+    "NOT_COMPILED: outcomes.refer_urgent_outside_age_range.follow_up: needs a return date (no trigger defined)",
     "NOT_COMPILED: outcomes.refer_outside_age_range.follow_up: needs a return date (no trigger defined)",
     "NOT_COMPILED: outcomes.refer_urgent_with_antibiotic.follow_up: needs a return date (no trigger defined)",
     "NOT_COMPILED: outcomes.refer_urgent.follow_up: needs a return date (no trigger defined)"
   ],
   "notCompiled": [
+    {
+      "item": "outcomes.refer_urgent_outside_age_range.follow_up",
+      "reason": "needs a return date (no trigger defined)"
+    },
     {
       "item": "outcomes.refer_outside_age_range.follow_up",
       "reason": "needs a return date (no trigger defined)"
@@ -83,14 +88,14 @@
   "flow": {
     "mode": "minimal",
     "derivationVersion": "flow-2-is_no",
-    "nodes": 105,
-    "leaves": 54,
+    "nodes": 153,
+    "leaves": 78,
     "maxDepth": 9,
     "questionsAlwaysAsked": [
-      "age_months"
+      "age_months",
+      "cough"
     ],
     "questionsSometimesSkipped": [
-      "cough",
       "cough_days",
       "convulsions",
       "not_able_to_drink_or_feed",
@@ -101,7 +106,7 @@
     ],
     "neverAsked": [],
     "points": 6400,
-    "avgQuestions": 3.19125,
+    "avgQuestions": 4.675,
     "avgQuestionsFullForm": 8.92,
     "treeMismatches": 0,
     "compiledMismatches": 0,
@@ -109,7 +114,7 @@
   },
   "sourcemap": {
     "formId": "cough_fast_breathing",
-    "modelSha": "3dcbacce7f6065dd4394c6cea1b1e4b268c607e8fc487d40ad4a67d804b22955",
+    "modelSha": "ade819699397846e36390e803232c81226724585d68b0d7c61deb6d0e1852deb",
     "flowMode": "minimal",
     "entries": [
       {
@@ -144,8 +149,7 @@
             "page": 5,
             "quote": "Cough? If yes, for how long?"
           }
-        ],
-        "flowCondition": "minimal"
+        ]
       },
       {
         "target": {
@@ -278,6 +282,23 @@
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
           "row": 41,
+          "name": "outside_age_range"
+        },
+        "kind": "derived",
+        "item": "outside_age_range",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 3,
+            "quote": "child age 2 months up to 5 years"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 42,
           "name": "fast_breathing"
         },
         "kind": "derived",
@@ -287,6 +308,10 @@
           {
             "page": 8,
             "quote": "In a child age 2 months up to 12 months, 50 breaths or more per minute"
+          },
+          {
+            "page": 8,
+            "quote": "In a child age 12 months up to 5 years, 40 breaths or more per minute"
           }
         ]
       },
@@ -294,7 +319,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 42,
+          "row": 43,
           "name": "danger_sign"
         },
         "kind": "derived",
@@ -311,7 +336,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 43,
+          "row": 44,
           "name": "outcome"
         },
         "kind": "rule",
@@ -323,11 +348,28 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 43,
+          "row": 44,
           "name": "outcome"
         },
         "kind": "rule",
         "item": "R2",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 12,
+            "quote": "If any OTHER PROBLEM or condition you cannot manage, refer child to health facility"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 44,
+          "name": "outcome"
+        },
+        "kind": "rule",
+        "item": "R3",
         "origin": "guideline",
         "sources": [
           {
@@ -340,11 +382,11 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 43,
+          "row": 44,
           "name": "outcome"
         },
         "kind": "rule",
-        "item": "R3",
+        "item": "R4",
         "origin": "guideline",
         "sources": [
           {
@@ -357,11 +399,11 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 43,
+          "row": 44,
           "name": "outcome"
         },
         "kind": "rule",
-        "item": "R4",
+        "item": "R5",
         "origin": "guideline",
         "sources": [
           {
@@ -374,19 +416,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 43,
-          "name": "outcome"
-        },
-        "kind": "rule",
-        "item": "R5",
-        "origin": "team",
-        "sources": []
-      },
-      {
-        "target": {
-          "file": "forms/app/cough_fast_breathing.xlsx",
-          "sheet": "survey",
-          "row": 43,
+          "row": 44,
           "name": "outcome"
         },
         "kind": "rule",
@@ -398,7 +428,31 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 45,
+          "row": 44,
+          "name": "outcome"
+        },
+        "kind": "rule",
+        "item": "R7",
+        "origin": "team",
+        "sources": []
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 46,
+          "name": "outcome_refer_urgent_outside_age_range"
+        },
+        "kind": "outcome_note",
+        "item": "refer_urgent_outside_age_range",
+        "origin": "team",
+        "sources": []
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 47,
           "name": "outcome_refer_outside_age_range"
         },
         "kind": "outcome_note",
@@ -410,7 +464,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 46,
+          "row": 48,
           "name": "outcome_refer_urgent_with_antibiotic"
         },
         "kind": "outcome_note",
@@ -427,7 +481,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 47,
+          "row": 49,
           "name": "outcome_refer_urgent_with_antibiotic_dose_1_1"
         },
         "kind": "dose_note",
@@ -444,7 +498,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 48,
+          "row": 50,
           "name": "outcome_refer_urgent_with_antibiotic_dose_1_2"
         },
         "kind": "dose_note",
@@ -461,7 +515,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 49,
+          "row": 51,
           "name": "outcome_refer_urgent"
         },
         "kind": "outcome_note",
@@ -478,7 +532,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 50,
+          "row": 52,
           "name": "outcome_treat_fast_breathing_at_home"
         },
         "kind": "outcome_note",
@@ -495,7 +549,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 51,
+          "row": 53,
           "name": "outcome_treat_fast_breathing_at_home_dose_1_1"
         },
         "kind": "dose_note",
@@ -512,7 +566,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 52,
+          "row": 54,
           "name": "outcome_treat_fast_breathing_at_home_dose_1_2"
         },
         "kind": "dose_note",
@@ -529,7 +583,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 53,
+          "row": 55,
           "name": "outcome_cough_no_fast_breathing"
         },
         "kind": "outcome_note",
@@ -541,7 +595,7 @@
         "target": {
           "file": "forms/app/cough_fast_breathing.xlsx",
           "sheet": "survey",
-          "row": 54,
+          "row": 56,
           "name": "outcome_no_cough"
         },
         "kind": "outcome_note",
