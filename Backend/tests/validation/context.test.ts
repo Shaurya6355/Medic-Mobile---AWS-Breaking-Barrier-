@@ -28,7 +28,7 @@ describe("loadGoldenCases", () => {
   it("reads the proposed cases", () => {
     const g = loadGoldenCases(rawGoldenCases());
     expect(g.length).toBeGreaterThanOrEqual(14);
-    expect(g[0]).toMatchObject({ id: "g01", expected_outcome: "treat_fast_breathing_at_home", expected_rule: "R4" });
+    expect(g[0]).toMatchObject({ id: "g01", expected_outcome: "treat_fast_breathing_at_home", expected_rule: "R5" });
   });
   it("rejects duplicate ids and cases without an expected outcome", () => {
     const c = { id: "a", description: "d", answers: { x: 1 }, expected_outcome: "o" };

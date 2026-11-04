@@ -14,10 +14,10 @@ describe("goldenCases", () => {
     expect(fs.filter((f) => f.code === "GOLDEN_MISMATCH" || f.code === "GOLDEN_INVALID")).toEqual([]);
     const count = fs.find((f) => f.code === "GOLDEN_COUNT")!;
     expect(count.severity).toBe("info");
-    expect(count.params["total"]).toBe(17);
-    expect(count.params["agree"]).toBe(17);
+    expect(count.params["total"]).toBe(20);
+    expect(count.params["agree"]).toBe(20);
     expect(fs.filter((f) => f.code === "GOLDEN_PENDING_CLINICIAN")).toHaveLength(1);
-    expect(fs.find((f) => f.code === "GOLDEN_PENDING_CLINICIAN")!.params["count"]).toBe(17);
+    expect(fs.find((f) => f.code === "GOLDEN_PENDING_CLINICIAN")!.params["count"]).toBe(20);
   });
   it("outcomes no case leads to are warned about", () => {
     const fs = run().filter((f) => f.code === "OUTCOME_WITHOUT_GOLDEN_CASE");
@@ -26,7 +26,7 @@ describe("goldenCases", () => {
       expect(f.decidedBy).toBe("clinician");
     }
     const withCase = new Set(goldenCases().map((c) => c.expected_outcome));
-    const all = ["refer_outside_age_range", "refer_urgent_with_antibiotic", "refer_urgent", "treat_fast_breathing_at_home", "cough_no_fast_breathing", "no_cough"];
+    const all = ["refer_urgent_outside_age_range", "refer_outside_age_range", "refer_urgent_with_antibiotic", "refer_urgent", "treat_fast_breathing_at_home", "cough_no_fast_breathing", "no_cough"];
     expect(fs.map((f) => f.subjects[0]!.id).sort()).toEqual(all.filter((o) => !withCase.has(o)).sort());
   });
   it("a case that expects another result blocks, with both results in words and the rule that fired", () => {
@@ -38,14 +38,14 @@ describe("goldenCases", () => {
     expect(f.subjects[0]!.id).toBe("golden:g01");
     expect(f.message).toContain("Danger sign: refer urgently");
     expect(f.message).toContain("Fast breathing (pneumonia): treat at home and follow up in 3 days");
-    expect(f.message).toContain("R4");
+    expect(f.message).toContain("R5");
     expect(f.message).toContain("6 months, 52 breaths");
   });
   it("a case that gets the right result through another rule also blocks, saying so", () => {
-    const f = run((g) => { g[0].expected_rule = "R5"; }).find((x) => x.code === "GOLDEN_MISMATCH")!;
+    const f = run((g) => { g[0].expected_rule = "R6"; }).find((x) => x.code === "GOLDEN_MISMATCH")!;
     expect(f.params["ruleOnly"]).toBe(true);
-    expect(f.message).toContain("R4");
     expect(f.message).toContain("R5");
+    expect(f.message).toContain("R6");
   });
   it("a case without an expected rule is judged on the result alone", () => {
     expect(codes((g) => { delete g[0].expected_rule; })).not.toContain("GOLDEN_MISMATCH");
@@ -79,7 +79,7 @@ describe("goldenCases", () => {
   it("an empty list of cases still reports the count and the outcomes without a case", () => {
     const fs = run((g) => { g.length = 0; });
     expect(fs.find((f) => f.code === "GOLDEN_COUNT")!.params["total"]).toBe(0);
-    expect(fs.filter((f) => f.code === "OUTCOME_WITHOUT_GOLDEN_CASE")).toHaveLength(6);
+    expect(fs.filter((f) => f.code === "OUTCOME_WITHOUT_GOLDEN_CASE")).toHaveLength(7);
   });
   it("is deterministic", () => {
     expect(run().map((f) => f.id)).toEqual(run().map((f) => f.id));

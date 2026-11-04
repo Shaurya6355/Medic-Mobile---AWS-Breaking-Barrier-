@@ -9,7 +9,7 @@ describe("closedTable", () => {
   });
 
   it("reports a missing catch-all and the children who would get no result", () => {
-    const fs = closedTable(matchedCtx((m) => { m.rules = m.rules.filter((r: any) => r.id !== "R6"); }));
+    const fs = closedTable(matchedCtx((m) => { m.rules = m.rules.filter((r: any) => r.id !== "R7"); }));
     expect(codesOf(fs)).toEqual(["TABLE_NOT_CLOSED", "UNCOVERED_ANSWERS"]);
     for (const f of fs) {
       expect(f.severity).toBe("blocking");
@@ -25,8 +25,8 @@ describe("closedTable", () => {
     const fs = closedTable(
       matchedCtx((m) => {
         const r1 = m.rules.find((r: any) => r.id === "R1");
-        const r6 = m.rules.find((r: any) => r.id === "R6");
-        [r1.priority, r6.priority] = [r6.priority, r1.priority];
+        const r7 = m.rules.find((r: any) => r.id === "R7");
+        [r1.priority, r7.priority] = [r7.priority, r1.priority];
       }),
     );
     expect(codesOf(fs)).toEqual(["TABLE_NOT_CLOSED"]);
@@ -45,7 +45,7 @@ describe("closedTable", () => {
   });
 
   it("is NOT_PROVEN when the draft refers to something that does not exist", () => {
-    const fs = closedTable(matchedCtx((m) => { m.rules[2].when = { field: "ghost", op: "is_yes" }; }));
+    const fs = closedTable(matchedCtx((m) => { m.rules[3].when = { field: "ghost", op: "is_yes" }; }));
     expect(codesOf(fs)).toEqual(["NOT_PROVEN"]);
   });
 });

@@ -12,14 +12,14 @@ const swapPriorities = (m: any, a: string, b: string) => {
 describe("exclusivity (first match wins)", () => {
   it("passes v1", () => expect(exclusivity(matchedCtx())).toEqual([]));
   it("warns about a rule that is always hidden by a rule above it, with an example child", () => {
-    const fs = exclusivity(matchedCtx((m) => swapPriorities(m, "R2", "R3")));
+    const fs = exclusivity(matchedCtx((m) => swapPriorities(m, "R3", "R4")));
     expect(fs).toHaveLength(1);
     const f = fs[0]!;
     expect(f.code).toBe("SHADOWED_RULE");
     expect(f.severity).toBe("warning");
-    expect(f.subjects).toContainEqual({ kind: "rule", id: "R2" });
+    expect(f.subjects).toContainEqual({ kind: "rule", id: "R3" });
     expect(f.message).toMatch(/a child aged \d+ months?/);
-    expect(f.message).toContain("R3");
+    expect(f.message).toContain("R4");
     expect(f.message).not.toMatch(JARGON_RE);
   });
 });
@@ -31,19 +31,19 @@ describe("reachability", () => {
   it("blocks a rule that can never be true (UNREACHABLE_RULE) and the result only it gave", () => {
     const fs = reachability(
       matchedCtx((m) => {
-        m.rules.find((r: any) => r.id === "R2").when = { all: [{ field: "danger_sign", op: "is_yes" }, { field: "age_months", op: "at_least", value: 500 }] };
+        m.rules.find((r: any) => r.id === "R3").when = { all: [{ field: "danger_sign", op: "is_yes" }, { field: "age_months", op: "at_least", value: 500 }] };
       }),
     );
     // 500 months is above the age entry limit (120), which is reported as well
     expect(codesOf(fs).sort()).toEqual(["ENTRY_LIMIT_HIDES_CUTOFF", "UNREACHABLE_OUTCOME", "UNREACHABLE_RULE"]);
     const rule = fs.find((f) => f.code === "UNREACHABLE_RULE")!;
     expect(rule.severity).toBe("blocking");
-    expect(rule.subjects).toContainEqual({ kind: "rule", id: "R2" });
+    expect(rule.subjects).toContainEqual({ kind: "rule", id: "R3" });
     expect(rule.source.length).toBeGreaterThan(0);
     expect(rule.message).not.toMatch(JARGON_RE);
   });
   it("blocks a rule that is always preempted, and says so differently from a rule that is never true", () => {
-    const fs = reachability(matchedCtx((m) => swapPriorities(m, "R2", "R3")));
+    const fs = reachability(matchedCtx((m) => swapPriorities(m, "R3", "R4")));
     expect(codesOf(fs).sort()).toEqual(["UNREACHABLE_OUTCOME", "UNREACHABLE_RULE"]);
     expect(fs.find((f) => f.code === "UNREACHABLE_RULE")!.params["why"]).toBe("hidden");
   });

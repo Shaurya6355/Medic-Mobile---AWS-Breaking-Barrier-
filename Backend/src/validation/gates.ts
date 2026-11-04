@@ -47,6 +47,7 @@ const LABELS: Record<string, readonly [string, string]> = {
   RESERVED_FIELD_NAME: ["name the form keeps for itself", "names the form keeps for itself"],
   INVALID_FIELD_NAME: ["name that cannot be used in the form", "names that cannot be used in the form"],
   FIELD_RENAMED: ["renamed or removed question that existing reports use", "renamed or removed questions that existing reports use"],
+  OUTSIDE_AGE_BANDS_MISMATCH: ["rule for children outside the covered ages that leaves some of them out", "rules for children outside the covered ages that leave some of them out"],
   UNCOVERED_ANSWERS: ["group of children left without a result", "groups of children left without a result"],
   TABLE_NOT_CLOSED: ["list of rules without a catch-all", "lists of rules without a catch-all"],
   CHECK_CRASHED: ["check that stopped before it finished", "checks that stopped before they finished"],

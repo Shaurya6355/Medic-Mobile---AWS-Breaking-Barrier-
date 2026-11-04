@@ -85,8 +85,19 @@ export function boundaryCards(model: Model, maxPoints?: number): BoundaryCard[] 
   const cards: BoundaryCard[] = [];
   const score = (p: Answers): number => Object.values(p).filter((v) => v === true).length;
   const order = a.points.map((_, i) => i).sort((i, j) => score(a.points[i] as Answers) - score(a.points[j] as Answers) || i - j);
+  const ageId = monthsQuestionId(model);
+  const { age_months_min: scopeMin, age_months_below: scopeBelow } = model.scope;
+  // A cut-off on any other question is shown for a child the form is meant for, not for a child outside the covered ages
+  // (who is sent on by the age rules whatever the other answers are). The age question itself keeps every age.
+  const insideScope = (p: Answers): boolean => {
+    const v = ageId === undefined ? undefined : p[ageId];
+    return typeof v !== "number" || (v >= scopeMin && v < scopeBelow);
+  };
+  const inScopeFirst = order.filter((i) => insideScope(a.points[i] as Answers));
+  const scopeOrder = inScopeFirst.length > 0 ? [...inScopeFirst, ...order.filter((i) => !insideScope(a.points[i] as Answers))] : order;
   for (const q of model.questions) {
     if (q.answer_type !== "integer") continue;
+    const candidates = q.id === ageId ? order : scopeOrder;
     const ts = [...new Set([...uses.values()].filter((u) => u.field === q.id).map((u) => u.t))].sort((x, y) => x - y);
     for (const t of ts) {
       const values = [t - 1, t, t + 1].filter((v) => !q.constraint || (v >= q.constraint.min && v <= q.constraint.max));
@@ -98,7 +109,7 @@ export function boundaryCards(model: Model, maxPoints?: number): BoundaryCard[] 
       let derivedPick: Answers | undefined;
       let fallback: Answers | undefined;
       if (values.length === 3) {
-        for (const i of order) {
+        for (const i of candidates) {
           const p = a.points[i] as Answers;
           if (p[q.id] === undefined) continue;
           fallback ??= p;
@@ -141,10 +152,10 @@ export function boundaryCardsCheck(ctx: CheckContext): Finding[] {
     const meeting = card.field === months ? bands.filter((b) => b.hi === t && bands.some((o) => o.lo === t)) : [];
     const bandsMeet = meeting.length > 0;
     const meetingIds = new Set(bands.filter((b) => b.hi === t || b.lo === t).map((b) => b.id));
-    const openQ = bandsMeet
-      ? model.open_questions.filter((o) => o.status === "open" && o.affects.some((x) => meetingIds.has(x))).map((o) => o.id).sort()[0]
-      : undefined;
+    // Only an open question about this very cut-off is named: one that opens with another number is about another edge.
+    const openQ = bandsMeet ? openQuestionFor(model, meetingIds, t) : undefined;
     const unit = q.unit === undefined ? "" : ` ${q.unit.replace(/_/g, " ")}`;
+    const withUnit = (v: number): string => `${v}${v === 1 ? singular(unit) : unit}`;
     const [c1, c2, c3] = card.cases as [BoundaryCase, BoundaryCase, BoundaryCase];
     const src = uses.get(`${card.field}|${t}`)?.source ?? [];
     const first = src[0];
@@ -161,9 +172,9 @@ export function boundaryCardsCheck(ctx: CheckContext): Finding[] {
           threshold: t,
           unit,
           child: describeChild(model, card.baseline),
-          below: `${c1.value}${unit}`,
-          at: `${c2.value}${unit}`,
-          above: `${c3.value}${unit}`,
+          below: withUnit(c1.value),
+          at: withUnit(c2.value),
+          above: withUnit(c3.value),
           o1: outcomeTitle(model, c1.outcome),
           o2: outcomeTitle(model, c2.outcome),
           o3: outcomeTitle(model, c3.outcome),
@@ -176,4 +187,18 @@ export function boundaryCardsCheck(ctx: CheckContext): Finding[] {
     );
   }
   return out;
+}
+
+/** "1 months" reads wrongly: the plain time units lose their s for exactly 1. */
+function singular(unit: string): string {
+  return /^ (months|days|years|weeks|hours|minutes)$/.test(unit) ? unit.slice(0, -1) : unit;
+}
+
+/** The first open question that concerns one of the calculated values meeting at the cut-off and whose first number is the cut-off (or that names no number). */
+function openQuestionFor(model: Model, ids: ReadonlySet<string>, t: number): string | undefined {
+  const mine = model.open_questions.filter((o) => o.status === "open" && o.affects.some((x) => ids.has(x)));
+  const numbers = (o: { question: string }): string[] => o.question.match(/\d+/g) ?? [];
+  const about = mine.filter((o) => numbers(o)[0] === String(t));
+  const unnumbered = mine.filter((o) => numbers(o).length === 0);
+  return (about.length > 0 ? about : unnumbered).map((o) => o.id).sort()[0];
 }

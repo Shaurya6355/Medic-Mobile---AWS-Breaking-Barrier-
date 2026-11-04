@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { ageGroups } from "../../src/validation/checks/ageGroups.js";
-import { codesOf, JARGON_RE, matchedCtx } from "./helpers.js";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { parseModel } from "../../src/logic/schema.js";
+import { codesOf, JARGON_RE, matchedCtx, realDocument } from "./helpers.js";
+
+/** The first, six-rule model (no out-of-range calculated value: its age rule reads the age question itself). */
+function oldModelCtx(mutate?: (m: any) => void) {
+  const r = parseModel(JSON.parse(readFileSync(path.join(import.meta.dirname, "../fixtures/validation/old-six-rule-v1.json"), "utf8")));
+  if (!r.ok) throw new Error(r.issues.join("; "));
+  const doc = realDocument();
+  const m = structuredClone(r.value) as any;
+  m.meta.guideline.file_sha256 = doc.docSha256;
+  mutate?.(m);
+  return { model: m, document: doc };
+}
+const outside = (m: any) => m.derived.find((d: any) => d.id === "outside_age_range").definition.any;
 
 const band = (m: any) => m.derived.find((d: any) => d.id === "fast_breathing").definition.all[1].any;
 
@@ -48,6 +63,64 @@ describe("ageGroups", () => {
       a.dose_by_age[1].age_months_min = 10;
     }));
     expect(codesOf(over)).toContain("AGE_OVERLAP");
+  });
+});
+
+describe("ageGroups: a calculated value for children outside the covered ages", () => {
+  it("the final model's outside_age_range (below 2, 60 and over) is no age-band gap: nothing at all is found", () => {
+    const fs = ageGroups(matchedCtx());
+    expect(codesOf(fs)).not.toContain("AGE_GAP");
+    expect(fs).toEqual([]);
+  });
+  it("blocks when its upper band starts after the covered ages end (62 instead of 60), naming the ages left out", () => {
+    const fs = ageGroups(matchedCtx((m) => { outside(m)[1].value = 62; }));
+    expect(codesOf(fs)).toEqual(["OUTSIDE_AGE_BANDS_MISMATCH"]);
+    const f = fs[0]!;
+    expect(f.severity).toBe("blocking");
+    expect(f.decidedBy).toBe("clinician");
+    expect(f.subjects).toEqual([{ kind: "derived", id: "outside_age_range" }, { kind: "scope", id: "scope" }]);
+    expect(f.params["range"]).toBe("60 up to 62 months");
+    expect(f.message).toMatch(/outside the covered ages \(2 up to 60 months\)/);
+    expect(f.message).toContain("60 up to 62 months");
+    expect(f.message).not.toMatch(JARGON_RE);
+    expect(f.source.length).toBeGreaterThan(0);
+  });
+  it("blocks when its lower band stops short of the covered ages (below 1 instead of below 2)", () => {
+    const fs = ageGroups(matchedCtx((m) => { outside(m)[0].value = 1; }));
+    expect(codesOf(fs)).toEqual(["OUTSIDE_AGE_BANDS_MISMATCH"]);
+    expect(fs[0]!.params["range"]).toBe("1 up to 2 months");
+  });
+  it("blocks when its upper band has an end (60 up to 120): older children are left out", () => {
+    const fs = ageGroups(matchedCtx((m) => { outside(m)[1] = { all: [{ field: "age_months", op: "at_least", value: 60 }, { field: "age_months", op: "less_than", value: 120 }] }; }));
+    expect(codesOf(fs)).toEqual(["OUTSIDE_AGE_BANDS_MISMATCH"]);
+    expect(fs[0]!.params["range"]).toBe("120 months and over");
+  });
+  it("accepts a value for one side only (children too young), and bands that overlap each other", () => {
+    expect(codesOf(ageGroups(matchedCtx((m) => { m.derived.find((d: any) => d.id === "outside_age_range").definition = { field: "age_months", op: "less_than", value: 2 }; })))).toEqual([]);
+    expect(codesOf(ageGroups(matchedCtx((m) => { outside(m).push({ field: "age_months", op: "at_least", value: 80 }); })))).toEqual([]);
+  });
+  it("a value that has one band inside the covered ages is a mixed value and keeps the old rule (an upper band from 58 leaves a gap 2 up to 58)", () => {
+    const fs = ageGroups(matchedCtx((m) => { outside(m)[1].value = 58; }));
+    expect(codesOf(fs)).toContain("AGE_GAP");
+    expect(codesOf(fs)).not.toContain("OUTSIDE_AGE_BANDS_MISMATCH");
+    expect(fs.find((f) => f.code === "AGE_GAP")!.severity).toBe("blocking");
+  });
+  it("a dose-list mismatch names the fast-breathing bands, not the bands of the out-of-range value", () => {
+    const fs = ageGroups(matchedCtx((m) => {
+      const a = m.outcomes.find((o: any) => o.id === "refer_urgent_with_antibiotic").actions.find((x: any) => x.dose_by_age);
+      a.dose_by_age[0].age_months_below = 13;
+      a.dose_by_age[1].age_months_min = 13;
+    }));
+    expect(codesOf(fs)).toEqual(["DOSE_BANDS_MISMATCH"]);
+    expect(fs[0]!.params["ruleBands"]).toBe("2 up to 12 months, 12 up to 60 months");
+    expect(fs[0]!.subjects).toContainEqual({ kind: "derived", id: "fast_breathing" });
+  });
+  it("the older six-rule model still passes, and its gap, overlap and short bands are still found", () => {
+    expect(ageGroups(oldModelCtx())).toEqual([]);
+    const fb = (m: any) => m.derived.find((d: any) => d.id === "fast_breathing").definition.all[1].any;
+    expect(codesOf(ageGroups(oldModelCtx((m) => { fb(m)[0].all[1].value = 11; })))).toContain("AGE_GAP");
+    expect(codesOf(ageGroups(oldModelCtx((m) => { fb(m)[1].all[0].value = 10; })))).toContain("AGE_OVERLAP");
+    expect(codesOf(ageGroups(oldModelCtx((m) => { fb(m)[1].all[1].value = 48; })))).toContain("AGE_GAP");
   });
 });
 

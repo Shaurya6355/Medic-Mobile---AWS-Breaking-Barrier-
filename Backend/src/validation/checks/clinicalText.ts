@@ -39,7 +39,7 @@ function shownTexts(model: CheckContext["model"]): { labels: Shown[]; actions: S
   const actions: Shown[] = [];
   for (const o of model.outcomes) {
     o.actions.forEach((a, i) => {
-      if (a.origin === "team" || a.text.trim() === "") return;
+      if (a.origin === "team" || (a.origin === "clinician" && (a.source ?? []).length === 0) || a.text.trim() === "") return;
       actions.push({ subject: actionSubject(o, i), item: describeAction(o, i), text: a.text, sources: a.source ?? [], topic: false });
     });
   }
@@ -114,7 +114,7 @@ export function clinicalText(ctx: CheckContext): Finding[] {
     if (!o.actions.some((a) => a.text.trim() !== "")) {
       out.push(makeFinding({ ...common, code: "CLINICAL_TEXT_MISSING", severity: "blocking", params: { item, ...cite.params } }));
     }
-    if (isReferral(o) && !o.actions.some((a) => a.origin === "guideline" && a.source !== undefined && a.source.length > 0 && a.text.trim() !== "")) {
+    if (isReferral(o) && !o.actions.some((a) => ((a.origin === "guideline" && a.source !== undefined && a.source.length > 0) || a.origin === "clinician") && a.text.trim() !== "")) {
       out.push(makeFinding({ ...common, code: "CLINICAL_TEXT_UNSOURCED", severity: "blocking", params: { item, ...cite.params } }));
     }
     const team = o.actions.filter((a) => a.origin === "team" && a.text.trim() !== "");
