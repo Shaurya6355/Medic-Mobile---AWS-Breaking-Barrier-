@@ -67,7 +67,7 @@ export function NextStrip({ w, role, checks, path, act, go, pick }: { w: Workflo
             {STAGES.map((s, k) => (
               <span key={s.key} style={{ display: "contents" }}>
                 {k ? <i aria-hidden="true">/</i> : null}
-                <span className={k < at ? "done" : k === at ? "now" : ""} aria-current={k === at ? "step" : undefined}>{(k < at ? "✓ " : "") + s.label}</span>
+                <span className={k < at ? "done" : k === at ? "now" : ""} aria-current={k === at ? "step" : undefined}>{s.label}</span>
               </span>
             ))}
           </div>

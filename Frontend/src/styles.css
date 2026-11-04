@@ -678,3 +678,123 @@ h2{font-size:15px;font-weight:600}
 .chklink{color:var(--accent);font-weight:600;white-space:nowrap}
 .rissues .sev{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
 .app:has(.rv){max-width:1680px}
+
+/* ===== Theme: cht-agent design language =====
+   Indigo-to-violet brand gradient, light lavender page, white rounded cards with soft shadows,
+   numbered indigo step circles, outlined score pills and tinted callouts. Clinical outcome colours
+   (pink, yellow, green) are unchanged on purpose. */
+:root{
+  --bg:#F5F6FB; --surface:#FFFFFF; --ink:#1A202C; --muted:#5B6478; --line:#E2E5F0;
+  --accent:#5A67D8; --accent2:#764BA2; --grad:linear-gradient(135deg,#667EEA 0%,#764BA2 100%);
+  --teal:#2C9C93; --teal-bg:#E9F8F6; --amber:#DD8A1C; --amber-bg:#FFF8E6; --rose:#E05252; --rose-bg:#FFF2F2;
+  --shadow:0 1px 2px rgba(26,32,44,.04),0 4px 14px rgba(90,103,216,.08);
+  --shadow-hi:0 2px 4px rgba(26,32,44,.05),0 10px 26px rgba(90,103,216,.16);
+  --font-display:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-body:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+body{background:var(--bg)}
+h1{font-weight:700;letter-spacing:-.01em}
+
+/* App bar: brand gradient, white text */
+.apphead{background:var(--grad);border-bottom:0;box-shadow:0 2px 12px rgba(90,103,216,.25)}
+.brand{color:#fff;font-weight:800;letter-spacing:-.01em}
+.nav a{color:rgba(255,255,255,.78);border-bottom-width:3px}
+.nav a:hover{color:#fff}
+.nav a.on{color:#fff;border-bottom-color:#fff}
+.nav a:focus-visible{outline-color:#fff}
+.apphead .nx-who{color:rgba(255,255,255,.85)}
+.apphead .nx-who select{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.14);color:#fff}
+.apphead .nx-who select option{color:var(--ink)}
+.ndot{background:#FFD166 !important}
+
+/* Next-step strip: white card band; progress steps as numbered circles */
+.nx{background:var(--surface);border-bottom:1px solid var(--line)}
+.nx.mine{background:var(--surface)}
+.nx-steps{counter-reset:nstep;gap:6px 14px}
+.nx-steps > span > span{counter-increment:nstep;display:inline-flex;align-items:center;gap:6px}
+.nx-steps i{display:inline-block;width:18px;height:2px;border-radius:1px;background:var(--line);font-size:0;vertical-align:middle;opacity:1}
+.nx-steps > span > span::before{content:counter(nstep);width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font-size:11px;font-weight:700;background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.nx-steps .now::before{background:var(--grad);color:#fff;border-color:transparent}
+.nx-steps .done::before{content:"\2713";background:var(--teal-bg);color:var(--teal);border-color:var(--teal)}
+.nx-steps .done{color:var(--teal)}
+
+/* Cards */
+.panel{border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.banner{border-radius:12px;border:1px solid var(--line);border-left:4px solid var(--accent);background:#F0F2FF}
+.banner.good{background:var(--teal-bg);border-color:var(--teal)}
+
+/* Buttons */
+.btn{border-radius:10px;font-weight:600;transition:box-shadow .15s,transform .15s,filter .15s}
+.btn.primary{background:var(--grad);border:0;color:#fff;box-shadow:0 2px 8px rgba(102,126,234,.35)}
+.btn.primary:hover:not(:disabled){box-shadow:0 4px 14px rgba(102,126,234,.45);transform:translateY(-1px);filter:none}
+.btn.primary:disabled{opacity:.45;box-shadow:none}
+.btn.ok{background:var(--teal);border-color:var(--teal)}
+.btn.bad{color:var(--rose);border-color:var(--rose)}
+.lnk,.linkb,.chklink,.banner a,.note a{color:var(--accent)}
+.chipb{border-radius:999px}
+.chipb.on{background:var(--grad);border-color:transparent}
+
+/* Review header: hero card with the brand gradient */
+.rvhead{background:var(--grad);border:0;border-radius:16px;padding:18px 22px;color:#fff;box-shadow:0 6px 22px rgba(102,126,234,.3)}
+.rvhead h1{color:#fff}
+.rvhead .ver{color:rgba(255,255,255,.8)}
+.rvhead .vtabs{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.28)}
+.rvhead .vtabs button{color:rgba(255,255,255,.85)}
+.rvhead .vtabs button:hover{color:#fff}
+.rvhead .vtabs button[aria-selected=true]{background:#fff;color:var(--accent);box-shadow:0 2px 6px rgba(26,32,44,.15)}
+.rvhead .btn{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);color:#fff}
+.rvhead .btn:disabled{opacity:.5}
+.rvhead .btn.primary{background:#fff;color:var(--accent);border:0;box-shadow:0 2px 8px rgba(26,32,44,.18)}
+.rvhead .tcount{background:#FFD166;color:#5A3E00;border-color:#FFD166}
+.rvhead .vtabs button:not([aria-selected=true]) .tcount{background:#FFD166}
+
+/* Callouts: amber "before you approve", lavender tips */
+.rvwhy{margin-top:0;background:var(--amber-bg);border:1.5px solid #F6C453;border-radius:12px;padding:10px 14px;color:#6B4A00;font-size:13px}
+.rvwhy::before{content:"Before you approve";display:block;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--amber);margin-bottom:2px}
+.rvtip{background:#F0F2FF;border:1px solid #D5DAFB;border-radius:12px;color:#3C4699}
+.rvtip .dotc{background:var(--accent)}
+
+/* Check widgets: white cards, coloured border by state, round icon */
+.cwid{border:2px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.cwid.s-pass{border-color:#9ED9D3} .cwid.s-warn{border-color:#F6C453} .cwid.s-fail{border-color:#F4A3A3}
+.cwid:hover{box-shadow:var(--shadow-hi)}
+.cwid.on{outline:2px solid var(--accent);outline-offset:2px}
+.cown{color:var(--accent);text-transform:uppercase;letter-spacing:.05em;font-size:10.5px;font-weight:700;top:-18px}
+.cico{width:28px;height:28px;border:0}
+.cico.pass{color:var(--teal);background:var(--teal-bg)} .cico.warn{color:var(--amber);background:var(--amber-bg)} .cico.fail{color:var(--rose);background:var(--rose-bg)}
+.cname .sn{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--grad);color:#fff;font:700 10px/1 var(--font-body);margin-right:6px;vertical-align:1px}
+.cpop{border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow-hi);padding:14px}
+.pill{border-radius:999px;border-width:1.5px;background:var(--surface) !important;font-weight:700}
+.pill.pass{color:var(--teal);border-color:var(--teal)} .pill.warn{color:var(--amber);border-color:var(--amber)} .pill.fail{color:var(--rose);border-color:var(--rose)}
+
+/* Test patients: step-card look with a score pill */
+.gscore{border:1.5px solid;background:var(--surface) !important;padding:3px 12px;font-weight:700}
+.gscore.ok{color:var(--teal);border-color:var(--teal)} .gscore.bad{color:var(--rose);border-color:var(--rose)}
+.gcard{border-radius:12px;border:1px solid var(--line);box-shadow:var(--shadow);padding:10px 12px}
+.gcard:hover{border-color:#B4BCF5;box-shadow:var(--shadow-hi)}
+.gcard.bad{border:2px solid #F4A3A3;background:var(--rose-bg)}
+.gmark{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px}
+.gcard.ok .gmark{color:var(--teal);background:var(--teal-bg)} .gcard.bad .gmark{color:var(--rose);background:#fff}
+
+/* Assistant: white message cards; clinician messages in the gradient */
+.chat{border-radius:16px}
+.chath h2,.chath b{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cmsg.agent{background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+.cmsg.clinician{background:var(--grad);color:#fff}
+.cmsg.ask{background:var(--amber-bg);border:1.5px solid #F6C453}
+.ctag{color:var(--amber)}
+.cans{color:var(--teal)}
+.cprop{border-radius:12px}
+.cprop.applied{border-color:var(--teal);background:var(--teal-bg)}
+.cin input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(90,103,216,.15);outline:none}
+
+/* Tables and tabs */
+th{color:var(--accent)}
+.tabs button[aria-selected="true"]{background:var(--grad);color:#fff}
+.flowpanel{border-radius:16px}
+.badge.ed,.badge.ai2{background:#EEF0FF;color:var(--accent);border-color:#B4BCF5}
+.pstep.running .pdot{border-color:var(--accent);border-top-color:transparent}
+.pstep.done .pdot{background:var(--teal);border-color:var(--teal)}
+.rissues li{grid-template-columns:minmax(62px,max-content) 1fr;column-gap:12px}
+.rissues{border-radius:10px;background:#F7F8FD}
+.cname .sn{width:auto;min-width:18px;padding:0 5px;border-radius:999px;box-sizing:border-box}
