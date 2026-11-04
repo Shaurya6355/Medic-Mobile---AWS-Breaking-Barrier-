@@ -1,0 +1,76 @@
+import { useEffect, useRef, useState } from "react";
+import type { ChatMsg, Workflow } from "../domain/types";
+import type { Actions } from "../actions";
+
+const TRY = ["What happens to a 2 year old breathing 45 a minute?", "Explain R3", "Change 40 to 45", "Which checks have problems?"];
+
+function Ask({ w, id, act, canAct, onChange }: { w: Workflow; id: string; act: Actions; canAct: boolean; onChange: (about: string) => void }) {
+  const f = w.flags.find(x => x.id === id);
+  if (!f) return null;
+  if (f.res) return <div className="cans">{f.res.choice === "keep" ? "✓ Kept as drafted" : "✎ You chose to change this"}</div>;
+  return (
+    <div className="cbtns">
+      <span className="note">{f.src}</span>
+      <div className="btnrow">
+        <button type="button" className="btn tiny ok" disabled={!canAct} onClick={() => act.answer(f.id, "keep")}>Keep as drafted</button>
+        <button type="button" className="btn tiny" disabled={!canAct} onClick={() => { act.answer(f.id, "change"); onChange(f.about); }}>Change it</button>
+      </div>
+    </div>
+  );
+}
+
+function Msg({ m, w, act, canAct, onSelect, onChange }: { m: ChatMsg; w: Workflow; act: Actions; canAct: boolean; onSelect: (id: string) => void; onChange: (about: string) => void }) {
+  const open = m.proposals?.some(p => p.state === "open");
+  return (
+    <li className={"cmsg " + m.from + (m.ask ? " ask" : "")}>
+      {m.ask ? <span className="ctag">{"Question " + m.ask.slice(2)}</span> : null}
+      <div>{m.text}</div>
+      {m.proposals?.length ? (
+        <ul className="cprops">
+          {m.proposals.map((p, i) => (
+            <li key={i} className={"cprop " + p.state}>
+              <div className="mono">{p.label}</div>
+              <div className="note">{p.impact}</div>
+              {p.state === "open" ? <button type="button" className="btn tiny primary" disabled={!canAct} onClick={() => act.apply(m.id, i)}>Apply</button>
+                : <span className="note">{p.state === "applied" ? "✓ Applied" : "Not applied"}</span>}
+            </li>
+          ))}
+          {open ? <li><button type="button" className="lnk" disabled={!canAct} onClick={() => act.dismiss(m.id)}>Dismiss</button></li> : null}
+        </ul>
+      ) : null}
+      {m.ask ? <Ask w={w} id={m.ask} act={act} canAct={canAct} onChange={onChange} /> : null}
+      {m.select ? <button type="button" className="lnk cshow" onClick={() => onSelect(m.select!)}>Show on flow</button> : null}
+    </li>
+  );
+}
+
+/** The assistant beside the flow: answers questions about the rules and proposes changes the clinician applies. */
+export function Chat({ w, act, canAct, onSelect, onChange, onClose }: { w: Workflow; act: Actions; canAct: boolean; onSelect: (id: string) => void; onChange: (about: string) => void; onClose: () => void }) {
+  const [text, setText] = useState("");
+  const log = useRef<HTMLOListElement>(null);
+  useEffect(() => { const el = log.current; if (el) el.scrollTop = el.scrollHeight; }, [w.chat.length]);
+  const send = (t: string) => { if (t.trim()) { act.chat(t); setText(""); } };
+  const left = w.flags.filter(f => !f.res).length;
+  return (
+    <aside className="chat panel" aria-label="Assistant">
+      <div className="chath">
+        <b>Assistant</b>
+        <span className="note">{left ? left + " question" + (left > 1 ? "s" : "") + " for you" : "All questions answered"}</span>
+        <button type="button" className="lnk" onClick={onClose} aria-label="Hide assistant">Hide</button>
+      </div>
+      <ol className="clog" ref={log}>
+        {w.chat.map(m => <Msg key={m.id} m={m} w={w} act={act} canAct={canAct} onSelect={onSelect} onChange={onChange} />)}
+      </ol>
+      {canAct ? (
+        <>
+          <div className="ctry">{TRY.map(t => <button key={t} type="button" className="chipb" onClick={() => send(t)}>{t}</button>)}</div>
+          <form className="cin" onSubmit={e => { e.preventDefault(); send(text); }}>
+            <label className="sr" htmlFor="chat-in">Message the assistant</label>
+            <input id="chat-in" type="text" value={text} onChange={e => setText(e.target.value)} placeholder="Ask about a patient, a rule, or a change" autoComplete="off" />
+            <button type="submit" className="btn primary" disabled={!text.trim()}>Send</button>
+          </form>
+        </>
+      ) : <p className="note">Read-only: only the clinician talks to the assistant.</p>}
+    </aside>
+  );
+}

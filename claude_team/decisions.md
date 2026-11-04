@@ -338,3 +338,100 @@ Other options considered (and why not):
 - Compare every field: floods the clinician with naming noise.
 Revisit if: the first Bedrock runs show too many or too few flags, or the logic model schema replaces the extraction schema (DEC-022).
 Related: INT-014, DEC-021, DEC-022
+
+### DEC-024 | Trimmed review UI for the first frontend build
+Status: decided
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Approval steps and review UI
+Decision: Build a trimmed version of the mockup. Kept: Guidelines, Review, Release, History screens; dagre flow; flags; checks; AI revision card; next-step strip; role switcher. Dropped for now: Compare screen (phone preview, side-by-side flows, outcome-change table), page thumbnails and page preview, plain-language rules tab, undo and reset-to-draft, the JSON/XLSForm/XForm code diffs and tasks.js diff, Runs screen.
+Assumptions: The core approval flow matters more for the demo than the comparison views. Dropped parts are still in Frontend/docs/mockup.html and can be ported later.
+Why: Human asked to trim the UI significantly and make it work.
+Other options considered (and why not):
+- Full port of the mockup: more surface to wire to a backend in the time available.
+Revisit if: reviewers need the v3 vs new comparison before approving. Note that dagre plus react-router does not match the cht-ui-builder stack (React Flow, Zustand), so DEC-001 may require a change here.
+Related: INT-015, DEC-001
+
+### DEC-025 | Intake pipeline runs in local mode first
+Status: superseded: the local intake backend was removed when merging into main; main's orchestrator (Backend/src) does intake
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Guideline intake
+Decision: Build the pipeline against on-disk emulators of S3, SQS and the state table behind interfaces, with local text extraction instead of Textract.
+Assumptions: No AWS credentials on this laptop yet. AWS adapters can replace the emulators without changing the worker or the HTTP API.
+Why: Human chose fully local, no AWS, for now.
+Other options considered (and why not):
+- Build against real AWS now: no credentials or bucket available.
+- Canned demo only: would not exercise a real upload, event and extraction.
+Revisit if: AWS sandbox access is set up.
+Related: INT-016
+
+### DEC-026 | S3 event to queue to worker, no Lambda
+Status: superseded: the local intake backend was removed when merging into main; main's orchestrator (Backend/src) does intake
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Guideline intake
+Decision: The bucket notification sends ObjectCreated events under uploads/ to a queue; a worker in the backend container polls it (visibility timeout, 3 receives, then dead-letter).
+Assumptions: SQS is acceptable under the Technical Environment Document's optional services; this has not been checked against the document.
+Why: Human chose the event-driven route. Lambda for application logic is out of scope (claude.md).
+Other options considered (and why not):
+- Backend starts processing after the browser reports the upload: simpler, not event-driven.
+Revisit if: SQS turns out to be out of scope.
+Related: INT-016
+
+### DEC-027 | Logic model step is a placeholder until AgentCore
+Status: superseded: the local intake backend was removed when merging into main; main's orchestrator (Backend/src) does intake
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Logic drafting
+Decision: No model call. The step returns the sample cough-pathway template through a LogicModelBuilder interface; output is Zod-validated and quote-checked like any future model output. The UI labels it as a placeholder.
+Assumptions: The team plans AgentCore, choosing models per task, instead of a direct Bedrock call. Whether AgentCore fits the rule that model calls go through Bedrock needs checking.
+Why: Human asked to keep the model step blank for now.
+Other options considered (and why not):
+- Direct Bedrock call: team is moving to AgentCore.
+- Leave the step empty: the review screen would have nothing to render.
+Revisit if: AgentCore integration starts, or the logic model format is generalised beyond the cough pathway.
+Related: INT-016, DEC-001
+
+### DEC-028 | Logic model is a pathway spec, compiled by shared code
+Status: decided
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Logic drafting, review UI, compiler
+Decision: The logic model is the pathway spec JSON (schema_version 1.0) the human supplied. One dependency-free compiler in shared/pathway does validation, evaluation, flow graph and XLSForm for both Backend and Frontend.
+Assumptions: Hit policy is first match by priority with exactly one final otherwise rule. A comparison on a hidden or unanswered field is false. Show conditions may only use earlier questions. Derived values are yes/no.
+Why: Human asked for the JSON to drive the flow as a logical, compiler-like rule set, keeping the user flow. Sharing the code keeps backend validation and UI behaviour identical.
+Other options considered (and why not):
+- Map the JSON onto the old fixed d1/d2/d3 model: lossy, breaks for any other pathway.
+- Separate Zod schema in Backend and hand-written checks in Frontend: two copies drift.
+Revisit if: A pathway needs a different hit policy, numeric derived values, or select-multiple questions.
+Related: INT-017, DEC-027
+
+
+### DEC-029 | Everything reaches the clinician through the PO
+Status: superseded by DEC-030
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Review workflow
+Decision: Open questions marked route_to clinician are flags for the PO first. The clinician sees only what the PO sent. Notes are required only to send something on or to request a change.
+Why: Human asked that nothing go to the clinician directly and that approvals not need a note.
+Related: INT-020
+
+### DEC-030 | No program officer: an AI agent checks the draft, the clinician reviews and edits
+Status: decided
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Review workflow
+Decision: The PO role is removed. An AI agent runs checks 1 to 3, fixes what is safe to fix, and sends everything to the clinician, open questions included. The clinician has a View tab (flowchart, test patients, six check widgets) and an Edit tab (rule table, live flow) plus an assistant chat. IT approves the deploy at the end.
+Why: Human asked for the architecture change.
+Related: DEC-029, INT-024
+
+### DEC-031 | Merged into main: the frontend uses main's orchestrator API; the AI agent signs as program officer
+Status: decided
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Frontend and backend integration
+Decision: main's Backend is kept as it is. The local intake backend from feature/pathway-compiler is removed (DEC-025 to DEC-027 superseded). In live mode the frontend calls main's /runs API. On Approve, the AI agent saves the answers to questions routed to the program officer in a version with authorRole program_officer and signs as program_officer (userId ai-agent); the clinician's version is then saved and signed by the clinician, which locks it. The backend's sign-off order, separation of duties and gates are unchanged.
+Why: Human asked to merge into main so that it works with the backend there, while the program officer role is replaced by the AI agent (DEC-030).
+Related: DEC-019, DEC-020, DEC-030, INT-025
+
