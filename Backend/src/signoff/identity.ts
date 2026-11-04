@@ -44,3 +44,19 @@ export function sameUser(a: string, b: string): boolean {
     return a.normalize("NFKC").replace(FORMAT_CHARS, "").trim().toLowerCase() === b.normalize("NFKC").replace(FORMAT_CHARS, "").trim().toLowerCase();
   }
 }
+
+/**
+ * The officer agent's identity (DEC-024). The program officer's signature slot is filled by the officer agent,
+ * never by a person: rules.ts accepts only this id as the first signature, both stores condition the first
+ * write on it, and the HTTP API refuses it in any request body, so only in-process code can use it.
+ */
+export const OFFICER_AGENT_ID = "officer-agent@system";
+
+/** True when the id (after normalisation) is the officer agent's. Malformed ids are never reserved. */
+export function isReservedUserId(raw: string): boolean {
+  try {
+    return normaliseUserId(raw) === OFFICER_AGENT_ID;
+  } catch {
+    return false;
+  }
+}

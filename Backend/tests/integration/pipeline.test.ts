@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +12,7 @@ import { Orchestrator } from "../../src/engine/engine.js";
 import type { Step } from "../../src/engine/step.js";
 import type { Model } from "../../src/logic/index.js";
 import { FakeModelClient } from "../../src/model/modelClient.js";
+import { OFFICER_AGENT_ID } from "../../src/signoff/identity.js";
 import { Signoff } from "../../src/signoff/signoff.js";
 import { createChecksStep } from "../../src/steps/checks.js";
 import { createFillLogicStep } from "../../src/steps/fillLogic.js";
@@ -68,6 +70,16 @@ describe("whole chain with fakes (DEC-019)", () => {
     const roleOf = (author: string) => (author.startsWith("c") ? "clinician" : "program_officer");
     const save = async (parent: number, author: string, m: Model) =>
       (await api.inject({ method: "POST", url: routes.versions("it"), payload: { parentVersion: parent, author, authorRole: roleOf(author), body: m } })).json().n as number;
+    // HTTP cannot save in the officer role (agent_only), so the officer agent's versions are stored in-process.
+    const saveAsAgent = async (m: Model) => {
+      const n = (await store.listVersions("it")).length + 1;
+      const key = artifactKey("it", "versions", `v${n}-agent.json`);
+      const text = JSON.stringify(m, null, 2);
+      await artifacts.put(key, text, "application/json");
+      await store.addVersion({ runId: "it", n, parent: n - 1, author: OFFICER_AGENT_ID, authorRole: "program_officer", createdAt: now(), artifactKey: key, bodySha256: createHash("sha256").update(text, "utf8").digest("hex") });
+      await signoff.onVersionSaved("it", n);
+      return n;
+    };
     const compile = (n: number) => compileLockedVersion({ store, artifacts, runId: "it", n, projectDir: join(root, `v${n}-${t}`), settings: demoSettings(), now, inputs });
 
     // 1. pipeline to the officer
@@ -84,14 +96,15 @@ describe("whole chain with fakes (DEC-019)", () => {
     expect(s1.gates.canOfficerSign).toBe(false);
 
     // 2. blocked and refused
-    expect((await sign(1, "program_officer", "o1", s1.modelSha)).statusCode).toBe(422);
+    expect((await sign(1, "program_officer", "o1", s1.modelSha)).json().error).toBe("agent_only");
+    await expect(signoff.signAsAgent("it", 1, s1.modelSha)).rejects.toMatchObject({ status: 422, code: "blocked" });
     expect((await sign(1, "clinician", "c1", s1.modelSha)).statusCode).toBe(409);
     await expect(compile(1)).rejects.toBeInstanceOf(ApprovalError);
 
     // 3. officer fixes -> v2, signs; clinician blocked
-    const n2 = await save(1, "o1", resolveForDemo(await body(1), "program_officer"));
+    const n2 = await saveAsAgent(resolveForDemo(await body(1), "program_officer"));
     const s2 = await status(n2);
-    expect((await sign(n2, "program_officer", "o1", s2.modelSha)).statusCode).toBe(201);
+    await signoff.signAsAgent("it", n2, s2.modelSha);
     expect((await sign(n2, "clinician", "c1", s2.modelSha)).statusCode).toBe(422);
 
     // 4. clinician answers -> v3: zero signatures, officer again, then clinician; same person refused
@@ -99,8 +112,8 @@ describe("whole chain with fakes (DEC-019)", () => {
     const s3 = await status(n3);
     expect(s3.signatures).toEqual([]);
     expect((await status(n2)).status).toBe("superseded");
-    expect((await sign(n3, "program_officer", "o1", s3.modelSha)).statusCode).toBe(201);
-    expect((await sign(n3, "clinician", "o1", s3.modelSha)).statusCode).toBe(403);
+    await signoff.signAsAgent("it", n3, s3.modelSha);
+    expect((await sign(n3, "clinician", OFFICER_AGENT_ID, s3.modelSha)).statusCode).toBe(400);
     expect((await sign(n3, "clinician", "c1", s2.modelSha)).statusCode).toBe(409);
     const locked = await sign(n3, "clinician", "c1", s3.modelSha);
     expect(locked.statusCode).toBe(201);
@@ -117,7 +130,7 @@ describe("whole chain with fakes (DEC-019)", () => {
     const edited = await body(n3);
     edited.meta.parent_version = edited.meta.version;
     edited.meta.version += 1;
-    const n4 = await save(n3, "o1", edited);
+    const n4 = await saveAsAgent(edited);
     const s4 = await status(n4);
     expect([s4.status, s4.signatures.length, s4.latestLocked]).toEqual(["awaiting_officer", 0, n3]);
     expect((await status(n3)).status).toBe("locked");

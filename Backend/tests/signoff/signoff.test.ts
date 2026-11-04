@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { OFFICER_AGENT_ID } from "../../src/signoff/identity.js";
 import { artifactKey } from "../../src/artifacts/artifactStore.js";
 import { findingsKey, inputsShaOf } from "../../src/signoff/checks.js";
 import { demoSettings } from "../compiler/helpers.js";
@@ -54,7 +55,7 @@ describe("findings (BR-11: checks before anyone signs)", () => {
 describe("sign: gates (BR-11, AR-03)", () => {
   it("refuses the officer while officer blockers remain, and records nothing", async () => {
     const { signoff, store } = await seed("awaiting_officer", [draftV1()]);
-    const e = await errOf(signoff.sign("r1", 1, "program_officer", officer(shaOf(draftV1()))));
+    const e = await errOf(signoff.signAsAgent("r1", 1, shaOf(draftV1())));
     expect(e.status).toBe(422);
     expect(e.code).toBe("blocked");
     const blockers = (e.detail as { blockers: { code: string }[] }).blockers;
@@ -64,7 +65,7 @@ describe("sign: gates (BR-11, AR-03)", () => {
 
   it("lets the officer sign once the officer blockers are settled, even with clinician questions open", async () => {
     const { signoff, store } = await seed("awaiting_officer", [draftV1(), officerFixed()]);
-    const res = await signoff.sign("r1", 2, "program_officer", officer(shaOf(officerFixed())));
+    const res = await signoff.signAsAgent("r1", 2, shaOf(officerFixed()));
     expect(res.status).toBe("awaiting_clinician");
     expect(res.runState).toBe("awaiting_clinician");
     expect((await store.getRun("r1"))!.state).toBe("awaiting_clinician");
@@ -73,7 +74,7 @@ describe("sign: gates (BR-11, AR-03)", () => {
   it("refuses the clinician while clinical blockers remain (open questions routed to the clinician)", async () => {
     const { signoff } = await seed("awaiting_officer", [draftV1(), officerFixed()]);
     const sha = shaOf(officerFixed());
-    await signoff.sign("r1", 2, "program_officer", officer(sha));
+    await signoff.signAsAgent("r1", 2, sha);
     const e = await errOf(signoff.sign("r1", 2, "clinician", clinician(sha)));
     expect(e.status).toBe(422);
     const codes = (e.detail as { blockers: { code: string }[] }).blockers.map((b) => b.code);
@@ -85,14 +86,14 @@ describe("sign: order, separation of duties and lock (AR-03, AR-05, BRD section 
   it("officer then clinician locks the version and the run", async () => {
     const { signoff, store } = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await signoff.sign("r1", 1, "program_officer", officer(sha));
+    await signoff.signAsAgent("r1", 1, sha);
     const res = await signoff.sign("r1", 1, "clinician", clinician(sha));
     expect(res.status).toBe("locked");
     expect((await store.getRun("r1"))!.state).toBe("locked");
     const v = (await store.getVersion("r1", 1))!;
     expect(v.status).toBe("locked");
     expect(v.signatures!.map((s) => [s.role, s.userId, s.modelSha])).toEqual([
-      ["program_officer", "officer-1", sha],
+      ["program_officer", OFFICER_AGENT_ID, sha],
       ["clinician", "clinician-1", sha],
     ]);
     const audit = (await store.listAudit("r1")).map((a) => a.type);
@@ -109,24 +110,32 @@ describe("sign: order, separation of duties and lock (AR-03, AR-05, BRD section 
   it("refuses the same person signing as officer and clinician (403)", async () => {
     const { signoff, store } = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await signoff.sign("r1", 1, "program_officer", officer(sha, "same-person"));
-    const e = await errOf(signoff.sign("r1", 1, "clinician", clinician(sha, "same-person")));
+    await signoff.signAsAgent("r1", 1, sha);
+    const e = await errOf(signoff.sign("r1", 1, "clinician", clinician(sha, OFFICER_AGENT_ID)));
     expect([e.status, e.code]).toEqual([403, "separation_of_duties"]);
     expect((await store.getVersion("r1", 1))!.status ?? "draft").toBe("draft");
+  });
+
+  it("refuses a person at the program officer endpoint (403 agent_only) and records nothing", async () => {
+    const { signoff, store } = await seed("awaiting_officer", [fullyResolved()]);
+    const sha = shaOf(fullyResolved());
+    const e = await errOf(signoff.sign("r1", 1, "program_officer", officer(sha)));
+    expect([e.status, e.code]).toEqual([403, "agent_only"]);
+    expect((await store.getVersion("r1", 1))!.signatures ?? []).toEqual([]);
   });
 
   it("refuses a second officer signature (409)", async () => {
     const { signoff } = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await signoff.sign("r1", 1, "program_officer", officer(sha));
-    const e = await errOf(signoff.sign("r1", 1, "program_officer", officer(sha, "officer-2")));
+    await signoff.signAsAgent("r1", 1, sha);
+    const e = await errOf(signoff.signAsAgent("r1", 1, sha));
     expect([e.status, e.code]).toEqual([409, "already_signed"]);
   });
 
   it("refuses any signature on a locked version (409)", async () => {
     const { signoff } = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await signoff.sign("r1", 1, "program_officer", officer(sha));
+    await signoff.signAsAgent("r1", 1, sha);
     await signoff.sign("r1", 1, "clinician", clinician(sha));
     const e = await errOf(signoff.sign("r1", 1, "clinician", clinician(sha, "clinician-2")));
     expect([e.status, e.code]).toEqual([409, "locked"]);
@@ -146,7 +155,7 @@ describe("sign: order, separation of duties and lock (AR-03, AR-05, BRD section 
 
   it("refuses to sign while the checks of the version are still running (run in checking)", async () => {
     const { signoff } = await seed("checking", [fullyResolved()]);
-    const e = await errOf(signoff.sign("r1", 1, "program_officer", officer(shaOf(fullyResolved()))));
+    const e = await errOf(signoff.signAsAgent("r1", 1, shaOf(fullyResolved())));
     expect([e.status, e.code]).toEqual([409, "wrong_state"]);
   });
 });
@@ -154,14 +163,14 @@ describe("sign: order, separation of duties and lock (AR-03, AR-05, BRD section 
 describe("sign: bound to the exact modelSha (AR-07, AR-04)", () => {
   it("refuses a signature for content the signer did not see (sha mismatch, 409)", async () => {
     const { signoff } = await seed("awaiting_officer", [fullyResolved()]);
-    const e = await errOf(signoff.sign("r1", 1, "program_officer", officer(shaOf(draftV1()))));
+    const e = await errOf(signoff.signAsAgent("r1", 1, shaOf(draftV1())));
     expect([e.status, e.code]).toEqual([409, "sha_mismatch"]);
   });
 
   it("an officer signature no longer counts when the body changed under it (and the bytes check refuses it outright)", async () => {
     const { signoff, artifacts } = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await signoff.sign("r1", 1, "program_officer", officer(sha));
+    await signoff.signAsAgent("r1", 1, sha);
     // Tampering with the stored body (never done by the app: edits are new versions) changes the sha.
     const tampered = fullyResolved();
     tampered.questions[0]!.label = "Changed after the officer signed";
@@ -176,7 +185,7 @@ describe("sign: bound to the exact modelSha (AR-07, AR-04)", () => {
   it("a new version starts over: the old version cannot collect more signatures (superseded)", async () => {
     const { signoff, store, artifacts } = await seed("awaiting_officer", [officerFixed()]);
     const sha1 = shaOf(officerFixed());
-    await signoff.sign("r1", 1, "program_officer", officer(sha1));
+    await signoff.signAsAgent("r1", 1, sha1);
     const v2 = fullyResolved();
     await artifacts.put(artifactKey("r1", "versions", "v2.json"), JSON.stringify(v2));
     await store.addVersion({ runId: "r1", n: 2, parent: 1, author: "clinician-1", createdAt: 5, artifactKey: artifactKey("r1", "versions", "v2.json") });
@@ -193,7 +202,7 @@ describe("sign: bound to the exact modelSha (AR-07, AR-04)", () => {
   it("edit after lock: a new version with zero signatures; the locked one stays locked and releasable (AR-05, AR-09)", async () => {
     const { signoff, store, artifacts } = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await signoff.sign("r1", 1, "program_officer", officer(sha));
+    await signoff.signAsAgent("r1", 1, sha);
     await signoff.sign("r1", 1, "clinician", clinician(sha));
     const edited = fullyResolved();
     edited.meta.version = 2;
@@ -249,14 +258,14 @@ describe("verifyLocked (AR-08)", () => {
 
   it("refuses a version with only the officer signature", async () => {
     const { signoff } = await seed("awaiting_officer", [fullyResolved()]);
-    await signoff.sign("r1", 1, "program_officer", officer(shaOf(fullyResolved())));
+    await signoff.signAsAgent("r1", 1, shaOf(fullyResolved()));
     expect((await errOf(signoff.verifyLocked("r1", 1, build))).code).toBe("not_locked");
   });
 
   it("returns the model, sha and signatures of a locked version", async () => {
     const { signoff } = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await signoff.sign("r1", 1, "program_officer", officer(sha));
+    await signoff.signAsAgent("r1", 1, sha);
     await signoff.sign("r1", 1, "clinician", clinician(sha));
     const ok = await signoff.verifyLocked("r1", 1, build);
     expect(ok.sha).toBe(sha);
@@ -266,7 +275,7 @@ describe("verifyLocked (AR-08)", () => {
   it("refuses a locked version whose stored body no longer matches the signatures", async () => {
     const { signoff, artifacts } = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await signoff.sign("r1", 1, "program_officer", officer(sha));
+    await signoff.signAsAgent("r1", 1, sha);
     await signoff.sign("r1", 1, "clinician", clinician(sha));
     const tampered = fullyResolved();
     tampered.outcomes[0]!.title = "Changed after locking";

@@ -7,6 +7,7 @@ import type { ArtifactStore } from "../artifacts/artifactStore.js";
 import { routes } from "../contract/routes.js";
 import { withDeadline } from "../shutdown.js";
 import { parseS3Event } from "../trigger/s3Event.js";
+import { registerClinicianRoutes, type ClinicianDeps } from "./clinicianRoutes.js";
 import { LAMBDA_BACKGROUND_DEADLINE_MS, runBackground } from "./background.js";
 import type { RunMode } from "./background.js";
 import {
@@ -25,6 +26,7 @@ import {
 import type { CreateRunResponse, InvocationResponse, LambdaEventResponse, PingResponse } from "../contract/schemas.js";
 import type { Run } from "../domain/types.js";
 import { Signoff, SignoffError } from "../signoff/signoff.js";
+import { saveVersion } from "../versions/saveVersion.js";
 import type { LogicModelValidator } from "../steps/logicModelValidator.js";
 import { Conflict } from "../store/store.js";
 import type { Store } from "../store/store.js";
@@ -59,6 +61,10 @@ export interface ServerDeps {
   eventsConcurrency?: number;
   eventsDeadlineMs?: number;
   backgroundDeadlineMs?: number;
+  // Called after a clinician reject returned the run to awaiting_officer (re-triggers the officer agent). Errors are logged.
+  onRejected?: (runId: string) => Promise<void>;
+  // Chat settings; without them POST /runs/:id/chat answers 503.
+  chat?: ClinicianDeps["chat"];
 }
 
 const BODY_LIMIT = 5 * 1024 * 1024;
@@ -184,56 +190,28 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   app.post<{ Params: { id: string } }>(routes.pattern.versions, async (req, reply) => {
     const runId = req.params.id;
     if (!(await store.getRun(runId))) return reply.code(404).send({ error: "not_found" });
-    const versions = await store.listVersions(runId);
-    const latest = versions[versions.length - 1];
-    if (!latest) return reply.code(409).send({ error: "no_base_version" });
+    if ((await store.listVersions(runId)).length === 0) return reply.code(409).send({ error: "no_base_version" });
     const req_ = parseBody(SaveVersionRequest, req.body, reply);
     if (!req_) return reply;
-    if (req_.parentVersion !== latest.n) {
-      req.log.debug({ parentVersion: req_.parentVersion, latest: latest.n }, "stale parentVersion");
-      return reply.code(409).send({ error: "conflict" });
+    if (req_.authorRole === "program_officer") return reply.code(403).send({ error: "agent_only" });
+    const r = await saveVersion(
+      { store, artifacts, validator, onVersionSaved, now },
+      {
+        runId,
+        parentVersion: req_.parentVersion,
+        body: req_.body,
+        author: req_.author,
+        ...(req_.authorRole !== undefined ? { authorRole: req_.authorRole } : {}),
+        origin: "api",
+      },
+    );
+    if (!r.ok) {
+      const { ok: _ok, status, ...rest } = r;
+      return reply.code(status).send(rest);
     }
-    const result = validator.validate(req_.body);
-    if (!result.ok) return reply.code(422).send({ error: "invalid_logic_model", issues: result.issues });
-
-    const n = latest.n + 1;
-    // The body must say where it sits in the chain: the store assigns n and the parent (AR-01), and a body
-    // claiming another lineage would carry a misleading version into the README and the signatures (DEC-020).
-    const meta = (req_.body as { meta?: { version?: unknown; parent_version?: unknown } }).meta ?? {};
-    if (meta.version !== n || meta.parent_version !== latest.n) {
-      return reply.code(422).send({
-        error: "version_mismatch",
-        issues: [`meta.version must be ${n} and meta.parent_version must be ${latest.n} (got ${String(meta.version)} and ${String(meta.parent_version)})`],
-        expected: { version: n, parent_version: latest.n },
-      });
-    }
-    const key = artifactKey(runId, "versions", `v${n}-${randomUUID()}.json`);
-    const text = JSON.stringify(req_.body, null, 2);
-    await artifacts.put(key, text, "application/json");
-    await store.addVersion({
-      runId,
-      n,
-      parent: latest.n,
-      author: req_.author,
-      ...(req_.authorRole !== undefined ? { authorRole: req_.authorRole } : {}),
-      createdAt: now(),
-      artifactKey: key,
-      // The exact bytes stored, so a release can refuse a body rewritten later (DEC-020).
-      bodySha256: createHash("sha256").update(text, "utf8").digest("hex"),
-    });
-    try {
-      await onVersionSaved(runId, n);
-    } catch (err) {
-      req.log.error({ runId, n, errName: err instanceof Error ? err.name : "unknown" }, "onVersionSaved failed");
-      // Saved, but the checks did not finish: never report plain success. The run is either failed at the
-      // checks step (POST /resume runs them again) or keeps its state; findings are recomputed on the next read.
-      return reply.code(201).send({
-        n,
-        checks_status: "failed",
-        message: "The version was saved but its checks did not finish. They run again when the version is opened; if the run shows failed, resume it.",
-      });
-    }
-    return reply.code(201).send({ n, checks_status: "ok" });
+    if (r.checks_status === "failed") req.log.error({ runId, n: r.n }, "onVersionSaved failed");
+    const { ok: _ok, ...rest } = r;
+    return reply.code(201).send(rest);
   });
 
   app.post<{ Params: { id: string; n: string } }>(routes.pattern.comments, async (req, reply) => {
@@ -297,6 +275,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const body = parseBody(RejectRequest, req.body, reply);
     if (!body) return reply;
     const res = await signoff.reject(req.params.id, n, body);
+    if (deps.onRejected) {
+      const runId = req.params.id;
+      await background(deps.onRejected(runId), (err) => app.log.error({ runId, errName: errName(err) }, "onRejected failed"));
+    }
     return reply.code(201).send(res);
   });
 
@@ -317,6 +299,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     );
     return reply.code(202).send({ runId });
   });
+
+  registerClinicianRoutes(app, { store, artifacts, signoff, validator, onVersionSaved, now, ...(deps.chat ? { chat: deps.chat } : {}) });
 
   // AgentCore Runtime HTTP contract. The busy flag comes from the in-process active set.
   app.get(routes.pattern.ping, async () => {

@@ -4,6 +4,7 @@ import { routes } from "../../src/contract/routes.js";
 import { Signoff } from "../../src/signoff/signoff.js";
 import { parseModelValidator } from "../../src/steps/logicModelValidator.js";
 import { createHash } from "node:crypto";
+import { OFFICER_AGENT_ID } from "../../src/signoff/identity.js";
 import { draftV1, fullyResolved, officerFixed, openFor, seed, shaOf, testInputs } from "../signoff/helpers.js";
 
 const orchestrator: OrchestratorPort = {
@@ -93,19 +94,43 @@ describe("GET status", () => {
     const res = await server.inject({ method: "GET", url: routes.status("r1", 1) });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ n: 1, latest: 1, status: "awaiting_officer", runState: "awaiting_officer", signatures: [], latestLocked: null });
-    expect(res.json().nextStep).toMatch(/before the program officer can sign/);
+    expect(res.json().nextStep).toMatch(/before the officer agent can sign/);
   });
 });
 
 describe("POST sign", () => {
   it("422 while blockers for that role remain, with the blockers in plain words", async () => {
-    const { server } = await setup();
-    const res = await sign(server, 1, "program_officer", { role: "program_officer", userId: "officer-1", modelSha: shaOf(draftV1()) });
-    expect(res.statusCode).toBe(422);
-    expect(res.json().error).toBe("blocked");
-    const blockers = res.json().blockers as { code: string }[];
-    expect(blockers.filter((b) => b.code === "OPEN_QUESTION")).toHaveLength(openFor(draftV1(), "program_officer"));
-    expect(res.json().blockers[0].message).toMatch(/\w/);
+    const { server, signoff } = await setup();
+    const res = await sign(server, 1, "clinician", { role: "clinician", userId: "clinician-1", modelSha: shaOf(draftV1()) });
+    expect(res.statusCode).toBe(409);
+    const e = (await signoff.signAsAgent("r1", 1, shaOf(draftV1())).catch((x: unknown) => x)) as { status: number; code: string; detail: { blockers: { code: string; message: string }[] } };
+    expect([e.status, e.code]).toEqual([422, "blocked"]);
+    expect(e.detail.blockers.filter((b: { code: string }) => b.code === "OPEN_QUESTION")).toHaveLength(openFor(draftV1(), "program_officer"));
+    expect(e.detail.blockers[0]!.message).toMatch(/\w/);
+  });
+
+  it("403 agent_only: no HTTP caller can fill the program officer signature", async () => {
+    const { server, store } = await setup([fullyResolved()]);
+    const res = await sign(server, 1, "program_officer", { role: "program_officer", userId: "officer-1", modelSha: shaOf(fullyResolved()) });
+    expect([res.statusCode, res.json().error]).toEqual([403, "agent_only"]);
+    expect((await store.getVersion("r1", 1))!.signatures ?? []).toEqual([]);
+  });
+
+  it("refuses the officer agent's reserved id in a sign, reject or save body", async () => {
+    const { server } = await setup([fullyResolved()]);
+    const sha = shaOf(fullyResolved());
+    expect((await sign(server, 1, "clinician", { role: "clinician", userId: "Officer-Agent@System", modelSha: sha })).statusCode).toBe(400);
+    const rej = await server.inject({ method: "POST", url: routes.reject("r1", 1), payload: { role: "clinician", userId: "officer-agent@system", modelSha: sha, comment: "This rule is wrong and must change." } });
+    expect(rej.statusCode).toBe(400);
+    const save = await server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 1, author: "officer-agent@system", body: {} } });
+    expect(save.statusCode).toBe(400);
+  });
+
+  it("403 agent_only when a save names the program officer role", async () => {
+    const { server, store } = await setup([fullyResolved()]);
+    const res = await server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 1, author: "o", authorRole: "program_officer", body: nextBody() } });
+    expect([res.statusCode, res.json().error]).toEqual([403, "agent_only"]);
+    expect(await store.listVersions("r1")).toHaveLength(1);
   });
 
   it("403 when the role in the body does not match the endpoint", async () => {
@@ -135,21 +160,18 @@ describe("POST sign", () => {
   });
 
   it("409 for a sha the version does not have", async () => {
-    const { server } = await setup([fullyResolved()]);
-    const res = await sign(server, 1, "program_officer", { role: "program_officer", userId: "officer-1", modelSha: "0".repeat(64) });
+    const { server, signoff } = await setup([fullyResolved()]);
+    await signoff.signAsAgent("r1", 1, shaOf(fullyResolved()));
+    const res = await sign(server, 1, "clinician", { role: "clinician", userId: "clinician-1", modelSha: "0".repeat(64) });
     expect(res.statusCode).toBe(409);
     expect(res.json().error).toBe("sha_mismatch");
   });
 
-  it("officer 201, same person as clinician 403, other clinician 201 and locked", async () => {
-    const { server } = await setup([fullyResolved()]);
+  it("agent signs, clinician 201 and locked", async () => {
+    const { server, signoff } = await setup([fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    const a = await sign(server, 1, "program_officer", { role: "program_officer", userId: "officer-1", modelSha: sha });
-    expect(a.statusCode).toBe(201);
-    expect(a.json()).toMatchObject({ status: "awaiting_clinician", runState: "awaiting_clinician", signature: { role: "program_officer", userId: "officer-1", modelSha: sha } });
-    const same = await sign(server, 1, "clinician", { role: "clinician", userId: "officer-1", modelSha: sha });
-    expect(same.statusCode).toBe(403);
-    expect(same.json().error).toBe("separation_of_duties");
+    const a = await signoff.signAsAgent("r1", 1, sha);
+    expect(a).toMatchObject({ status: "awaiting_clinician", runState: "awaiting_clinician", signature: { role: "program_officer", userId: OFFICER_AGENT_ID, modelSha: sha } });
     const b = await sign(server, 1, "clinician", { role: "clinician", userId: "clinician-1", modelSha: sha });
     expect(b.statusCode).toBe(201);
     expect(b.json()).toMatchObject({ status: "locked", runState: "locked" });
@@ -161,9 +183,9 @@ describe("POST sign", () => {
   });
 
   it("a version saved through the API is checked, starts with zero signatures and replaces the old one", async () => {
-    const { server, store } = await setup([officerFixed()]);
+    const { server, store, signoff } = await setup([officerFixed()]);
     const sha1 = shaOf(officerFixed());
-    expect((await sign(server, 1, "program_officer", { role: "program_officer", userId: "officer-1", modelSha: sha1 })).statusCode).toBe(201);
+    await signoff.signAsAgent("r1", 1, sha1);
     const body = fullyResolved();
     body.meta.version = 2;
     body.meta.parent_version = 1;
@@ -214,10 +236,10 @@ describe("POST versions (DEC-020)", () => {
 
   it("records the sha256 of the exact stored bytes and the author's role on the version", async () => {
     const { server, store, artifacts } = await setup([fullyResolved()]);
-    const res = await server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 1, author: "o", authorRole: "program_officer", body: nextBody() } });
+    const res = await server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 1, author: "o", authorRole: "clinician", body: nextBody() } });
     expect(res.statusCode).toBe(201);
     const v = (await store.getVersion("r1", 2))!;
-    expect(v.authorRole).toBe("program_officer");
+    expect(v.authorRole).toBe("clinician");
     expect(v.bodySha256).toBe(createHash("sha256").update(await artifacts.get(v.artifactKey)).digest("hex"));
   });
 
@@ -240,21 +262,19 @@ describe("POST versions (DEC-020)", () => {
 });
 
 describe("signer identity at the API (DEC-020)", () => {
-  it("normalises the userId: the officer's id in another case is refused as the clinician", async () => {
-    const { server, store } = await setup([fullyResolved()]);
+  it("normalises the userId: the clinician's id is stored normalised", async () => {
+    const { server, store, signoff } = await setup([fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    expect((await sign(server, 1, "program_officer", { role: "program_officer", userId: " Officer-1 ", modelSha: sha })).statusCode).toBe(201);
-    expect((await store.getVersion("r1", 1))!.signatures![0]!.userId).toBe("officer-1");
-    const same = await sign(server, 1, "clinician", { role: "clinician", userId: "OFFICER-1\u200b", modelSha: sha });
-    expect(same.statusCode).toBe(403);
-    expect(same.json().error).toBe("separation_of_duties");
+    await signoff.signAsAgent("r1", 1, sha);
+    expect((await sign(server, 1, "clinician", { role: "clinician", userId: " Clinician-1\u200b", modelSha: sha })).statusCode).toBe(201);
+    expect((await store.getVersion("r1", 1))!.signatures![1]!.userId).toBe("clinician-1");
   });
 
   it("400 for a userId with spaces inside or nothing usable", async () => {
     const { server } = await setup([fullyResolved()]);
     const sha = shaOf(fullyResolved());
     for (const userId of ["officer one", "\u200b", ""]) {
-      expect((await sign(server, 1, "program_officer", { role: "program_officer", userId, modelSha: sha })).statusCode, JSON.stringify(userId)).toBe(400);
+      expect((await sign(server, 1, "clinician", { role: "clinician", userId, modelSha: sha })).statusCode, JSON.stringify(userId)).toBe(400);
     }
   });
 });
@@ -271,9 +291,9 @@ describe("POST reject (AR-06, RR-02)", () => {
   });
 
   it("201: the version is rejected, the run goes back to the officer, and status shows the rejection", async () => {
-    const { server } = await setup([officerFixed()]);
+    const { server, signoff } = await setup([officerFixed()]);
     const sha = shaOf(officerFixed());
-    expect((await sign(server, 1, "program_officer", { role: "program_officer", userId: "officer-1", modelSha: sha })).statusCode).toBe(201);
+    await signoff.signAsAgent("r1", 1, sha);
     const res = await server.inject({ method: "POST", url: routes.reject("r1", 1), payload: body(sha) });
     expect(res.statusCode).toBe(201);
     expect(res.json()).toMatchObject({ status: "rejected", runState: "awaiting_officer", rejection: { urgent: true, itemRef: "rules.R3" } });

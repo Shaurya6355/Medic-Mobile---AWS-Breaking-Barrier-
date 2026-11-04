@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { InvalidUserId, normaliseUserId } from "../signoff/identity.js";
+import { InvalidUserId, isReservedUserId, normaliseUserId } from "../signoff/identity.js";
 
 export const RunState = z.enum([
   "created",
@@ -27,7 +27,13 @@ export const UserId = z
   .max(512)
   .transform((raw, ctx) => {
     try {
-      return normaliseUserId(raw);
+      const id = normaliseUserId(raw);
+      // DEC-024: the officer agent's id can never arrive in a request body.
+      if (isReservedUserId(id)) {
+        ctx.addIssue({ code: "custom", message: "this userId is reserved for the officer agent" });
+        return z.NEVER;
+      }
+      return id;
     } catch (e) {
       ctx.addIssue({ code: "custom", message: e instanceof InvalidUserId ? e.message : "invalid userId" });
       return z.NEVER;
@@ -85,7 +91,7 @@ export type CreateRunResponse = z.infer<typeof CreateRunResponse>;
 export const SaveVersionRequest = z.object({
   parentVersion: z.number().int().nonnegative(),
   body: z.unknown(),
-  author: z.string().min(1).max(200),
+  author: z.string().min(1).max(200).refine((a) => !isReservedUserId(a), { message: "this author is reserved for the officer agent" }),
   // The role the author saves in (DEC-020): an open question counts as answered only in a version saved
   // by the role it is routed to. AUTH SEAM (DEC-015): from the token's group once Cognito is built.
   authorRole: SignerRole.optional(),
@@ -95,7 +101,7 @@ export type SaveVersionRequest = z.infer<typeof SaveVersionRequest>;
 export const CreateCommentRequest = z.object({
   itemRef: z.string().min(1).max(500),
   text: z.string().min(1).max(10000),
-  author: z.string().min(1).max(200),
+  author: z.string().min(1).max(200).refine((a) => !isReservedUserId(a), { message: "this author is reserved for the officer agent" }),
 });
 export type CreateCommentRequest = z.infer<typeof CreateCommentRequest>;
 
@@ -160,3 +166,38 @@ export const LambdaEventResponse = z.object({
   batchItemFailures: z.array(z.object({ itemIdentifier: z.string() })),
 });
 export type LambdaEventResponse = z.infer<typeof LambdaEventResponse>;
+
+// Clinician features (activity, chat, tree edits, restore). AUTH SEAM as for SignRequest: role and userId come from the body.
+export const ActivityQuery = z.object({ after: z.coerce.number().int().nonnegative().optional() }).strict();
+export type ActivityQuery = z.infer<typeof ActivityQuery>;
+
+export const ChatRequest = z
+  .object({
+    userId: UserId,
+    role: z.literal("clinician"),
+    messages: z.array(z.object({ from: z.enum(["user", "assistant"]), text: z.string().min(1).max(4000) }).strict()).min(1).max(20),
+  })
+  .strict();
+export type ChatRequest = z.input<typeof ChatRequest>;
+
+// The closed set of tree edits (src/edit/treeEdits.ts). Any other op is refused with 422 unsupported_edit.
+export const TreeEditSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("setQuestionLabel"), questionId: z.string().min(1).max(200), text: z.string().min(1).max(2000) }).strict(),
+  z.object({ op: z.literal("setThreshold"), questionId: z.string().min(1).max(200), ruleId: z.string().min(1).max(200), from: z.number().finite(), to: z.number().finite() }).strict(),
+  z.object({ op: z.literal("setOutcomeText"), ruleId: z.string().min(1).max(200), field: z.enum(["title", "action"]), actionIndex: z.number().int().nonnegative().optional(), text: z.string().min(1).max(4000) }).strict(),
+  z.object({ op: z.literal("setFollowUpDays"), ruleId: z.string().min(1).max(200), days: z.number().int().min(0).max(3650) }).strict(),
+]);
+export type TreeEditInput = z.infer<typeof TreeEditSchema>;
+
+export const PreviewEditsRequest = z
+  .object({ userId: UserId, role: z.literal("clinician"), edits: z.array(TreeEditSchema).min(1).max(50) })
+  .strict();
+export type PreviewEditsRequest = z.input<typeof PreviewEditsRequest>;
+
+export const SaveEditsRequest = z
+  .object({ userId: UserId, role: z.literal("clinician"), edits: z.array(TreeEditSchema).min(1).max(50), modelSha: z.string().regex(/^[0-9a-f]{64}$/) })
+  .strict();
+export type SaveEditsRequest = z.input<typeof SaveEditsRequest>;
+
+export const RestoreRequest = z.object({ userId: UserId, role: z.literal("clinician") }).strict();
+export type RestoreRequest = z.input<typeof RestoreRequest>;

@@ -23,6 +23,16 @@ describe("loadConfig", () => {
     expect(path.basename(path.dirname(c.fillPrompt))).toBe("extraction");
     expect(c.fillModelId).toBe("us.m");
   });
+  it("reads chat settings with defaults", () => {
+    expect(loadConfig(base)).toMatchObject({ chatModelId: "us.m", chatMaxCostUsd: 1, chatRatePerMin: 10 });
+    expect(loadConfig({ ...base, CHAT_MODEL_ID: "us.c", CHAT_MAX_COST_USD: "0.5", CHAT_RATE_PER_MIN: "3" })).toMatchObject({ chatModelId: "us.c", chatMaxCostUsd: 0.5, chatRatePerMin: 3 });
+    expect(() => loadConfig({ ...base, CHAT_MAX_COST_USD: "-1" })).toThrow(/CHAT_MAX_COST_USD/);
+  });
+  it("reads officer agent and chat token settings with defaults", () => {
+    expect(loadConfig(base)).toMatchObject({ officerAgentModelId: "us.m", officerAgentMaxCostUsd: 2, chatMaxTokens: 200000 });
+    expect(loadConfig({ ...base, OFFICER_AGENT_MODEL_ID: "us.a", OFFICER_AGENT_MAX_COST_USD: "0.5", CHAT_MAX_TOKENS: "5000" })).toMatchObject({ officerAgentModelId: "us.a", officerAgentMaxCostUsd: 0.5, chatMaxTokens: 5000 });
+    expect(() => loadConfig({ ...base, OFFICER_AGENT_MAX_COST_USD: "0" })).toThrow(/OFFICER_AGENT_MAX_COST_USD/);
+  });
   it("reads FILL_PROMPT and FILL_MODEL_ID", () => {
     const c = loadConfig({ ...base, FILL_PROMPT: "/f.txt", FILL_MODEL_ID: "us.small" });
     expect(c).toMatchObject({ fillPrompt: "/f.txt", fillModelId: "us.small", modelId: "us.m" });

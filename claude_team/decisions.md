@@ -338,3 +338,27 @@ Other options considered (and why not):
 - Compare every field: floods the clinician with naming noise.
 Revisit if: the first Bedrock runs show too many or too few flags, or the logic model schema replaces the extraction schema (DEC-022).
 Related: INT-014, DEC-021, DEC-022
+
+### DEC-024 | The program officer role is played by an officer agent; the clinician is the only human approver
+Status: proposed (needs Medic to confirm the role change, see BRD OQ-08)
+Date: 2026-11-04
+Decided by: Claude session, from the human's request (Backend/src/agent, guard, signoff)
+Feature or area: sign-off, officer agent, clinician features (chat, tree edits, history)
+Decision:
+- The program officer signature is given only by an officer agent under the reserved identity OFFICER_AGENT_ID. A person cannot sign as program officer (403 agent_only) and cannot save a version as program officer. The clinician is the sole human approver and signs second. Separation of duties holds: the agent and the clinician are different identities.
+- Behaviour guard: the agent may only produce a JSON patch, never a model. Every patch is applied to the saved model and the outcome of every enumerated answer combination is compared before and after (behaviourDiff). Any change in behaviour, or an incomplete comparison, refuses the patch (fails closed).
+- Path allowlist (guard/patchPaths.ts): per finding code, only citations, file hash and open-question bookkeeping. Rules, conditions, outcomes, thresholds, questions, derived definitions and action text are never writable.
+- Open questions: the agent answers only open questions whose route_to is program_officer (operational items such as follow-up window, entry limits, publisher/edition, file fingerprint): it may set status to resolved and write the resolution text. The guard reads route_to from the target question in the saved model, never from the patch, so a question routed to the clinician cannot be touched, and route_to can never change.
+- Escalation: after 2 failed fix attempts, a refused patch, suspected instruction text in the guideline, an exhausted budget (OFFICER_AGENT_MAX_COST_USD) or a finding it may not fix, the agent stops, comments "agent:escalation" and the run stays with a person (the clinician).
+- Editing: the clinician edits only through a closed set of tree edits (label, threshold, outcome text, follow-up days) with a preview of behaviour changes and findings before saving. Every edit is a new version. Restore copies an old version into a new one (origin restore).
+- Chat answers only: the chat cannot change anything, cites sources, is rate limited and cost capped per run (token cap when no price is configured, so it fails closed).
+- OWASP LLM controls: LLM01 text from the guideline goes into prompts only inside data blocks and instruction-like text is flagged and escalated; LLM02/LLM05 model output is a patch checked by schema, allowlist and behaviour diff, never executed; LLM06 narrow path allowlist and no tools that write; LLM08 retrieval is scoped to the run; LLM09 answers cite pages or findings; LLM10 per-run cost budgets, token cap, rate limit and attempt cap; secrets and personal text are redacted from stored agent logs.
+- Cognito (or any real authentication) is needed before a real deployment. Until then userId and role come from the request body (AUTH SEAM, DEC-015), so a caller could claim to be the clinician.
+- The check that the officer signer id is the reserved agent id is client-side in the DynamoDB store (a conditional write cannot compare normalised ids on its own); the release build re-checks it with verifyLock.
+Assumptions: Medic accepts an AI agent as the first signer. The clinician remains accountable for clinical content.
+Why: The user asked for the clinician to be the only human approver and the officer work to be automated, with guards that keep the agent from changing clinical meaning.
+Other options considered (and why not):
+- Let the agent edit the model freely: cannot be audited, can change clinical behaviour.
+- Let the agent answer clinician-routed questions: removes the clinician decision (BR-04, GR-07).
+Revisit if: Medic rejects the role change; Cognito is added; the first runs show the agent escalating too often.
+Related: DEC-015, DEC-019, DEC-020, BRD AR-03, AR-04, AR-06, OQ-08

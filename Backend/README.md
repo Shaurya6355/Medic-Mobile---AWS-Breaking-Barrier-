@@ -77,6 +77,9 @@ Before emitting, `compileSnapshot` runs `verifyFlow` on every point of the exact
 | GOLDEN_CASES_PATH | tests/fixtures/logic/golden-proposed.json (proposed, awaiting Medic; TODO DEC-020) | Golden cases for the checks when the run has no `runs/<id>/inputs/golden_cases.json`. `none` switches them off; a set path that is missing is an error. Missing default (Lambda image): the findings say the test-case check did not run |
 | COMPILE_SETTINGS_PATH | compile-demo/settings.demo.json (TODO DEC-020) | Compile settings for the checks when the run has no `runs/<id>/inputs/compile_settings.json`. Their sha256 is recorded on each signature; a release build must use the same settings |
 | PRICES_JSON | none | JSON map of model ID to `{inPerMTok, outPerMTok}` for cost metrics |
+| CHAT_MAX_TOKENS | 200000 | Per-run chat token cap, used when PRICES_JSON has no price for the chat model |
+| OFFICER_AGENT_MODEL_ID | MODEL_ID | Model of the officer agent |
+| OFFICER_AGENT_MAX_COST_USD | 2 | Max model cost per run for the officer agent |
 
 Startup fails with a list of the names of any missing required variables.
 
@@ -87,6 +90,21 @@ On SIGTERM or SIGINT the process stops polling SQS and the resume sweep, waits u
 ## HTTP API
 
 Route names and request/response shapes are defined only in `src/contract/` (`routes.ts`, `schemas.ts`). The API covers creating a run (returning a presigned upload URL), reading a run, saving versions, comments, resuming a run, and sign-off: `GET .../versions/:n/findings[?audience=program_officer|clinician]`, `GET .../versions/:n/status`, `POST .../versions/:n/signatures/:role` with body `{role, userId, modelSha}` (201, or 400/403/404/409/422 as listed under "Sign-off"). See that folder for the exact paths.
+
+## For the frontend
+
+Exact shapes live in `src/contract/` (`routes.ts`, `schemas.ts`). Until Cognito is added (DEC-015, DEC-024) `userId` and `role` are sent in the body. All clinician routes use `role: "clinician"`; unknown run 404, unknown version 404, bad body 400.
+
+- `GET /runs/:id/activity[?after=<cursor>]` returns `{items:[{seq, at, actor, kind, text}], cursor, runState}`. Poll with the last `cursor`. Actors: pipeline, officer_agent, clinician, it.
+- `POST /runs/:id/chat` with `{userId, role, messages:[{from:"user"|"assistant", text}]}` (1 to 20 messages) returns `{reply, citations:[{kind, ref, quote?}]}`. Answers only, never changes anything. Errors: 429 `rate_limited` or `chat_budget_exceeded`, 503 `chat_unavailable`.
+- `GET /runs/:id/versions/:n/flow` returns `{flow, nodes:[{nodeId, kind, questionId?, ruleId?, label, editable:[...]}], modelSha}`. Send `modelSha` back when saving edits.
+- `POST /runs/:id/versions/:n/edits/preview` with `{userId, role, edits:[...]}` returns `{flow, nodes, paths, behaviourChanges, findings}`. `findings` is what the edited model would get as the next version (`{status, blocking, gates, checksNotRun, clinician:[groups], program_officer:[groups]}`); nothing is saved. Edit ops: `setQuestionLabel {questionId,text}`, `setThreshold {questionId,ruleId,from,to}`, `setOutcomeText {ruleId,field:"title"|"action",actionIndex?,text}`, `setFollowUpDays {ruleId,days}`. Any other op: 422 `unsupported_edit`.
+- `POST /runs/:id/versions/:n/edits` with `{userId, role, edits, modelSha}` (optional `Idempotency-Key` header) saves a new version (origin `tree_edit`) and returns 201 `{n, checks_status, behaviourChanges}`. Only the latest version can be edited: a stale `n` or `modelSha` gives 409 `conflict`. The new version goes to the officer agent, which fixes and signs it, then to the clinician.
+- `GET /runs/:id/versions/:a/diff/:b` returns `{a, b, structural:{changes, total, truncated}, behaviourChanges}`.
+- `GET /runs/:id/versions/:n/change` returns the stored change record of a version (who, what, behaviour changes, agent details).
+- `POST /runs/:id/versions/:n/restore` with `{userId, role}` copies version n into a new latest version (origin `restore`) and returns 201 `{n, checks_status, restoredFrom}`.
+- Unchanged: `GET .../findings`, `GET .../status`, `POST .../signatures/clinician` `{role, userId, modelSha}`, and `POST .../reject` `{role:"clinician", userId, modelSha, comment (15+ chars), itemRef?, urgent?}`.
+- Officer sign is now agent-only: `POST .../signatures/program_officer` and saving a version with `authorRole: "program_officer"` answer 403 `agent_only`. The officer agent runs by itself after the pipeline, after every saved version and after a reject; watch `activity` for `agent_fix`, `agent_signed` and `agent_escalated`. An escalation comment (itemRef `agent:escalation`) lists what a person must still do.
 
 ## Docker
 

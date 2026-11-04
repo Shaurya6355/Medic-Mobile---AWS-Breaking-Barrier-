@@ -12,6 +12,8 @@ import { startResumeSweep } from "./engine/sweep.js";
 import { withDeadline } from "./shutdown.js";
 import { createAgentCoreModelClient } from "./model/agentcore.js";
 import { createStrandsModelClient } from "./model/strands.js";
+import { OfficerAgent } from "./agent/officerAgent.js";
+import { runBackground } from "./api/background.js";
 import { Signoff } from "./signoff/signoff.js";
 import { createChecksStep } from "./steps/checks.js";
 import { createExtractStep } from "./steps/extract.js";
@@ -43,6 +45,17 @@ async function main(): Promise<void> {
       ? createAgentCoreModelClient({ region: cfg.region, runtimeArn: cfg.agentCoreRuntimeArn as string })
       : createStrandsModelClient({ region: cfg.region });
 
+  // The officer agent is built after the orchestrator and signoff; the hooks below reach it through this holder.
+  const triggers: { agent?: OfficerAgent } = {};
+  const triggerAgent = (runId: string): Promise<void> => {
+    const agent = triggers.agent;
+    if (!agent) return Promise.resolve();
+    // Idempotent: the agent's state record per base version stops a second run from doing the work twice.
+    return runBackground(cfg.runMode, agent.onAwaitingOfficer(runId), (e) =>
+      log("officer agent failed", { runId, error: e instanceof Error ? e.message : String(e) }),
+    );
+  };
+
   const orchestrator = new Orchestrator({
     store,
     artifacts,
@@ -62,6 +75,7 @@ async function main(): Promise<void> {
       createChecksStep(),
     ],
     finalState: "awaiting_officer",
+    onFinalState: triggerAgent,
     owner: randomUUID(),
     leaseMs: cfg.leaseMs,
     runnerOpts: {
@@ -75,6 +89,20 @@ async function main(): Promise<void> {
   // Findings, status and signatures. Compile is not here: it runs on the build host (DEC-014),
   // see scripts/compileLocked.ts.
   const signoff = new Signoff({ store, artifacts });
+  // The agent saves its fixes through saveVersion with signoff.onVersionSaved (no re-trigger: it loops itself).
+  triggers.agent = new OfficerAgent({
+    store,
+    artifacts,
+    signoff,
+    model,
+    modelId: cfg.officerAgentModelId,
+    validator: parseModelValidator,
+    saveDeps: { store, artifacts, validator: parseModelValidator, onVersionSaved: (runId, n) => signoff.onVersionSaved(runId, n), now: Date.now },
+    now: Date.now,
+    budgetUsd: cfg.officerAgentMaxCostUsd,
+    prices: cfg.prices,
+    leaseMs: cfg.leaseMs,
+  });
 
   const app = buildServer({
     orchestrator,
@@ -90,8 +118,11 @@ async function main(): Promise<void> {
     onVersionSaved: async (runId, n) => {
       log("version saved", { runId, version: n });
       await signoff.onVersionSaved(runId, n);
+      await triggerAgent(runId);
     },
+    onRejected: triggerAgent,
     signoff,
+    chat: { model, modelId: cfg.chatModelId, prices: cfg.prices, maxCostUsd: cfg.chatMaxCostUsd, maxTokens: cfg.chatMaxTokens, ratePerMin: cfg.chatRatePerMin },
     maxPages: cfg.maxPages,
     runMode: cfg.runMode,
     logger: false,
