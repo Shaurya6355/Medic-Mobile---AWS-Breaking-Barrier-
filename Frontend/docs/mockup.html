@@ -1,0 +1,1584 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guideline to Form</title>
+<style>
+/* Layout idea: a reviewer's diff screen. Two dagre-laid decision flows (current left, new right) share node ids, so selecting one highlights its twin; below sit the rule detail, the patients whose outcome changes, and a sticky decision bar. */
+:root{
+  --bg:#F2F5F6; --surface:#FFFFFF; --ink:#14222A; --muted:#5A6A72; --line:#D2DBDF; --accent:#0B7A84;
+  --chg:#B7791F; --chg-bg:#FDF3E1; --add:#2F855A; --add-bg:#E3F4EA; --del:#B23A2C; --del-bg:#FBE4E0;
+  --pink:#E05A8A; --pink-bg:#FCE7EF; --yellow:#C9A100; --yellow-bg:#FFF6D6; --green:#2F8F5B; --green-bg:#E2F3E9;
+  --font-display:"Public Sans","Helvetica Neue",Arial,sans-serif;
+  --font-body:"Public Sans","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.5}
+.app{max-width:1240px;margin:0 auto;padding:16px 16px 140px;display:grid;gap:16px}
+.mock{font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.mock b{font-family:var(--font-mono);font-weight:500;background:var(--surface);border:1px dashed var(--line);padding:1px 6px;border-radius:4px}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-end}
+.crumb{font-size:12px;color:var(--muted)}
+h1{font-family:var(--font-display);font-size:24px;margin:2px 0 0;line-height:1.25;text-wrap:balance}
+h2{font-family:var(--font-display);font-size:15px;margin:0;font-weight:600}
+.risk{display:inline-flex;gap:8px;align-items:center;background:var(--pink-bg);color:var(--ink);border:1px solid var(--pink);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:600}
+.risk i{width:8px;height:8px;border-radius:50%;background:var(--pink);display:inline-block}
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.chk{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;border-left:4px solid var(--green)}
+.chk.warn{border-left-color:var(--chg)}
+.chk .k{font-size:12px;color:var(--muted)}
+.chk .v{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:14px;border-radius:4px;border:2px solid}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.toggle input{accent-color:var(--accent);width:16px;height:16px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:860px){.cols{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0;display:grid;gap:8px;align-content:start}
+.ph{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.ver{font-size:12px;color:var(--muted)}
+.ver code{font-family:var(--font-mono);font-size:11px}
+.tagcur,.tagnew{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px}
+.tagcur{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.tagnew{background:var(--chg-bg);color:var(--chg);border:1px solid var(--chg)}
+.stage{position:relative;overflow:hidden}
+.canvas{position:absolute;left:0;top:0;transform-origin:0 0}
+.canvas svg{position:absolute;left:0;top:0;overflow:visible}
+.edge{fill:none;stroke:var(--muted);stroke-width:1.4}
+.elbl rect{fill:var(--surface)}
+.elbl text{font-size:11px;fill:var(--muted);font-family:var(--font-body)}
+.ah{fill:var(--muted)}
+.node{position:absolute;border:1.5px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;font-size:13px;line-height:18px;cursor:pointer;text-align:left;font-family:inherit;color:inherit;transition:opacity .15s, box-shadow .15s}
+.node:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.node .kick{font-size:11px;line-height:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;display:flex;justify-content:space-between;gap:6px}
+.node .sub{font-size:12px;line-height:16px;color:var(--muted);margin-top:2px}
+.node.decision{border-radius:14px}
+.node.start{background:var(--bg)}
+.node.outcome{border-top-width:6px}
+.node.o-pink{border-top-color:var(--pink)} .node.o-yellow{border-top-color:var(--yellow)} .node.o-green{border-top-color:var(--green)}
+.node.outcome .ttl{font-weight:700;font-size:12px;letter-spacing:.02em}
+.node.task{border-style:dashed}
+.node.d-changed{border-color:var(--chg);background:var(--chg-bg)}
+.node.d-added{border-color:var(--add);background:var(--add-bg)}
+.node.d-removed{border-color:var(--del);background:var(--del-bg)}
+.badge{font-size:10px;font-weight:700;padding:0 6px;border-radius:999px;letter-spacing:.04em}
+.badge.changed{background:var(--chg);color:var(--surface)}
+del{color:var(--del);text-decoration-thickness:2px}
+ins{color:var(--add);text-decoration:none;font-weight:600;border-bottom:2px solid var(--add)}
+.node.sel{box-shadow:0 0 0 3px var(--accent)}
+.dimmed .node:not(.d-changed):not(.d-added):not(.d-removed):not(.sel){opacity:.35}
+.lower{display:grid;grid-template-columns:5fr 7fr;gap:16px}
+@media (max-width:860px){.lower{grid-template-columns:1fr}}
+.rule{display:grid;gap:10px}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){.cmp{grid-template-columns:1fr}}
+.side{border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;gap:6px;align-content:start}
+.side .lab{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.quote{font-size:13px;border-left:3px solid var(--line);padding-left:8px;color:var(--muted)}
+.quote small{display:block;font-size:11px}
+.bound{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-variant-numeric:tabular-nums}
+.chip.y{border-color:var(--yellow);background:var(--yellow-bg)}
+.chip.n{border-color:var(--green);background:var(--green-bg)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top;font-variant-numeric:tabular-nums}
+.tw{overflow-x:auto}
+td:nth-child(-n+3),td .btn{white-space:nowrap}
+.cls{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.cls i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.arrow{color:var(--muted)}
+.note{font-size:12px;color:var(--muted)}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 18px rgba(0,0,0,.08);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.bar .in{max-width:1240px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.bar .who{font-size:12px;color:var(--muted)}
+.bar .who b{color:var(--ink)}
+.bar .act{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bar label{font-size:12px;color:var(--muted)}
+.bar input[type=text]{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:240px}
+.btn{font:inherit;font-size:13px;font-weight:600;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.msg{font-size:12px;color:var(--accent);width:100%}
+.tabs{justify-self:start;display:inline-flex;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:3px;gap:2px}
+.tabs button{font:inherit;font-size:13px;font-weight:600;border:0;background:transparent;color:var(--muted);padding:6px 12px;border-radius:7px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--surface)}
+.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.banner{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--chg);border-radius:10px;padding:10px 12px;font-size:13px}
+.picker{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.picker button{font:inherit;font-size:12px;font-family:var(--font-mono);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:3px 10px;cursor:pointer}
+.picker button.dif{border-color:var(--chg)}
+.picker button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.picker button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.phone{width:100%;max-width:340px;margin:0 auto;border:10px solid var(--ink);border-radius:30px;background:var(--surface);overflow:hidden}
+.phone .bar2{background:var(--accent);color:var(--surface);padding:10px 14px;font-weight:600;font-size:14px;display:flex;justify-content:space-between}
+.phone .bar2 span{font-weight:400;font-size:12px;opacity:.85}
+.fq{padding:10px 14px;border-bottom:1px solid var(--line);display:grid;gap:6px;font-size:13px}
+.fq .lb{font-weight:600}
+.fq .hint{font-size:12px;color:var(--muted);margin-top:-4px}
+.fin{border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-variant-numeric:tabular-nums;background:var(--bg)}
+.opt{display:flex;gap:8px;align-items:center}
+.rd,.cb{width:14px;height:14px;border:1.5px solid var(--muted);flex:none}
+.rd{border-radius:50%}.cb{border-radius:3px}
+.rd.on,.cb.on{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--surface)}
+.sect{padding:8px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;background:var(--bg)}
+.res{margin:10px 14px;border-radius:8px;padding:10px;border:1px solid var(--line);border-top-width:6px;display:grid;gap:4px;font-size:13px}
+.res.o1{border-top-color:var(--pink);background:var(--pink-bg)}.res.o2{border-top-color:var(--yellow);background:var(--yellow-bg)}.res.o3{border-top-color:var(--green);background:var(--green-bg)}
+.res.diff{outline:3px solid var(--chg);outline-offset:2px}
+.res b{font-size:12px;letter-spacing:.02em}
+.submit{margin:6px 14px 14px;text-align:center;background:var(--accent);color:var(--surface);border-radius:8px;padding:8px;font-weight:600;font-size:13px}
+.pipe{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px}
+.pipe .st{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:grid}
+.pipe .st b{font-size:13px}
+.pipe .st span{color:var(--muted)}
+.pipe .st.ours{border-color:var(--accent)}
+.pipe .ar{color:var(--muted)}
+.xls{font-family:var(--font-mono);font-size:12px}
+.xls td,.xls th{white-space:nowrap;padding:5px 8px}
+.xls td:nth-child(n+4){white-space:normal;min-width:180px}
+.xls tr.del td{background:var(--del-bg)}
+.xls tr.add td{background:var(--add-bg)}
+.xls td.m{font-weight:700;width:14px}
+.xls tr.del td.m{color:var(--del)}.xls tr.add td.m{color:var(--add)}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:980px){.three{grid-template-columns:1fr}}
+pre.code{margin:0;font-family:var(--font-mono);font-size:11.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+pre.code .d{color:var(--del);background:var(--del-bg);display:block}
+pre.code .a{color:var(--add);background:var(--add-bg);display:block}
+pre.code .c{color:var(--muted);display:block}
+@media (prefers-reduced-motion: reduce){.node{transition:none}}
+.stepper{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.stp{font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px 5px 5px;cursor:pointer}
+.stp:disabled{cursor:not-allowed;color:var(--muted);opacity:.7}
+.stp .dot{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px;font-weight:700;background:var(--bg);border:1px solid var(--line)}
+.stp.now{border-color:var(--accent);font-weight:600}
+.stp.now .dot{background:var(--accent);color:var(--surface);border-color:var(--accent)}
+.stp.done .dot{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+.stp.next{cursor:default;border-style:dashed;color:var(--muted)}
+.stp:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.who2{font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}}
+.pcard{display:grid;gap:2px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;background:var(--bg)}
+.pcard code{font-family:var(--font-mono);font-size:11px}
+.kinds{display:grid;gap:8px}
+.kind{font:inherit;text-align:left;display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);color:var(--ink);cursor:pointer}
+.kind > span:last-child{display:grid;gap:2px}
+.kind.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.kind .rd{margin-top:3px}
+.kind:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.file{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.file > span:last-child{display:grid}
+.pdf{font-family:var(--font-mono);font-size:11px;font-weight:600;background:var(--del-bg);color:var(--del);border-radius:4px;padding:6px 6px}
+.checklist{margin:0;padding:0;list-style:none;display:grid;gap:4px;font-size:13px}
+.checklist li{padding-left:22px;position:relative}
+.checklist li.ok::before{content:"✓";position:absolute;left:4px;color:var(--green);font-weight:700}
+.pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.pg{font:inherit;display:grid;gap:4px;justify-items:start;text-align:left;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface);color:var(--ink);cursor:pointer}
+.pg .lines{display:grid;gap:3px;width:100%}
+.pg .lines i{display:block;height:4px;border-radius:2px;background:var(--line)}
+.pg .lines i:nth-child(2n){width:70%}
+.pg .pn{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.pg .pt{font-size:11px;line-height:1.3}
+.pg.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.pg:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+a.btn{text-decoration:none;justify-self:start;display:inline-block}
+.chk.bad{border-left-color:var(--del)}
+.chk.muted{border-left-color:var(--line)}
+.rcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px;cursor:pointer;background:var(--surface)}
+.rcard.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.rhead{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.rid{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.badges{display:flex;gap:4px;flex-wrap:wrap}
+.badge.ai{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.badge.ed{background:var(--accent);color:var(--surface)}
+.rbody{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.rbody select,.dform select{font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.kw{color:var(--muted);font-size:12px;font-weight:600}
+.out{font-weight:600;font-size:12px;padding:3px 8px;border-radius:6px;border-left:4px solid}
+.out.o-o1{background:var(--pink-bg);border-color:var(--pink)}.out.o-o2{background:var(--yellow-bg);border-color:var(--yellow)}.out.o-o3{background:var(--green-bg);border-color:var(--green)}
+.was{font-size:12px;color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.page{border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:8px;background:var(--bg)}
+.page .pl{height:7px;border-radius:3px;background:var(--line)}
+.page .pl.s{width:60%}
+.page .hl{background:var(--yellow-bg);border:1px solid var(--yellow);border-radius:4px;padding:6px 8px;font-size:13px;font-weight:600}
+.issue{border:1px solid var(--line);border-left:4px solid var(--del);border-radius:8px;padding:10px;display:grid;gap:6px}
+.issue.warning{border-left-color:var(--chg)}
+.issue.done{border-left-color:var(--green);opacity:.85}
+.ih{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.ih b{flex:1;font-size:13px}
+.sev{font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--del)}
+.issue.warning .sev{color:var(--chg)}.issue.done .sev{color:var(--green)}
+.dform{display:flex;flex-wrap:wrap;gap:6px}
+.dform input{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);flex:1;min-width:140px}
+.dec{font-size:13px;color:var(--green);font-weight:600}
+.summary{display:grid;gap:6px;font-size:13px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
+.summary > div{display:grid;grid-template-columns:110px 1fr;gap:8px}
+.summary .k{color:var(--muted)}
+.summary code{font-family:var(--font-mono);font-size:11px}
+.lab2{font-size:12px;font-weight:600;color:var(--muted)}
+select#rev,textarea{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
+textarea{resize:vertical}
+.timeline{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.timeline li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;font-size:13px;color:var(--muted);position:relative}
+.timeline li::before{content:"";position:absolute;left:10px;top:30px;bottom:-8px;width:2px;background:var(--line)}
+.timeline li:last-child::before{display:none}
+.tdot{width:22px;height:22px;flex:none;border-radius:50%;border:2px solid var(--line);background:var(--surface);display:grid;place-items:center;font-size:11px;font-weight:700;z-index:1}
+.timeline li.done{color:var(--ink)}
+.timeline li.done .tdot{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+.timeline li.now{color:var(--ink);font-weight:600}
+.timeline li.now .tdot{border-color:var(--accent)}
+
+.editgrid{display:grid;grid-template-columns:7fr 5fr;gap:16px;align-items:start}
+@media (max-width:960px){.editgrid{grid-template-columns:1fr}}
+.rightcol{display:grid;gap:16px;align-content:start}
+.editor{border-color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
+.fld{display:grid;gap:4px;border:0;margin:0;padding:0;min-width:0}
+.fld label,.fld legend{font-size:12px;font-weight:600;color:var(--muted);padding:0}
+.fld input[type=text],.fld input[type=number],.fld textarea{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
+.fld input[type=number]{font-variant-numeric:tabular-nums}
+.fld input:focus-visible,.fld textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.tgl{display:flex;flex-wrap:wrap;gap:6px}
+.tg{display:inline-flex;gap:6px;align-items:center;font-size:12px;font-weight:500;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;background:var(--surface)}
+.tg.on{border-color:var(--accent);background:var(--bg)}
+.tg input{accent-color:var(--accent);margin:0}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.row3 .fld label{font-weight:500}
+.btn.tiny{font-size:12px;padding:4px 10px}
+.clist{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px}
+.clist li{border-left:3px solid var(--line);padding-left:8px}
+.clist li.blocking{border-left-color:var(--del)}.clist li.warning{border-left-color:var(--chg)}.clist li.info{border-left-color:var(--accent)}
+.clist .sev{font-size:10px}
+.clist li.info .sev{color:var(--accent)}
+.lnk{font:inherit;background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer}
+.plain{margin:0;padding-left:20px;display:grid;gap:10px;font-size:14px}
+.node.bad{border-color:var(--del);box-shadow:0 0 0 2px var(--del)}
+.node .badges{display:inline-flex;gap:4px}
+
+.app{padding-bottom:48px}
+.apphead{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.hin{max-width:1240px;margin:0 auto;padding:0 16px;display:flex;flex-wrap:wrap;gap:6px 20px;align-items:center}
+.brand{font-family:var(--font-display);font-weight:700;font-size:16px;padding:12px 0}
+.nav{display:flex;flex-wrap:wrap;gap:4px 16px;flex:1 1 auto}
+.nav a{color:var(--muted);text-decoration:none;font-size:14px;padding:12px 0;border-bottom:2px solid transparent}
+.nav a.on{color:var(--ink);font-weight:600;border-bottom-color:var(--accent)}
+.nav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.roles{display:flex;gap:0;align-items:center;flex-wrap:wrap;padding:6px 0}
+.roles .note{margin-right:8px}
+.rolebtn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 12px;cursor:pointer;margin-left:-1px}
+.rolebtn:first-of-type{border-radius:8px 0 0 8px}.rolebtn:last-of-type{border-radius:0 8px 8px 0}
+.rolebtn.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.rolebtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;position:relative}
+.mock{flex-wrap:wrap}
+.spacer{flex:1 1 auto}
+.stpill{font-size:12px;font-weight:600;border:1px solid var(--accent);color:var(--accent);border-radius:999px;padding:2px 10px}
+.banner.good{border-left-color:var(--green)}
+.banner a,.note a{color:var(--accent)}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn.ok{background:var(--green-bg);border-color:var(--green);color:var(--ink)}
+.btn.bad{background:var(--del-bg);border-color:var(--del);color:var(--ink)}
+.btn.primary:disabled{opacity:.45}
+.stack{display:grid;gap:8px}
+.stack0{display:grid;gap:0}
+.mono{font-family:var(--font-mono);font-size:12px}
+.mono.b{font-weight:600}
+.lab{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.03em}
+.okc{color:var(--green)}.badc{color:var(--del)}
+.badge.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green)}
+.badge.req{background:var(--del);color:var(--surface)}
+.badge.todo{background:var(--surface);color:var(--accent);border:1px solid var(--accent)}
+.badge.ai2{background:var(--accent);color:var(--surface)}
+.badge.q-added{background:var(--add-bg);color:var(--add);border:1px solid var(--add)}
+.badge.q-removed{background:var(--del-bg);color:var(--del);border:1px solid var(--del)}
+.badge.q-changed{background:var(--chg-bg);color:var(--chg);border:1px solid var(--chg)}
+.badge.q-same{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.node .kick{flex-wrap:wrap}
+.tray{border:1px dashed var(--line);border-radius:10px;padding:10px;display:grid;gap:8px}
+.tray-h{font-size:12px;font-weight:700;color:var(--muted)}
+.tray-items{display:flex;flex-wrap:wrap;gap:8px}
+.titem{font:inherit;font-size:13px;text-align:left;display:grid;gap:3px;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);color:var(--ink);cursor:pointer;min-width:200px;flex:1 1 200px}
+.titem.sel{box-shadow:0 0 0 3px var(--accent)}
+.titem.gone > span:last-child{text-decoration:line-through;color:var(--muted)}
+.titem:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.facts{display:grid;grid-template-columns:minmax(110px,max-content) 1fr;gap:6px 12px;margin:0;font-size:13px}
+.facts dt{color:var(--muted)}
+.facts dd{margin:0;display:grid;gap:2px}
+.facts .was,.qrow .was{font-size:12px;color:var(--muted)}
+.qread{display:grid;gap:6px;border-top:1px solid var(--line);padding-top:8px}
+.qrow{display:grid;gap:4px;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px}
+.qtop{display:flex;gap:6px;align-items:center;justify-content:space-between}
+.qedit{display:grid;grid-template-columns:2fr 1fr;gap:6px}
+.qedit input{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0}
+.rv{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.rv.approved{color:var(--green)}
+.rv.changes b{color:var(--del)}
+.rv .fld input{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
+.rv > .btn,.rv > button{justify-self:start}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chipb{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:4px 10px;cursor:pointer}
+.chipb.on{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.chipb:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.fbcard{display:grid;gap:8px;background:var(--del-bg);border:1px solid var(--del);border-radius:10px;padding:10px;font-size:13px}
+.sug{display:grid;gap:6px;background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:10px}
+.sugh{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ins2{color:var(--add)}
+.kv{display:flex;justify-content:space-between;font-size:13px}
+.vrow{display:grid;grid-template-columns:62px 1fr;gap:8px;font-size:13px;border-bottom:1px solid var(--line);padding:6px 0}
+.vrow > span:last-child{display:grid}
+.g-lib{grid-template-columns:5fr 7fr}
+@media (max-width:860px){.g-lib{grid-template-columns:1fr}}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:14px;display:grid;gap:6px;justify-items:center;text-align:center}
+.dialog{border:1px solid var(--accent);border-radius:10px;padding:12px;display:grid;gap:8px;background:var(--bg)}
+.dialog select{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.flist{margin:0;padding-left:18px;display:grid;gap:2px}
+.libitem{font:inherit;text-align:left;display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);color:var(--ink);cursor:pointer}
+.libitem.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.libitem .note{grid-column:2 / 3}
+.libitem .st{grid-row:1 / 3;grid-column:3}
+.tbadge{font-size:11px;font-weight:600;background:var(--code-bg, var(--bg));border:1px solid var(--line);border-radius:4px;padding:1px 6px;grid-row:1 / 3}
+.lname{font-weight:600;font-size:14px}
+.st{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:2px 10px;justify-self:start;color:var(--muted)}
+.st.ok{border-color:var(--green);color:var(--green);background:var(--green-bg)}
+h2.big{font-size:20px}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.thumb{font:inherit;width:64px;height:80px;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:6px;display:grid;align-content:space-between;cursor:pointer;color:var(--ink)}
+.thumb .lines{display:grid;gap:3px}.thumb .lines i{display:block;height:3px;background:var(--line);border-radius:2px}
+.thumb .pn{font-size:11px;font-family:var(--font-mono)}
+.thumb.on{border:2px solid var(--accent)}
+.thumb.view{box-shadow:0 0 0 3px var(--yellow)}
+.thumb:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pview{display:grid;grid-template-columns:minmax(0,280px) 1fr;gap:14px;align-items:start}
+@media (max-width:560px){.pview{grid-template-columns:1fr}}
+.ppage{border:1px solid var(--line);border-radius:6px;padding:12px;display:grid;gap:7px;background:var(--surface);min-height:300px;align-content:start}
+.pphead{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+.pptitle{font-weight:700;font-size:14px;border:2px solid var(--accent);border-radius:4px;padding:3px 6px}
+.ppage .pl{height:6px;border-radius:3px;background:var(--line)}.ppage .pl.s{width:60%}
+.ptable{border:2px solid var(--accent);border-radius:4px;display:grid;font-size:10px}
+.pth,.ptr{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:5px}
+.pth{font-weight:700;border-bottom:1px solid var(--line)}
+.ptr.pink{background:var(--pink-bg)}.ptr.yellow{background:var(--yellow-bg)}.ptr.green{background:var(--green-bg)}
+.pipe .st2{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:grid}
+.pipe .st2 b{font-size:13px}.pipe .st2 span{color:var(--muted)}
+.pipe .st2.ours{border-color:var(--accent)}
+.timeline li.skip{color:var(--muted)}
+.cols .panel h2{margin:0}
+.app{padding-bottom:150px}
+.journey{display:flex;gap:4px;overflow-x:auto;padding:2px 2px 6px}
+.jstep{font:inherit;flex:1 0 128px;display:flex;gap:8px;align-items:flex-start;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;color:var(--muted)}
+.jstep .jtext{display:grid;gap:0;font-size:12px;line-height:1.3}
+.jstep .jtext b{font-size:13px;color:inherit}
+.jdot{width:22px;height:22px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;border:1.5px solid var(--line);background:var(--bg)}
+.jstep.done{color:var(--ink)}
+.jstep.done .jdot{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+.jstep.skip{opacity:.6}
+.jstep.now{color:var(--ink);border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
+.jstep.now .jdot{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.jstep:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nav a{position:relative}
+.ndot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--del);margin-left:5px;vertical-align:2px}
+.nextbar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:3px solid var(--accent);box-shadow:0 -8px 22px rgba(0,0,0,.1);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.nextbar.wait{border-top-color:var(--muted)}
+.nin{max-width:1240px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.nmain{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;flex:1 1 420px;min-width:0}
+.npill{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:var(--accent);color:var(--surface)}
+.nextbar.wait .npill{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.ntitle{font-size:14px;font-weight:600}
+.ntodo{display:flex;flex-wrap:wrap;gap:6px;width:100%}
+.ndemo{width:100%;text-align:right}
+.banner.muted{border-left-color:var(--line);color:var(--muted)}
+/* v3 shell: one "next step" strip under the header replaces the journey cards, mockup bar and bottom bar */
+.app{padding-bottom:48px}
+.nx{background:var(--surface);border-bottom:1px solid var(--line)}
+.nx.mine{background:color-mix(in srgb,var(--accent) 9%,var(--surface))}
+.nx-in{max-width:1240px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.nx-main{display:grid;gap:4px;flex:1 1 360px;min-width:0}
+.nx-steps{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:12px;color:var(--muted)}
+.nx-steps .done{color:var(--add)}
+.nx-steps .now{color:var(--ink);font-weight:600}
+.nx-steps i{font-style:normal;opacity:.5}
+.nx-title{font-weight:600}
+.nx-todo{display:flex;flex-wrap:wrap;gap:6px}
+.nx-who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);white-space:nowrap;padding:6px 0}
+.nx-who select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.foot{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between}
+/* Plain theme: system font, neutral greys, one standard blue, small radii, no uppercase labels, no glow or accent rails */
+:root{
+  --bg:#F6F7F9; --surface:#FFFFFF; --ink:#1F2328; --muted:#59636E; --line:#D0D7DE; --accent:#0969DA;
+  --chg:#9A6700; --chg-bg:#FFF8C5; --add:#1A7F37; --add-bg:#DAFBE1; --del:#CF222E; --del-bg:#FFEBE9;
+  --pink:#D6336C; --pink-bg:#FFF0F5; --yellow:#C69026; --yellow-bg:#FFF8E5; --green:#2DA44E; --green-bg:#EEFBF1;
+  --font-display:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+h1{font-size:20px;font-weight:600}
+h2{font-size:15px;font-weight:600}
+.panel{border-radius:6px;padding:16px;gap:12px}
+.btn{font-weight:500;border-radius:6px;padding:6px 14px;font-size:14px}
+.btn.tiny{font-size:13px;padding:4px 10px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.ok{background:var(--add);border-color:var(--add);color:#fff}
+.btn.bad{background:var(--surface);border-color:var(--del);color:var(--del)}
+.btn:hover:not(:disabled){filter:brightness(.97)}
+.chipb,.tg,.st,.stpill,.chip,.picker button{border-radius:6px}
+.chipb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.tabs{border-radius:6px;padding:2px}
+.tabs button{border-radius:4px;font-weight:500}
+.badge{font-size:11px;font-weight:500;letter-spacing:0;border-radius:4px;padding:1px 6px}
+.badge.changed{background:var(--chg-bg);color:var(--chg);border:1px solid #D4A72C}
+.badge.req{background:var(--del-bg);color:var(--del);border:1px solid var(--del)}
+.badge.ed{background:#DDF4FF;color:var(--accent);border:1px solid #54AEFF}
+.badge.ai2{background:#DDF4FF;color:var(--accent);border:1px solid #54AEFF}
+.node{border-radius:6px;border-width:1px}
+.node.decision{border-radius:6px}
+.node.outcome{border-top-width:3px}
+.node .kick,.side .lab,th,.sect,.lab,.tray-h{text-transform:none;letter-spacing:0;font-weight:600;font-size:12px}
+.node.outcome .ttl{font-size:13px;font-weight:600;letter-spacing:0}
+.node.sel{box-shadow:none;outline:2px solid var(--accent);outline-offset:2px}
+.node.bad{box-shadow:none;border-color:var(--del);border-width:2px}
+.titem{border-width:1px;border-radius:6px}
+.titem.sel{box-shadow:none;outline:2px solid var(--accent);outline-offset:2px}
+.editor{box-shadow:none;border-color:var(--line)}
+.banner{border-left-width:1px;border-radius:6px;background:#F6F8FA}
+.banner.good{background:var(--add-bg);border-color:#4AC26B}
+.chk{border-left-width:1px;border-radius:6px}
+.chk .v{font-size:15px}
+.issue{border-left-width:1px;border-radius:6px}
+.issue:not(.done){border-color:#FF8182}
+.issue.warning{border-color:#D4A72C}
+.sev{font-size:12px;letter-spacing:0;font-weight:600}
+.clist li{border-left-width:2px}
+.fbcard{border-radius:6px;background:var(--del-bg);border-color:#FF8182}
+.sug{border-radius:6px;border-color:#54AEFF}
+.libitem,.pcard,.side,.qrow,.thumb,.ppage,.tray,.res{border-radius:6px}
+.libitem.on{box-shadow:none;border-color:var(--accent);background:#F6FAFF}
+.thumb.view{box-shadow:none;outline:2px solid var(--ink);outline-offset:1px}
+.tray{border-style:solid}
+.fld input[type=text],.fld input[type=number],.fld textarea,.qedit input,.dform input,.rv .fld input,select#rev,textarea{background:var(--surface);border-radius:6px}
+.phone{border-width:8px;border-radius:24px}
+.res b{font-size:13px;letter-spacing:0}
+.nx{background:var(--surface)}
+.nx.mine{background:#F6F8FA}
+.nx-steps .done{color:var(--add)}
+.nx-who select{border-radius:6px}
+.mono{font-size:12px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+<script>
+(function(){
+const h = React.createElement;
+const {useState, useMemo, useRef, useLayoutEffect, useEffect} = React;
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function fnv(str){ let x = 0x811c9dc5; for (let i = 0; i < str.length; i++){ x ^= str.charCodeAt(i); x = Math.imul(x, 0x01000193) >>> 0; } return x.toString(16).padStart(8, "0").slice(0, 8); }
+
+/* ================= Domain: one logic model drives every screen ================= */
+const COND = {ci:"Chest indrawing", stridor:"Stridor in a calm child", fast:"Fast breathing for age"};
+const SIGNS = {drink:"Not able to drink or breastfeed", vomit:"Vomits everything", conv:"Convulsions", leth:"Lethargic or unconscious"};
+const OUTCODE = {o1:"severe_pneumonia", o2:"pneumonia", o3:"no_pneumonia"};
+const OUTCOLOR = {o1:"pink", o2:"yellow", o3:"green"};
+const QORDER = ["cough","age_months","resp_rate","chest_indrawing","stridor","danger_signs","wheeze","cough_syrup"];
+const QTYPE = {yesno:"yes/no", int:"integer", multi:"select multiple"};
+const NODE_IDS = ["start","d1","d2","d3","o1","o2","o3","f1"];
+
+const AI_DRAFT = {
+  start:{ageMin:2, ageMax:60},
+  d1:{q:"Any general danger sign?", signs:["drink","vomit","conv","leth"]},
+  d2:{q:"Stridor in calm child?", conds:["stridor"], hint:"Look and listen while the child is calm."},
+  d3:{q:"Chest indrawing or fast breathing?", conds:["ci","fast"], cut:12, young:50, old:40, hint:"Count the breaths in one minute. The child must be calm."},
+  o1:{title:"Severe pneumonia or very severe disease", note:"Give first dose of antibiotic. Refer URGENTLY to the health facility."},
+  o2:{title:"Pneumonia", note:"Give oral amoxicillin. Advise the caregiver when to return."},
+  o3:{title:"No pneumonia: cough or cold", note:"Soothe the throat. Advise the caregiver when to return."},
+  f1:{title:"Pneumonia follow-up visit", due:3, end:7},
+  src:{
+    start:["Assess and classify the sick child aged 2 months up to 5 years","section heading"],
+    d1:["Any general danger sign","classification table, row 1"],
+    d2:["Any general danger sign or stridor in calm child","classification table, row 1"],
+    d3:["Chest indrawing or fast breathing","classification table, row 2"],
+    o1:["Give first dose of an appropriate antibiotic. Refer URGENTLY to hospital","treatment column, row 1"],
+    o2:["Give oral Amoxicillin","treatment column, row 2"],
+    o3:["No signs of pneumonia or very severe disease","classification table, row 3"],
+    f1:["Follow-up in 3 days","treatment column, row 2"]
+  },
+  questions:{
+    cough:{type:"yesno", label:"Does the child have cough or difficult breathing?", showIf:"", quote:"Does the child have cough or difficult breathing?"},
+    age_months:{type:"int", label:"Child's age in months", showIf:"", quote:"Assess and classify the sick child aged 2 months up to 5 years"},
+    resp_rate:{type:"int", label:"Count the breaths in one minute", showIf:"cough = yes", quote:"Count the breaths in one minute"},
+    chest_indrawing:{type:"yesno", label:"Is there chest indrawing?", showIf:"cough = yes", quote:"Look for chest indrawing"},
+    stridor:{type:"yesno", label:"Is there stridor in a calm child?", showIf:"cough = yes", quote:"Look and listen for stridor"},
+    danger_signs:{type:"multi", label:"General danger signs", showIf:"", quote:"Check for general danger signs"},
+    wheeze:{type:"yesno", label:"Is there wheezing?", showIf:"cough = yes", quote:"Look and listen for wheezing"}
+  }
+};
+const V3 = clone(AI_DRAFT);
+V3.d2 = {q:"Chest indrawing or stridor in calm child?", conds:["ci","stridor"], hint:"Look and listen while the child is calm."};
+V3.d3 = Object.assign({}, V3.d3, {q:"Fast breathing?", conds:["fast"]});
+V3.src.d2 = ["Any general danger sign or chest indrawing or stridor in calm child","2008 booklet, classification table, row 1"];
+V3.src.d3 = ["Fast breathing","2008 booklet, classification table, row 2"];
+V3.questions.chest_indrawing = Object.assign({}, V3.questions.chest_indrawing, {label:"Chest indrawing?"});
+delete V3.questions.wheeze;
+V3.questions.cough_syrup = {type:"yesno", label:"Has the child been given cough syrup?", showIf:"cough = yes", quote:"Cited in the 2008 source only"};
+const V3_HASH = fnv(JSON.stringify(V3));
+
+function usesOf(m, id){
+  if (id === "start") return ["cough","age_months"];
+  if (id === "d1") return ["danger_signs"];
+  if (id === "d2" || id === "d3"){
+    const s = [];
+    m[id].conds.forEach(c => { if (c === "ci") s.push("chest_indrawing"); if (c === "stridor") s.push("stridor"); if (c === "fast") s.push("resp_rate","age_months"); });
+    return Array.from(new Set(s)).filter(q => m.questions[q]);
+  }
+  return [];
+}
+function usedSet(m){ const s = new Set(); ["start","d1","d2","d3"].forEach(id => usesOf(m, id).forEach(q => s.add(q))); return s; }
+const anyQ = (q) => V3.questions[q] || AI_DRAFT.questions[q] || null;
+function qStatus(m, q, ref){ ref = ref || V3; if (!ref.questions[q] && m.questions[q]) return "added"; if (!m.questions[q]) return anyQ(q) ? "removed" : "none"; return same(m.questions[q], ref.questions[q]) ? "same" : "changed"; }
+function trayIds(m){
+  const used = usedSet(m);
+  const unused = Object.keys(m.questions).filter(q => !used.has(q));
+  const removed = Object.keys(Object.assign({}, V3.questions, AI_DRAFT.questions)).filter(q => !m.questions[q]);
+  return QORDER.concat(Object.keys(m.questions).filter(q => !QORDER.includes(q))).filter(q => unused.includes(q) || removed.includes(q));
+}
+function nodeSig(m, id){
+  if (id.startsWith("q:")){ const q = id.slice(2); return JSON.stringify(m.questions[q] || null); }
+  return JSON.stringify([m[id], m.src[id], usesOf(m, id).map(q => m.questions[q])]);
+}
+function changedVs(m, id, ref){ return nodeSig(m, id) !== nodeSig(ref || V3, id); }
+
+/* ---------- Plain facts for read-only panels and diffs ---------- */
+function facts(m, id){
+  if (id.startsWith("q:")){
+    const q = m.questions[id.slice(2)];
+    if (!q) return [["Question", anyQ(id.slice(2)) ? anyQ(id.slice(2)).label + " (removed)" : "(not in this version)"]];
+    return [["Question", q.label],["Type", QTYPE[q.type]],["Shown when", q.showIf || "always"]];
+  }
+  const v = m[id];
+  if (id === "start") return [["Applies to", "Children " + v.ageMin + " months up to " + v.ageMax + " months (not included)"]];
+  if (id === "d1") return [["Question", v.q],["Yes if any of", v.signs.map(s => SIGNS[s]).join(", ") || "none"]];
+  if (id === "d2" || id === "d3"){
+    const f = [["Question", v.q],["Yes if any of", v.conds.map(c => COND[c]).join(", ") || "none"]];
+    if (id === "d3" && v.conds.includes("fast")) f.push(["Fast breathing", v.young + "/min or more under " + v.cut + " months; " + v.old + "/min or more after"]);
+    f.push(["Note under the question", v.hint || "none"]);
+    return f;
+  }
+  if (id === "f1") return [["Task", v.title],["Due","day " + v.due],["Open until","day " + v.end]];
+  return [["Classification", v.title],["Note shown to the CHW", v.note]];
+}
+function plainRule(m, id){
+  if (id === "d1") return "If the child has any of: " + m.d1.signs.map(s => SIGNS[s].toLowerCase()).join(", ") + " → " + m.o1.title + ".";
+  if (id === "d2") return "Else if " + (m.d2.conds.map(c => COND[c].toLowerCase()).join(" or ") || "(no condition)") + " → " + m.o1.title + ".";
+  if (id === "d3") return "Else if " + (m.d3.conds.map(c => COND[c].toLowerCase()).join(" or ") || "(no condition)") + (m.d3.conds.includes("fast") ? " (fast: " + m.d3.young + "/min or more under " + m.d3.cut + " months, " + m.d3.old + " or more after)" : "") + " → " + m.o2.title + ".";
+  if (id === "o3") return "Otherwise → " + m.o3.title + ".";
+  if (id === "f1") return "For " + m.o2.title.toLowerCase() + ": " + m.f1.title.toLowerCase() + ", due day " + m.f1.due + ", open until day " + m.f1.end + ".";
+  return facts(m, id).map(f => f[0] + ": " + f[1]).join(". ");
+}
+
+/* ---------- Interpreter: the only place outcomes are computed ---------- */
+function classify(m, p){
+  if (p.age < m.start.ageMin || p.age >= m.start.ageMax) return {out:"none", rule:"start"};
+  if (p.danger.some(d => m.d1.signs.includes(d))) return {out:"o1", rule:"d1"};
+  const fast = p.age < m.d3.cut ? p.rr >= m.d3.young : p.rr >= m.d3.old;
+  const val = {ci:p.ci, stridor:p.stridor, fast};
+  if (m.d2.conds.some(c => val[c])) return {out:"o1", rule:"d2"};
+  if (m.d3.conds.some(c => val[c])) return {out:"o2", rule:"d3"};
+  return {out:"o3", rule:"o3"};
+}
+const GRID = (() => {
+  const out = []; let n = 1;
+  [2,6,11,12,24,59].forEach(age => [30,39,40,49,50,55].forEach(rr => [false,true].forEach(ci => [false,true].forEach(stridor => [[],["conv"]].forEach(danger => {
+    out.push({id:"P-" + String(n++).padStart(3,"0"), age, rr, ci, stridor, danger});
+  })))));
+  return out;
+})();
+const GOLDEN = [
+  ["G-01",{age:8,rr:52,ci:false,stridor:false,danger:[]},"o2"],
+  ["G-02",{age:8,rr:45,ci:false,stridor:false,danger:[]},"o3"],
+  ["G-03",{age:30,rr:42,ci:false,stridor:false,danger:[]},"o2"],
+  ["G-04",{age:30,rr:38,ci:false,stridor:false,danger:[]},"o3"],
+  ["G-05",{age:12,rr:40,ci:false,stridor:false,danger:[]},"o2"],
+  ["G-06",{age:11,rr:49,ci:false,stridor:false,danger:[]},"o3"],
+  ["G-07",{age:18,rr:30,ci:true,stridor:false,danger:[]},"o2"],
+  ["G-08",{age:6,rr:40,ci:false,stridor:true,danger:[]},"o1"],
+  ["G-09",{age:24,rr:30,ci:false,stridor:false,danger:["conv"]},"o1"],
+  ["G-10",{age:3,rr:60,ci:true,stridor:false,danger:[]},"o2"],
+  ["G-11",{age:48,rr:35,ci:false,stridor:false,danger:[]},"o3"],
+  ["G-12",{age:9,rr:50,ci:false,stridor:false,danger:[]},"o2"]
+];
+function golden(m){ return GOLDEN.map(([id, p, exp]) => { const r = classify(m, p); return {id, p, exp, got:r.out, ok:r.out === exp}; }); }
+function describeP(p){
+  const s = [];
+  if (p.ci) s.push("chest indrawing"); if (p.stridor) s.push("stridor"); if (p.danger.length) s.push("convulsions");
+  return s.length ? s.join(", ") : "no signs";
+}
+function outName(m, o){ return o === "none" ? "Out of range" : m[o].title; }
+
+/* ---------- Checks: same for AI drafts, PO edits and accepted AI revisions ---------- */
+const SRC_NUMS = [2, 5, 12, 50, 40, 3, 7, 60];
+function runChecks(m){
+  const out = [];
+  ["d2","d3"].forEach(id => { if (!m[id].conds.length) out.push(["blocking", id, "No condition set, so its Yes branch can never be reached."]); });
+  if (!m.d1.signs.length) out.push(["blocking","d1","No danger signs selected: this branch is unreachable."]);
+  if (m.f1.end < m.f1.due) out.push(["blocking","f1","The task closes before it is due."]);
+  if (m.start.ageMin >= m.start.ageMax) out.push(["blocking","start","The age range is empty."]);
+  Object.keys(m.questions).forEach(q => { if (!m.questions[q].label.trim()) out.push(["blocking","q:" + q, "Question has no label."]); });
+  const fired = new Set(GRID.map(p => classify(m, p).rule));
+  ["d1","d2","d3"].forEach(id => { if (m[id].conds ? m[id].conds.length : m[id].signs.length){ if (!fired.has(id)) out.push(["blocking", id, "No patient ever reaches this rule: an earlier rule always fires first."]); } });
+  [["d3","young"],["d3","old"],["d3","cut"],["f1","due"],["f1","end"],["start","ageMin"],["start","ageMax"]].forEach(([id, k]) => {
+    if (!SRC_NUMS.includes(Number(m[id][k]))) out.push(["warning", id, "The number " + m[id][k] + " is not in the cited passage."]);
+  });
+  if (m.d3.conds.includes("fast") && m.d3.young < m.d3.old) out.push(["warning","d3","Younger children have the lower threshold; the guideline has it the other way round."]);
+  const used = usedSet(m);
+  Object.keys(m.questions).forEach(q => { if (!used.has(q)) out.push(["warning","q:" + q, "Asked on the form but no rule uses it."]); });
+  golden(m).filter(g => !g.ok).forEach(g => out.push(["blocking", classify(m, g.p).rule === "o3" ? "d3" : classify(m, g.p).rule, "Golden case " + g.id + " (" + g.p.age + " mo, " + g.p.rr + "/min, " + describeP(g.p) + ") expected " + m[g.exp].title + ", got " + outName(m, g.got) + "."]));
+  return out;
+}
+
+/* ---------- Compiler: model → XLSForm rows → XForm. Deterministic, no AI. ---------- */
+const ref = (x) => "${" + x + "}";
+function condX(m, id){
+  const parts = m[id].conds.map(c => c === "ci" ? ref("chest_indrawing") + " = 'yes'" : c === "stridor" ? ref("stridor") + " = 'yes'" : ref("fast_breathing") + " = 'yes'");
+  return parts.length ? parts.join(" or ") : "false()";
+}
+function dangerX(m){
+  if (m.d1.signs.length === 4) return "if(count-selected(" + ref("danger_signs") + ") > 0 and not(selected(" + ref("danger_signs") + ", 'none')), 'yes', 'no')";
+  return "if(" + (m.d1.signs.map(s => "selected(" + ref("danger_signs") + ", '" + s + "')").join(" or ") || "false()") + ", 'yes', 'no')";
+}
+function classX(m){ return "if(" + ref("danger_any") + " = 'yes', 'severe_pneumonia', if(" + condX(m, "d2") + ", 'severe_pneumonia', if(" + condX(m, "d3") + ", 'pneumonia', 'no_pneumonia')))"; }
+function relX(s){ return s ? s.replace(/(\w+)\s*=\s*(\w+)/g, (a, f, v) => ref(f) + " = '" + v + "'").replace(/\bAND\b/gi, "and") : ""; }
+function xlsRows(m){
+  const rows = [["begin group","inputs","Inputs","",""],["string","source","","","(CHT contact inputs)"],["end group","","","",""]];
+  QORDER.concat(Object.keys(m.questions).filter(q => !QORDER.includes(q))).forEach(q => {
+    const x = m.questions[q]; if (!x) return;
+    const t = x.type === "yesno" ? "select_one yes_no" : x.type === "int" ? "integer" : "select_multiple danger";
+    const con = q === "age_months" ? ". >= " + m.start.ageMin + " and . < " + m.start.ageMax : q === "resp_rate" ? ". >= 0 and . <= 150" : "";
+    rows.push([t, q, x.label, relX(x.showIf), con]);
+  });
+  rows.push(["calculate","danger_any","","", dangerX(m)]);
+  rows.push(["calculate","fast_breathing","","", "if(" + ref("age_months") + " < " + m.d3.cut + ", if(" + ref("resp_rate") + " >= " + m.d3.young + ", 'yes', 'no'), if(" + ref("resp_rate") + " >= " + m.d3.old + ", 'yes', 'no'))"]);
+  rows.push(["calculate","classification","","", classX(m)]);
+  rows.push(["calculate","follow_up_date","", ref("classification") + " = 'pneumonia'", "format-date-time(decimal-date-time(today()) + " + m.f1.due + ", '%Y-%m-%d')"]);
+  ["o1","o2","o3"].forEach(o => rows.push(["note","n_" + OUTCODE[o], m[o].title.toUpperCase() + ". " + m[o].note, ref("classification") + " = '" + OUTCODE[o] + "'", ""]));
+  return rows;
+}
+function rowDiff(a, b){
+  const byName = (rs) => { const o = {}; rs.forEach((r, i) => { o[(r[1] || r[0]) + "#" + (r[1] ? "" : i)] = r; }); return o; };
+  const A = byName(a), B = byName(b), out = [];
+  const keys = []; b.forEach((r, i) => keys.push((r[1] || r[0]) + "#" + (r[1] ? "" : i)));
+  a.forEach((r, i) => { const k = (r[1] || r[0]) + "#" + (r[1] ? "" : i); if (!keys.includes(k)) keys.splice(Math.min(i, keys.length), 0, k); });
+  keys.forEach(k => {
+    if (A[k] && B[k]){ if (same(A[k], B[k])) out.push({k:"same", r:B[k]}); else { out.push({k:"del", r:A[k]}); out.push({k:"add", r:B[k]}); } }
+    else if (A[k]) out.push({k:"del", r:A[k]}); else out.push({k:"add", r:B[k]});
+  });
+  return out;
+}
+const toXForm = (s) => s.replace(/\$\{(\w+)\}/g, " /pneumonia_assessment/$1 ");
+function rulesJSON(m){
+  const c = (id) => m[id].conds.map(k => ({op:"==", var: k === "ci" ? "chest_indrawing" : k === "stridor" ? "stridor" : "fast_breathing", value:true}));
+  const w = (arr) => arr.length === 1 ? arr[0] : {op:"or", args:arr};
+  return [
+    {id:"r1", when:{op:"==", var:"danger_any", value:true}, then:{classification:"severe_pneumonia"}},
+    {id:"r2", when:w(c("d2")), then:{classification:"severe_pneumonia"}, source:[{quote:m.src.d2[0]}]},
+    {id:"r3", when:w(c("d3")), then:{classification:"pneumonia"}, source:[{quote:m.src.d3[0]}]},
+    {id:"r4", when:{op:"true"}, then:{classification:"no_pneumonia"}}
+  ].map(r => JSON.stringify(r, null, 1).replace(/\n\s*/g, " ")).join("\n");
+}
+function lineDiff(a, b){
+  const A = a.split("\n"), B = b.split("\n"), out = [];
+  const n = Math.max(A.length, B.length);
+  for (let i = 0; i < n; i++){
+    if (A[i] === B[i]) out.push(["c", A[i]]);
+    else { if (A[i] !== undefined) out.push(["d", A[i]]); if (B[i] !== undefined) out.push(["a", B[i]]); }
+  }
+  return out;
+}
+
+/* ================= Flow layout (dagre) ================= */
+const EDGES = [["start","d1",""],["d1","o1","yes"],["d1","d2","no"],["d2","o1","yes"],["d2","d3","no"],["d3","o2","yes"],["d3","o3","no"],["o2","f1","task"]];
+const WIDTH = {start:230, decision:230, outcome:230, task:210};
+function toNodes(m){
+  const yrs = m.start.ageMax % 12 === 0 ? (m.start.ageMax / 12) + " years" : m.start.ageMax + " months";
+  const qn = (id) => usesOf(m, id).length;
+  return [
+    {id:"start", type:"start", text:"Child " + m.start.ageMin + " months up to " + yrs + " with cough or difficult breathing", sub:"Asks " + qn("start") + " questions"},
+    {id:"d1", type:"decision", text:m.d1.q, sub:"Yes if any of " + m.d1.signs.length + " danger signs"},
+    {id:"d2", type:"decision", text:m.d2.q, sub:"Yes if: " + (m.d2.conds.map(c => COND[c].toLowerCase()).join(" or ") || "no condition set")},
+    {id:"d3", type:"decision", text:m.d3.q, sub:"Yes if: " + (m.d3.conds.map(c => COND[c].toLowerCase()).join(" or ") || "no condition set") + (m.d3.conds.includes("fast") ? ". Fast: " + m.d3.young + "/min or more under " + m.d3.cut + " months, " + m.d3.old + " or more after" : "")},
+    {id:"o1", type:"outcome", color:"pink", text:m.o1.title, sub:m.o1.note},
+    {id:"o2", type:"outcome", color:"yellow", text:m.o2.title, sub:m.o2.note},
+    {id:"o3", type:"outcome", color:"green", text:m.o3.title, sub:m.o3.note},
+    {id:"f1", type:"task", text:m.f1.title + ": due day " + m.f1.due + ", open until day " + m.f1.end}
+  ];
+}
+function estHeight(n){
+  const w = WIDTH[n.type] - 22;
+  const main = Math.max(1, Math.ceil(n.text.length / Math.floor(w / (n.type === "outcome" ? 7.6 : 7.3))));
+  const sub = n.sub ? Math.ceil(n.sub.length / Math.floor(w / 6.6)) : 0;
+  return 16 + 16 + main * 18 + sub * 16 + (sub ? 4 : 0) + (n.type === "outcome" ? 6 : 0) + 8;
+}
+function layout(nodes){
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({rankdir:"TB", nodesep:28, ranksep:34, marginx:6, marginy:6});
+  g.setDefaultEdgeLabel(() => ({}));
+  nodes.forEach(n => g.setNode(n.id, {width:WIDTH[n.type], height:estHeight(n), n}));
+  EDGES.forEach(([a, b, l]) => g.setEdge(a, b, {label:l, width:l ? l.length * 6.5 + 10 : 0, height:l ? 16 : 0, labelpos:"c"}));
+  dagre.layout(g);
+  return g;
+}
+function smooth(p){
+  let d = "M" + p[0].x + "," + p[0].y;
+  if (p.length === 2) return d + " L" + p[1].x + "," + p[1].y;
+  for (let i = 1; i < p.length - 1; i++){
+    const last = i === p.length - 2;
+    const ex = last ? p[i+1].x : (p[i].x + p[i+1].x) / 2, ey = last ? p[i+1].y : (p[i].y + p[i+1].y) / 2;
+    d += " Q" + p[i].x + "," + p[i].y + " " + ex + "," + ey;
+  }
+  return d;
+}
+let flowSeq = 0;
+/* markers: {nodeId: [[cls, label], ...]}; tone: {nodeId: "changed"|"bad"} */
+function Flow({m, selected, onSelect, markers, tone, label}){
+  const nodes = toNodes(m);
+  const g = useMemo(() => layout(nodes), [JSON.stringify(nodes)]);
+  const W = Math.ceil(g.graph().width), H = Math.ceil(g.graph().height);
+  const ref = useRef(null);
+  const mk = useMemo(() => "ah" + (flowSeq++), []);
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    const fit = () => setScale(Math.min(1, el.clientWidth / W));
+    fit(); const ro = new ResizeObserver(fit); ro.observe(el); return () => ro.disconnect();
+  }, [W]);
+  const kick = {decision:"Question", outcome:"Classify", task:"Follow-up task", start:"Applies to"};
+  return h("div", {ref, className:"stage", style:{height:H * scale}, role:"group", "aria-label":label},
+    h("div", {className:"canvas", style:{width:W, height:H, transform:"scale(" + scale + ")"}},
+      h("svg", {width:W, height:H, "aria-hidden":"true"},
+        h("defs", null, h("marker", {id:mk, viewBox:"0 0 10 10", refX:9, refY:5, markerWidth:7, markerHeight:7, orient:"auto-start-reverse"}, h("path", {className:"ah", d:"M0,0 L10,5 L0,10 z"}))),
+        g.edges().map((e, i) => { const ed = g.edge(e);
+          return h("g", {key:i}, h("path", {className:"edge", d:smooth(ed.points), markerEnd:"url(#" + mk + ")", strokeDasharray: e.w === "f1" ? "5 4" : null}),
+            ed.label ? h("g", {className:"elbl"}, h("rect", {x:ed.x - ed.width/2, y:ed.y - 8, width:ed.width, height:16, rx:4}), h("text", {x:ed.x, y:ed.y + 4, textAnchor:"middle"}, ed.label)) : null); })),
+      g.nodes().map(id => {
+        const nd = g.node(id), n = nd.n, t = (tone || {})[id];
+        const cls = ["node", n.type, n.color ? "o-" + n.color : "", t === "changed" ? "d-changed" : "", t === "bad" ? "d-changed bad" : "", selected === id ? "sel" : ""].join(" ");
+        return h("button", {key:id, type:"button", className:cls, "aria-pressed":selected === id, "aria-label":(kick[n.type] || "") + ": " + n.text,
+            style:{left:nd.x - nd.width/2, top:nd.y - nd.height/2, width:nd.width, minHeight:nd.height}, onClick:() => onSelect && onSelect(id)},
+          h("div", {className:"kick"}, h("span", null, kick[n.type]),
+            h("span", {className:"badges"}, ((markers || {})[id] || []).map((b, i) => h("span", {key:i, className:"badge " + b[0]}, b[1])))),
+          n.type === "outcome"
+            ? h(React.Fragment, null, h("div", {className:"ttl"}, n.text), h("div", {className:"sub"}, n.sub))
+            : h(React.Fragment, null, h("div", null, n.text), n.sub ? h("div", {className:"sub"}, n.sub) : null));
+      })));
+}
+function Tray({m, selected, onSelect, markers}){
+  const ids = trayIds(m);
+  if (!ids.length) return null;
+  return h("div", {className:"tray"},
+    h("div", {className:"tray-h"}, "Questions not used by any rule"),
+    h("div", {className:"tray-items"}, ids.map(q => {
+      const st = qStatus(m, q), id = "q:" + q, x = m.questions[q] || anyQ(q);
+      return h("button", {key:q, type:"button", className:"titem" + (selected === id ? " sel" : "") + (st === "removed" ? " gone" : ""), onClick:() => onSelect(id)},
+        h("span", {className:"badges"}, h("span", {className:"badge q-" + st}, st === "same" ? "Unused" : st[0].toUpperCase() + st.slice(1)), ((markers || {})[id] || []).map((b, i) => h("span", {key:i, className:"badge " + b[0]}, b[1]))),
+        h("span", {className:"mono"}, q), h("span", null, x.label));
+    })));
+}
+
+/* ================= Workflow: states, rounds, versions, audit ================= */
+const FB_TYPES = [["wording","Wording"],["value","Threshold or value"],["show","Show condition"],["source","Wrong source"],["remove","Remove"],["add","Add missing question"]];
+const PASS_B = (() => { const x = clone(AI_DRAFT); x.d2.conds = ["ci","stridor"]; return x; })();
+const PASS_DISAGREE = GRID.filter(p => classify(AI_DRAFT, p).out !== classify(PASS_B, p).out).length;
+const FLAGS0 = [
+  {id:"F-1", clinical:true, kind:"Ambiguity", about:"d3", title:"Does exactly 12 months use 50/min or 40/min?",
+   src:"2 months up to 12 months · 12 months up to 5 years", why:"A child of exactly 12 months fits both bands as written. The draft uses 40/min at 12 months.",
+   opts:[{label:"40/min at 12 months (as drafted)"},{label:"50/min at 12 months", fb:{type:"value", note:"Age cut-off: exactly 12 months should use the younger threshold, so the cut-off moves to 13 months", value:"13"}}]},
+  {id:"F-2", clinical:true, kind:"Cross-check", about:"d3", title:"Chest indrawing: pneumonia or severe?",
+   src:"Chest indrawing or fast breathing", why:"Pass B kept chest indrawing under severe, as in the 2008 edition. The two passes give different outcomes for " + PASS_DISAGREE + " of " + GRID.length + " synthetic patients.",
+   opts:[{label:"Pneumonia (pass A, 2014 text)"},{label:"Severe (pass B)", fb:{type:"value", about:"d2", note:"Add chest indrawing back to the severe signs", value:"chest indrawing"}}]},
+  {id:"F-3", clinical:false, kind:"Uncited passage", about:"q:wheeze", title:"Wheeze passage not used by any rule",
+   src:"If wheezing with either fast breathing or chest indrawing: give a trial of rapid acting inhaled bronchodilator…", why:"It has decision words, but no rule cites it. The wheeze question is asked but unused.",
+   opts:[{label:"Out of scope for CHWs (keep the question, note why)"},{label:"Escalate to clinician", escalate:true}]}
+];
+function initialWf(){
+  return {state:"none", round:0, rev:0, model:clone(AI_DRAFT), sent:null, required:[], reviews:{}, sug:{}, fixed:{}, flags:clone(FLAGS0),
+          audit:[], versions:[], clock:0, verify:null, approved:null, deployed:false, hist:[], lastKey:null};
+}
+const fmtTime = (t) => { const mm = 9 * 60 + t; return "Nov 3, " + String(Math.floor(mm / 60)).padStart(2, "0") + ":" + String(mm % 60).padStart(2, "0"); };
+function verLabel(w){
+  if (w.state === "none") return "—";
+  if (w.state === "po_draft") return "v4.0" + (w.rev ? "." + w.rev : "");
+  if (w.state === "po_revise") return "v4." + w.round + (w.rev ? "." + w.rev : "");
+  return "v4." + w.round;
+}
+function logged(w, actor, event, note){
+  const clock = w.clock + 2;
+  const row = {t:fmtTime(clock), actor, event, ver:verLabel(w), hash:fnv(JSON.stringify(w.model)), note:note || ""};
+  return Object.assign({}, w, {clock, audit:w.audit.concat(row)});
+}
+function addVersion(w, event, by){ return Object.assign({}, w, {versions:w.versions.concat({ver:verLabel(w), event, meta:fnv(JSON.stringify(w.model)) + " · " + by + " · " + fmtTime(w.clock)})}); }
+function requiredFor(m){
+  const ids = NODE_IDS.filter(id => changedVs(m, id));
+  trayIds(m).forEach(q => { if (qStatus(m, q) !== "same") ids.push("q:" + q); });
+  return ids;
+}
+
+/* AI revision from structured feedback (simulated Bedrock call; output is data that code applies only when the PO accepts) */
+function suggest(m, id, fb){
+  const note = (fb.note || "").trim(), val = (fb.value || "").trim(), lower = (note + " " + val).toLowerCase();
+  const clar = (t) => ({kind:"clarify", text:t});
+  if (!val && note.length < 25) return clar("Needs clarification: the note does not say what to change. Ask the clinician for the exact wording or value, or edit it yourself.");
+  const isQ = id.startsWith("q:"), q = isQ ? id.slice(2) : null;
+  const mk = (field, from, to, apply) => ({kind:"change", field, from:String(from), to:String(to), apply});
+  if (isQ && !m.questions[q]) return clar("This question is not in v4. Restore it first, then apply the change.");
+  if (fb.type === "wording"){
+    if (!val) return clar("Needs clarification: no new wording was given.");
+    if (isQ) return mk("Question label", m.questions[q].label, val, x => { x.questions[q].label = val; });
+    if (["d1","d2","d3"].includes(id)) return mk("Question", m[id].q, val, x => { x[id].q = val; });
+    if (id[0] === "o") return /name|title|classif/.test(note.toLowerCase()) ? mk("Classification name", m[id].title, val, x => { x[id].title = val; }) : mk("Note shown to the CHW", m[id].note, val, x => { x[id].note = val; });
+    if (id === "f1") return mk("Task title", m.f1.title, val, x => { x.f1.title = val; });
+    return clar("Wording does not apply to this box. Say what should change.");
+  }
+  if (fb.type === "value"){
+    const num = parseFloat(val.replace(/[^\d.]/g, ""));
+    if ((id === "d2" || id === "d3") && isNaN(num) && /indrawing|stridor|fast/.test(lower)){
+      const key = /indrawing/.test(lower) ? "ci" : /stridor/.test(lower) ? "stridor" : "fast";
+      const rem = /remove|drop|\bnot\b|without|shouldn/.test(lower);
+      const next = rem ? m[id].conds.filter(c => c !== key) : Array.from(new Set(m[id].conds.concat(key)));
+      return mk("Yes if any of", m[id].conds.map(c => COND[c]).join(", "), next.map(c => COND[c]).join(", "), x => { x[id].conds = next; });
+    }
+    if (isNaN(num)) return clar("Needs clarification: no number was given.");
+    if (id === "d3"){
+      const f = /cut-?off|age/.test(note.toLowerCase()) ? "cut" : /older|over|after/.test(lower) ? "old" : "young";
+      return mk({cut:"Age cut-off (months)", young:"Threshold under the cut-off (/min)", old:"Threshold at or over the cut-off (/min)"}[f], m.d3[f], num, x => { x.d3[f] = num; });
+    }
+    if (id === "f1"){ const f = /open|until|end|close/.test(lower) ? "end" : "due"; return mk(f === "due" ? "Due on day" : "Open until day", m.f1[f], num, x => { x.f1[f] = num; }); }
+    if (id === "start"){ const f = /youngest|from|min/.test(lower) ? "ageMin" : "ageMax"; return mk(f === "ageMin" ? "Youngest age (months)" : "Up to age (months)", m.start[f], num, x => { x.start[f] = num; }); }
+    return clar("This box has no numeric value. Say which value should change.");
+  }
+  if (fb.type === "show"){
+    if (!val) return clar("Needs clarification: give the new show condition, for example cough = yes.");
+    const target = isQ ? q : (usesOf(m, id).find(k => lower.includes(k.replace("_", " "))) || usesOf(m, id)[0]);
+    if (!target) return clar("Show conditions belong to questions. Pick the question.");
+    return mk("Shown when (" + target + ")", m.questions[target].showIf || "always", val, x => { x.questions[target].showIf = val; });
+  }
+  if (fb.type === "source"){
+    if (!val) return clar("Needs clarification: say which passage to cite instead.");
+    if (isQ) return mk("Cited quote", m.questions[q].quote, val, x => { x.questions[q].quote = val; });
+    if (!m.src[id]) return clar("This box has no citation.");
+    return mk("Cited quote", m.src[id][0], val, x => { x.src[id] = [val, m.src[id][1]]; });
+  }
+  if (fb.type === "remove"){
+    if (isQ) return mk("Question " + q, m.questions[q].label, "(removed)", x => { delete x.questions[q]; });
+    return clar("Removing a whole step changes the decision table. Ask what should replace it.");
+  }
+  const label = val || note;
+  const key = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 24) || "new_question";
+  return mk("New question " + key, "(none)", label, x => { x.questions[key] = {type:"yesno", label, showIf:"cough = yes", quote:"From clinician feedback; no guideline quote yet"}; });
+}
+function sugChecks(m, s){
+  if (s.kind !== "change") return null;
+  const x = clone(m); s.apply(x);
+  const c = runChecks(x), b = c.filter(r => r[0] === "blocking").length, wn = c.filter(r => r[0] === "warning").length - runChecks(m).filter(r => r[0] === "warning").length;
+  return b ? b + " blocking check" + (b > 1 ? "s" : "") + " after this change" : "Checks re-run on the proposed change: no blocking problems" + (wn > 0 ? ", " + wn + " new warning" + (wn > 1 ? "s" : "") : "");
+}
+
+/* ================= Review panels ================= */
+function Facts({m, id, refM, refLabel}){
+  const now = facts(m, id), was = facts(refM || V3, id);
+  return h("dl", {className:"facts"}, now.map(([k, v], i) => {
+    const old = (was.find(f => f[0] === k) || [])[1];
+    return h(React.Fragment, {key:i}, h("dt", null, k),
+      h("dd", null, v, old !== undefined && old !== v ? h("span", {className:"was"}, (refLabel || "v3") + ": ", h("del", null, old)) : null));
+  }));
+}
+function QuestionsRead({m, id, editable, edit}){
+  const qs = usesOf(m, id);
+  if (!qs.length) return null;
+  return h("div", {className:"qread"}, h("div", {className:"lab"}, "Questions this step asks"),
+    qs.map(q => {
+      const x = m.questions[q], st = qStatus(m, q);
+      return h("div", {key:q, className:"qrow"},
+        h("div", {className:"qtop"}, h("span", {className:"mono"}, q + " · " + QTYPE[x.type]), st !== "same" ? h("span", {className:"badge q-" + st}, st[0].toUpperCase() + st.slice(1)) : null),
+        editable
+          ? h("div", {className:"qedit"},
+              h("label", {className:"sr", htmlFor:"ql-" + q}, "Label for " + q),
+              h("input", {id:"ql-" + q, type:"text", value:x.label, onChange:e => edit(id, mm => { mm.questions[q].label = e.target.value; }, "ql-" + q)}),
+              h("label", {className:"sr", htmlFor:"qs-" + q}, "Shown when for " + q),
+              h("input", {id:"qs-" + q, type:"text", className:"mono", placeholder:"always", value:x.showIf, onChange:e => edit(id, mm => { mm.questions[q].showIf = e.target.value; }, "qs-" + q)}))
+          : h("div", null, h("b", null, x.label), h("span", {className:"note"}, " · shown when " + (x.showIf || "always"))),
+        st === "changed" ? h("span", {className:"was"}, "v3: ", h("del", null, V3.questions[q].label)) : null);
+    }));
+}
+function Field({id, label, help, children}){ return h("div", {className:"fld"}, h("label", {htmlFor:id}, label), children, help ? h("span", {className:"note"}, help) : null); }
+function NodeEditor({m, id, edit}){
+  const isQ = id.startsWith("q:");
+  if (isQ){
+    const q = id.slice(2), x = m.questions[q];
+    if (!x) return h("div", {className:"stack"}, h(Facts, {m, id}), h("p", {className:"note"}, V3.questions[q] ? "Removed in v4: the 2014 source no longer cites it." : "Removed from this draft."),
+      anyQ(q) ? h("button", {type:"button", className:"btn tiny", onClick:() => edit(id, mm => { mm.questions[q] = clone(anyQ(q)); }, "restore")}, "Restore question") : null);
+    return h("div", {className:"stack"},
+      h(Field, {id:"f-ql", label:"Question label"}, h("input", {id:"f-ql", type:"text", value:x.label, onChange:e => edit(id, mm => { mm.questions[q].label = e.target.value; }, "label")})),
+      h(Field, {id:"f-qs", label:"Shown when", help:"For example: cough = yes"}, h("input", {id:"f-qs", type:"text", className:"mono", value:x.showIf, onChange:e => edit(id, mm => { mm.questions[q].showIf = e.target.value; }, "show")})),
+      h("div", {className:"note"}, "Type: " + QTYPE[x.type]),
+      h("button", {type:"button", className:"btn tiny bad", onClick:() => edit(id, mm => { delete mm.questions[q]; }, "remove")}, "Remove question"));
+  }
+  const v = m[id];
+  const num = (k, label) => h(Field, {key:k, id:"f-" + k, label}, h("input", {id:"f-" + k, type:"number", value:v[k], onChange:e => edit(id, mm => { mm[id][k] = Number(e.target.value); }, k)}));
+  const txt = (k, label, help) => h(Field, {key:k, id:"f-" + k, label, help}, h("input", {id:"f-" + k, type:"text", value:v[k], onChange:e => edit(id, mm => { mm[id][k] = e.target.value; }, k)}));
+  const area = (k, label, help) => h(Field, {key:k, id:"f-" + k, label, help}, h("textarea", {id:"f-" + k, rows:3, value:v[k], onChange:e => edit(id, mm => { mm[id][k] = e.target.value; }, k)}));
+  const toggles = (k, opts, label) => h("fieldset", {key:k, className:"fld"}, h("legend", null, label),
+    h("div", {className:"tgl"}, Object.keys(opts).map(o => h("label", {key:o, className:"tg" + (v[k].includes(o) ? " on" : "")},
+      h("input", {type:"checkbox", checked:v[k].includes(o), onChange:() => edit(id, mm => { mm[id][k] = v[k].includes(o) ? v[k].filter(x => x !== o) : v[k].concat(o); }, k)}), opts[o]))));
+  let body;
+  if (id === "start") body = [num("ageMin","Youngest age (months)"), num("ageMax","Up to age (months, not included)")];
+  else if (id === "d1") body = [txt("q","Question"), toggles("signs", SIGNS, "Values: yes if any of these")];
+  else if (id === "d2") body = [txt("q","Question"), toggles("conds", COND, "Values: yes if any of these"), area("hint","Note shown under the question")];
+  else if (id === "d3") body = [txt("q","Question"), toggles("conds", COND, "Values: yes if any of these"),
+    v.conds.includes("fast") ? h("fieldset", {key:"fb", className:"fld"}, h("legend", null, "Fast breathing thresholds"), h("div", {className:"row3"}, num("cut","Age cut-off (months)"), num("young","Under it (/min)"), num("old","At or over it (/min)"))) : null,
+    area("hint","Note shown under the question")];
+  else if (id === "f1") body = [txt("title","Task title"), h("div", {key:"r", className:"row3"}, num("due","Due on day"), num("end","Open until day"))];
+  else body = [txt("title","Classification name"), area("note","Note shown to the CHW","Clinical text: the clinician sees every change.")];
+  return h("div", {className:"stack"}, body, h(QuestionsRead, {m, id, editable:true, edit}));
+}
+function ReviewControls({id, review, onDecide, required}){
+  const [type, setType] = useState("");
+  const [note, setNote] = useState("");
+  const [val, setVal] = useState("");
+  if (review) return h("div", {className:"rv " + review.status},
+    h("b", null, review.status === "approved" ? "✓ You approved this step" : "Change requested · " + FB_TYPES.find(t => t[0] === review.type)[1]),
+    review.status === "changes" ? h("div", null, review.note, review.value ? h("span", {className:"note"}, " · new value: " + review.value) : null) : null,
+    h("button", {type:"button", className:"btn tiny", onClick:() => onDecide(null)}, "Change my decision"));
+  return h("div", {className:"rv"},
+    h("div", {className:"note"}, required ? "This step changed. Approve it, or request a change. You can't edit; the program officer applies changes." : "This step is unchanged from v3. You can still request a change."),
+    h("button", {type:"button", className:"btn ok", onClick:() => onDecide({status:"approved"})}, "Approve this step"),
+    h("div", {className:"lab"}, "Or request a change: what is wrong?"),
+    h("div", {className:"chips", role:"radiogroup", "aria-label":"What is wrong"}, FB_TYPES.map(([k, l]) => h("button", {key:k, type:"button", role:"radio", "aria-checked":type === k, className:"chipb" + (type === k ? " on" : ""), onClick:() => setType(k)}, l))),
+    h(Field, {id:"fb-note-" + id, label:"Say exactly what to change (required)"}, h("input", {id:"fb-note-" + id, type:"text", value:note, onChange:e => setNote(e.target.value)})),
+    h(Field, {id:"fb-val-" + id, label:"New value (optional)"}, h("input", {id:"fb-val-" + id, type:"text", value:val, onChange:e => setVal(e.target.value)})),
+    h("button", {type:"button", className:"btn bad", disabled:!type || !note.trim(), onClick:() => onDecide({status:"changes", type, note:note.trim(), value:val.trim()})}, "Request change"));
+}
+function FeedbackCard({w, id, onSug}){
+  const r = w.reviews[id]; if (!r || r.status !== "changes" || r.round !== w.round) return null;
+  const s = w.sug[id];
+  return h("div", {className:"fbcard"},
+    h("div", null, h("b", null, "Clinician feedback, round " + r.round + " · " + FB_TYPES.find(t => t[0] === r.type)[1] + ": "), r.note, r.value ? " (new value: " + r.value + ")" : ""),
+    s ? h("div", {className:"sug"},
+      h("div", {className:"sugh"}, h("span", {className:"badge ai2"}, "Suggested revision"), h("span", {className:"note"}, "Bedrock · built only from this feedback · not applied until you accept")),
+      s.outcome ? h("div", {className:"dec"}, s.outcome === "accepted" ? "✓ Accepted" : s.outcome === "edited" ? "✓ Applied; edited by you" : w.fixed[id] ? "✓ Discarded; you edited it yourself" : "Discarded. Edit the box yourself to resolve it.")
+      : s.kind === "change" ? h(React.Fragment, null,
+          h("div", null, h("span", {className:"note"}, s.field + ": "), h("del", null, s.from), " → ", h("b", {className:"ins2"}, s.to)),
+          h("div", {className:"note"}, "Sources: clinician feedback, round " + r.round + " · guideline quote re-verified"),
+          h("div", {className:"note okc"}, sugChecks(w.model, s)),
+          h("div", {className:"btnrow"},
+            h("button", {type:"button", className:"btn tiny ok", onClick:() => onSug(id, "accepted")}, "Accept"),
+            h("button", {type:"button", className:"btn tiny", onClick:() => onSug(id, "edited")}, "Edit before accepting"),
+            h("button", {type:"button", className:"btn tiny bad", onClick:() => onSug(id, "discarded")}, "Discard")))
+      : h(React.Fragment, null, h("div", {className:"banner"}, s.text), h("button", {type:"button", className:"btn tiny", onClick:() => onSug(id, "discarded")}, "Edit it myself"))) : null);
+}
+function FlagsPanel({w, role, onFlag, onSelect}){
+  return h("section", {className:"panel"},
+    h("div", {className:"ph"}, h("h2", null, "Flags"), h("span", {className:"ver"}, w.flags.filter(f => !f.res).length + " open")),
+    w.flags.map(f => h(Flag, {key:f.id, f, w, role, onFlag, onSelect})));
+}
+function Flag({f, w, role, onFlag, onSelect}){
+  const [i, setI] = useState(0);
+  const [note, setNote] = useState("");
+  const canDecide = !f.res && (f.clinical ? (role === "clinician" && w.state === "clinician") : (role === "po" && (w.state === "po_draft" || w.state === "po_revise")));
+  return h("div", {id:"flag-" + f.id, className:"issue " + (f.res ? "done" : f.clinical ? "blocking" : "warning")},
+    h("div", {className:"ih"}, h("span", {className:"sev"}, f.res ? "Decided" : f.kind), h("b", null, f.title), h("button", {type:"button", className:"lnk", onClick:() => onSelect(f.about)}, f.about)),
+    h("div", {className:"quote"}, f.src),
+    h("div", {className:"note"}, f.why),
+    f.res ? h("div", {className:"dec"}, "✓ " + f.res.choice + (f.res.note ? " · “" + f.res.note + "”" : "") + " · " + f.res.by + (f.res.round ? ", round " + f.res.round : ", before round 1"))
+    : canDecide ? h("div", {className:"dform"},
+        h("div", {className:"chips"}, f.opts.map((o, k) => h("button", {key:k, type:"button", className:"chipb" + (i === k ? " on" : ""), "aria-pressed":i === k, onClick:() => setI(k)}, o.label))),
+        h("label", {className:"sr", htmlFor:f.id + "-n"}, "Note"),
+        h("input", {id:f.id + "-n", type:"text", placeholder:"Note (required)", value:note, onChange:e => setNote(e.target.value)}),
+        h("button", {type:"button", className:"btn tiny", disabled:!note.trim(), onClick:() => onFlag(f.id, i, note.trim())}, "Record decision"))
+    : h("div", {className:"note"}, f.clinical ? "The clinician decides this. " + (f.escalated ? "Escalated by the program officer." : "") : "The program officer decides this."));
+}
+function ChecksPanel({checks, onSelect, m}){
+  const g = golden(m), ok = g.filter(x => x.ok).length;
+  return h("section", {className:"panel"},
+    h("h2", null, "Automatic checks"),
+    h("div", {className:"kv"}, h("span", null, "Quotes found in the PDF"), h("b", {className:"okc"}, "All")),
+    h("div", {className:"kv"}, h("span", null, "Golden cases"), h("b", {className:ok === g.length ? "okc" : "badc"}, ok + " / " + g.length + " match")),
+    h("div", {className:"kv"}, h("span", null, "Blocking problems"), h("b", {className:checks.some(c => c[0] === "blocking") ? "badc" : "okc"}, checks.filter(c => c[0] === "blocking").length)),
+    checks.length ? h("ul", {className:"clist"}, checks.map((c, i) => h("li", {key:i, className:c[0]}, h("span", {className:"sev"}, c[0][0].toUpperCase() + c[0].slice(1)), " ",
+      h("button", {type:"button", className:"lnk", onClick:() => onSelect(c[1])}, c[1]), ": ", c[2]))) : null);
+}
+function VersionsPanel({w}){
+  return h("section", {className:"panel"},
+    h("h2", null, "Version history"),
+    h("div", {className:"vrow"}, h("span", {className:"mono b"}, "v3"), h("span", null, h("b", null, "Deployed"), h("span", {className:"note"}, V3_HASH + " · Oct 12"))),
+    w.versions.slice(-7).map((v, i) => h("div", {key:i, className:"vrow"}, h("span", {className:"mono b"}, v.ver), h("span", null, h("b", null, v.event), h("span", {className:"note"}, v.meta)))),
+    h("p", {className:"note", style:{margin:0}}, "Each version is a frozen logic model with a hash. An approval points at one hash."));
+}
+
+/* ================= Journey: one place that says where you are and what to do next ================= */
+const STAGES = [
+  {key:"none", label:"Pick guideline pages", owner:"po", screen:"guidelines"},
+  {key:"po_draft", label:"Check & edit draft", owner:"po", screen:"review"},
+  {key:"clinician", label:"Clinical review", owner:"clinician", screen:"review"},
+  {key:"po_revise", label:"Apply feedback", owner:"po", screen:"review"},
+  {key:"verify", label:"Synthetic check", owner:"system", screen:"release"},
+  {key:"deploy", label:"Approve deploy", owner:"it", screen:"release"},
+  {key:"done", label:"Deployed", owner:null, screen:"history"}
+];
+const OWNER_NAME = {po:"Program officer", clinician:"Clinician", it:"IT approver", system:"System"};
+function gate(w, checks){
+  const blockIds = Array.from(new Set(checks.filter(c => c[0] === "blocking").map(c => c[1])));
+  const poFlags = w.flags.filter(f => !f.clinical && !f.res);
+  const clinFlags = w.flags.filter(f => f.clinical && !f.res);
+  const changesNow = Object.keys(w.reviews).filter(k => w.reviews[k].status === "changes" && w.reviews[k].round === w.round);
+  const unresolved = changesNow.filter(id => !(w.sug[id] && (w.sug[id].outcome === "accepted" || w.sug[id].outcome === "edited")) && !w.fixed[id]);
+  const reqLeft = w.required.filter(id => !(w.reviews[id] && w.reviews[id].round === w.round));
+  return {blockIds, poFlags, clinFlags, changesNow, unresolved, reqLeft};
+}
+function itemLabel(m, id){
+  if (id.startsWith("F-")) return "Flag " + id;
+  if (id.startsWith("q:")) return "Question " + id.slice(2);
+  return nodeTitle(m, id).replace("Question · ", "").replace("Classification · ", "");
+}
+/* Returns the single next step for the current role */
+function nextStep(w, role, checks, screen, act, go, pick){
+  const g = gate(w, checks);
+  const stage = STAGES.find(s => s.key === w.state);
+  const owner = stage.owner;
+  const mine = owner === role || owner === "system";
+  const res = {owner, mine, title:"", todo:[], primary:null, secondary:null};
+  const asTodo = (ids) => ids.map(id => ({id, label:itemLabel(w.model, id)}));
+  if (!mine && owner){
+    const waiting = {po:{none:"create the workflow draft", po_draft:"check the draft and send it", po_revise:"apply the clinician's feedback"}[w.state], clinician:"review round " + w.round, it:"approve the deploy"}[owner];
+    res.title = "Waiting for the " + {po:"program officer", clinician:"clinician", it:"IT approver"}[owner] + " to " + waiting + ".";
+    res.primary = {label:"Switch to " + OWNER_NAME[owner], fn:() => act.setRole(owner, stage.screen), demo:true};
+    return res;
+  }
+  if (w.state === "none"){
+    res.title = screen === "guidelines" ? "Check the pathway and pages on the right, then create the workflow draft." : "Start by picking the guideline pages for this pathway.";
+    res.primary = screen === "guidelines" ? {label:"Create workflow draft", fn:() => { const b = document.getElementById("create-btn"); if (b && !b.disabled) b.click(); }} : {label:"Go to Guidelines", fn:() => go("guidelines")};
+  } else if (w.state === "po_draft"){
+    res.todo = asTodo(g.blockIds.concat(g.poFlags.map(f => f.id)));
+    res.title = res.todo.length ? "Check the AI draft. Clear " + res.todo.length + " item" + (res.todo.length > 1 ? "s" : "") + " before you can send it." : "The draft passes every check. Look through the changed boxes, then send it to the clinician.";
+    res.primary = res.todo.length ? {label:"Go to next item", fn:() => pick(res.todo[0].id)} : {label:"Send to clinician", fn:act.send};
+    res.secondary = {label:"Compare with live v3", fn:() => go("compare")};
+  } else if (w.state === "clinician"){
+    res.todo = asTodo(g.reqLeft.concat(g.clinFlags.map(f => f.id)));
+    if (res.todo.length){ res.title = "Round " + w.round + ": review " + res.todo.length + " item" + (res.todo.length > 1 ? "s" : "") + ". Approve each, or request a change."; res.primary = {label:"Review next", fn:() => pick(res.todo[0].id)}; }
+    else if (g.changesNow.length){ res.title = "Reviewed. You requested " + (g.changesNow.length > 1 ? g.changesNow.length + " changes; send them" : "1 change; send it") + " to the program officer."; res.primary = {label:"Return to PO with feedback", fn:act.returnToPO, bad:true}; }
+    else { res.title = "Everything in round " + w.round + " is approved. Approve the whole version."; res.primary = {label:"Approve all", fn:act.approveAll}; }
+    res.secondary = {label:"Compare with live v3", fn:() => go("compare")};
+  } else if (w.state === "po_revise"){
+    res.todo = asTodo(g.unresolved.concat(g.blockIds));
+    res.title = g.unresolved.length ? "The clinician requested " + g.changesNow.length + " change" + (g.changesNow.length > 1 ? "s" : "") + ". For each one, accept, edit or discard the AI suggestion." : g.blockIds.length ? "Fix the blocking checks before resending." : "All feedback is handled. Send round " + (w.round + 1) + " to the clinician.";
+    res.primary = res.todo.length ? {label:"Open next request", fn:() => pick(res.todo[0].id)} : {label:"Resend to clinician (round " + (w.round + 1) + ")", fn:act.send};
+  } else if (w.state === "verify"){
+    res.title = "Content approved. Build the form and run every synthetic patient through it.";
+    res.primary = {label:"Run synthetic check", fn:() => { go("release"); act.runVerify(); }};
+  } else if (w.state === "deploy"){
+    res.title = screen === "release" ? "Check the form changes and the test report, then approve the deploy." : "The synthetic check passed. Review the changes for deploy.";
+    res.primary = screen === "release" ? {label:"Approve deploy", fn:act.approveDeploy} : {label:"Go to Release", fn:() => go("release")};
+  } else {
+    res.title = "Deployed. Every step, with its version and hash, is in the audit log.";
+    res.primary = screen === "history" ? {label:"Start a new demo", fn:act.reset} : {label:"Open History", fn:() => go("history")};
+  }
+  return res;
+}
+function JourneyBar({w, go}){
+  const at = STAGES.findIndex(s => s.key === w.state);
+  return h("nav", {className:"journey", "aria-label":"Progress"},
+    STAGES.map((s, i) => {
+      const st = i < at ? "done" : i === at ? "now" : "todo";
+      const skipped = s.key === "po_revise" && i < at && w.round <= 1 && !w.audit.some(a => a.event.startsWith("Returned"));
+      const label = s.key === "clinician" && w.round ? s.label + " · round " + w.round : s.label;
+      return h("button", {key:s.key, type:"button", className:"jstep " + (skipped ? "skip" : st), "aria-current":st === "now" ? "step" : null, onClick:() => go(s.screen)},
+        h("span", {className:"jdot"}, st === "done" ? (skipped ? "–" : "✓") : i + 1),
+        h("span", {className:"jtext"}, h("b", null, label), h("span", null, s.owner ? OWNER_NAME[s.owner] : "")));
+    }));
+}
+function NextBar({n, role, pick}){
+  const owner = n.owner;
+  return h("div", {className:"nextbar" + (n.mine ? " mine" : " wait"), role:"region", "aria-label":"What to do next"},
+    h("div", {className:"nin"},
+      h("div", {className:"nmain"},
+        h("span", {className:"npill"}, n.mine ? (owner === "system" ? "Next" : "Your turn · " + OWNER_NAME[role]) : "Waiting · " + OWNER_NAME[owner]),
+        h("span", {className:"ntitle"}, n.title),
+        n.todo.length ? h("span", {className:"ntodo"}, n.todo.slice(0, 6).map(t => h("button", {key:t.id, type:"button", className:"chipb", onClick:() => pick(t.id)}, t.label)), n.todo.length > 6 ? h("span", {className:"note"}, "+" + (n.todo.length - 6) + " more") : null) : null),
+      h("div", {className:"btnrow"},
+        n.secondary ? h("button", {type:"button", className:"btn", onClick:n.secondary.fn}, n.secondary.label) : null,
+        n.primary ? h("button", {type:"button", className:"btn " + (n.primary.bad ? "bad" : "primary"), onClick:n.primary.fn}, n.primary.label + (n.primary.demo ? "" : " →")) : null),
+      n.primary && n.primary.demo ? h("span", {className:"note ndemo"}, "Demo shortcut: in the real app this is a different person's login.") : null));
+}
+
+/* ================= Review screen (all three roles) ================= */
+function markersFor(w, role, checks){
+  const mk = {}, tone = {};
+  const add = (id, b) => { (mk[id] = mk[id] || []).push(b); };
+  const m = w.model;
+  NODE_IDS.concat(trayIds(m).map(q => "q:" + q)).forEach(id => {
+    if (!id.startsWith("q:") && changedVs(m, id)){ tone[id] = "changed"; add(id, ["changed","Changed"]); }
+    if ((w.state === "po_draft" || w.state === "po_revise") && role === "po" && !id.startsWith("q:") && !same(nodeSig(m, id), nodeSig(AI_DRAFT, id))) add(id, ["ed","Edited"]);
+    const r = w.reviews[id];
+    if (r && r.status === "approved") add(id, ["ok","Approved"]);
+    else if (r && r.status === "changes" && r.round === w.round){
+      const s = w.sug[id];
+      const resolved = w.state === "po_revise" && ((s && (s.outcome === "accepted" || s.outcome === "edited")) || w.fixed[id]);
+      add(id, resolved ? ["ok","Resolved"] : ["req","Change requested"]);
+    } else if (w.state === "clinician" && w.required.includes(id)) add(id, ["todo","To review"]);
+  });
+  checks.filter(c => c[0] === "blocking").forEach(c => { tone[c[1]] = "bad"; });
+  return {mk, tone};
+}
+function nodeTitle(m, id){
+  if (id.startsWith("q:")) return "Question · " + id.slice(2);
+  return {start:"Applies to", d1:"Question · danger signs", d2:"Question · severe signs", d3:"Question · pneumonia signs", o1:"Classification · severe", o2:"Classification · pneumonia", o3:"Classification · no pneumonia", f1:"Follow-up task"}[id];
+}
+function srcOf(m, id){
+  if (id.startsWith("q:")){ const q = m.questions[id.slice(2)] || anyQ(id.slice(2)); return q ? [q.quote, "question"] : ["(no quote)", "—"]; }
+  return m.src[id];
+}
+function ReviewScreen({w, role, sel, setSel, act, checks}){
+  const [tab, setTab] = useState("flow");
+  if (w.state === "none") return h("div", {className:"banner"}, "No workflow yet. The program officer creates one from ", h("a", {href:"#guidelines"}, "Guidelines"), ".");
+  const m = w.model;
+  const canEdit = role === "po" && (w.state === "po_draft" || w.state === "po_revise");
+  const canReview = role === "clinician" && w.state === "clinician";
+  const {mk, tone} = markersFor(w, role, checks);
+  const block = checks.filter(c => c[0] === "blocking").length;
+  const changesNow = Object.keys(w.reviews).filter(k => w.reviews[k].status === "changes" && w.reviews[k].round === w.round);
+  const unresolved = changesNow.filter(id => !(w.sug[id] && (w.sug[id].outcome === "accepted" || w.sug[id].outcome === "edited")) && !w.fixed[id]);
+  const reqLeft = w.required.filter(id => !(w.reviews[id] && w.reviews[id].status === "approved"));
+  const clinFlagsOpen = w.flags.filter(f => f.clinical && !f.res).length;
+  const nChanged = NODE_IDS.filter(id => changedVs(m, id)).length;
+  const qAdded = Object.keys(m.questions).filter(q => qStatus(m, q) === "added").length, qRemoved = Object.keys(V3.questions).filter(q => !m.questions[q]).length;
+  const title = role === "clinician" ? "Clinical review" + (w.round ? " · round " + w.round : "") : role === "it" ? "Workflow (read-only)" : "Program officer workflow";
+  let banner = null, bcls = "banner";
+  if (w.state === "po_draft" && role === "po") banner = "Click any box to check it against its guideline quote and edit it. Boxes marked Changed differ from the live version.";
+  if (w.state === "clinician" && role === "clinician") banner = "Click a box marked To review. Approve it, or request a change; you can't edit. The next box opens after each decision.";
+  if (w.state === "po_revise" && role === "po") banner = "Boxes marked Change requested carry the clinician's feedback and an AI suggestion. Open each one and accept, edit or discard it.";
+  if (!banner && ["po_draft","clinician","po_revise"].includes(w.state)) { banner = "Read-only for your role. Editing is locked while it is with someone else."; bcls = "banner muted"; }
+  if (["verify","deploy","done"].includes(w.state)){ banner = "Content approved by the clinician: " + w.approved.ver + " · " + w.approved.hash + ". Next: " + (w.state === "verify" ? "synthetic patient check (Verify)." : w.state === "deploy" ? "IT approves the deploy (Changes)." : "deployed."); bcls = "banner good"; }
+  const r = w.reviews[sel];
+  return h(React.Fragment, null,
+    h("div", {className:"top"},
+      h("div", null, h("h1", null, title),
+        h("div", {className:"ver"}, verLabel(w) + " · " + fnv(JSON.stringify(m)) + " · " + nChanged + " steps changed · " + qAdded + " question added · " + qRemoved + " removed"))),
+    banner ? h("div", {className:bcls}, banner) : null,
+    h("div", {className:"editgrid"},
+      h("section", {className:"panel"},
+        h("div", {className:"ph"},
+          h("div", {className:"tabs", role:"tablist", "aria-label":"View"}, [["flow","Flow"],["plain","Plain-language rules"]].map(([k, l]) => h("button", {key:k, type:"button", role:"tab", "aria-selected":tab === k, onClick:() => setTab(k)}, l))),
+          h("span", {className:"btnrow"}, h("span", {className:"ver"}, canEdit ? "Click a box to edit it" : canReview ? "Click a box to review it" : "Click a box to see it"),
+            canEdit ? h("button", {type:"button", className:"btn tiny", disabled:!w.hist.length, onClick:act.undo}, "Undo") : null)),
+        tab === "flow" ? h(Flow, {m, selected:sel, onSelect:setSel, markers:mk, tone, label:"Decision flow"})
+          : h("ol", {className:"plain"}, ["d1","d2","d3","o3","f1"].map(id => h("li", {key:id}, h("button", {type:"button", className:"lnk", onClick:() => setSel(id)}, id), " ", plainRule(m, id)))),
+        h(Tray, {m, selected:sel, onSelect:setSel, markers:mk}),
+        h("div", {className:"legend"},
+          h("span", null, h("span", {className:"badge changed"}, "Changed"), " differs from live"),
+          role === "po" ? h("span", null, h("span", {className:"badge ed"}, "Edited"), " by you") : null,
+          h("span", null, h("span", {className:"badge todo"}, "To review")), h("span", null, h("span", {className:"badge ok"}, "Approved")), h("span", null, h("span", {className:"badge req"}, "Change requested")),
+          h("span", null, h("i", {className:"sw", style:{borderColor:"var(--del)"}}), "blocking check"))),
+      h("div", {className:"rightcol"},
+        h("section", {className:"panel editor", "aria-labelledby":"np-h"},
+          h("div", {className:"ph"}, h("h2", {id:"np-h"}, nodeTitle(m, sel)),
+            h("span", {className:"badges"}, (mk[sel] || []).map((b, i) => h("span", {key:i, className:"badge " + b[0]}, b[1])),
+              canEdit && !sel.startsWith("q:") && !same(m[sel], AI_DRAFT[sel]) ? h("button", {type:"button", className:"btn tiny", onClick:() => act.edit(sel, mm => { mm[sel] = clone(AI_DRAFT[sel]); }, "reset")}, "Reset to AI draft") : null)),
+          w.state === "po_revise" ? h(FeedbackCard, {w, id:sel, onSug:act.sug}) : null,
+          canEdit ? h(NodeEditor, {m, id:sel, edit:act.edit})
+            : h(React.Fragment, null, h(Facts, {m, id:sel}), h(QuestionsRead, {m, id:sel})),
+          h("div", {className:"quote"}, "“" + srcOf(m, sel)[0] + "”", h("small", null, "WHO IMCI 2014 · " + srcOf(m, sel)[1])),
+          role === "clinician" && w.state === "clinician" ? h(ReviewControls, {key:sel + ":" + w.round + ":" + (r ? r.status : "none"), id:sel, review:r && r.round === w.round || (r && r.status === "approved") ? r : null, required:w.required.includes(sel), onDecide:(d) => act.decide(sel, d)})
+          : r && role !== "po" ? h("div", {className:"rv " + r.status}, r.status === "approved" ? "✓ Approved by the clinician, round " + r.round : "Change requested, round " + r.round + ": " + r.note) : null),
+        h(FlagsPanel, {w, role, onFlag:act.flag, onSelect:setSel}),
+        h(ChecksPanel, {checks, onSelect:setSel, m}),
+        h(VersionsPanel, {w}))));
+}
+
+/* ================= Guidelines (ported from the uploaded mock-up) ================= */
+const LIB0 = [
+  {name:"IMCI chart booklet (sample).pdf", type:"PDF", meta:"80 pages · 6.1 MB · 2026-11-02 · Textract", status:"Indexed"},
+  {name:"National child health guideline 2025 (sample).pdf", type:"PDF", meta:"142 pages · 11.4 MB · Textract + model", status:"Indexed"},
+  {name:"Child health DAK decision tables (sample).xlsx", type:"Spreadsheet", meta:"6 sheets · cells read directly, no OCR", status:"Indexed"},
+  {name:"District cough protocol memo (sample).docx", type:"Word", meta:"12 pages · converted to PDF, then Textract", status:"Uploaded"},
+  {name:"Clinic wall chart photo (sample).jpg", type:"Image", meta:"1 image · Textract OCR + model", status:"Uploaded"}
+];
+const ACCEPT = ".pdf,.doc,.docx,.odt,.rtf,.xlsx,.xls,.csv,.ods,.png,.jpg,.jpeg,.tif,.tiff,.webp,.html,.htm,.txt,.md";
+const READABLE = ACCEPT.split(",").map(x => x.slice(1));
+const PATHWAYS = ["Cough or difficult breathing","Diarrhoea","Fever (malaria area)","Malnutrition danger signs"];
+function GuidelinesScreen({w, role, act}){
+  const [lib, setLib] = useState(LIB0);
+  const [selF, setSelF] = useState(0);
+  const [path, setPath] = useState(PATHWAYS[0]);
+  const [mode, setMode] = useState("auto");
+  const [pages, setPages] = useState([14, 15]);
+  const [view, setView] = useState(14);
+  const fileInput = useRef(null);
+  const onPick = (e) => {
+    const files = Array.from(e.target.files || []); e.target.value = "";
+    files.forEach((file, k) => {
+      const ext = (file.name.split(".").pop() || "").toLowerCase();
+      const ok = READABLE.includes(ext);
+      const type = {pdf:"PDF", doc:"Word", docx:"Word", odt:"Word", rtf:"Word", xlsx:"Spreadsheet", xls:"Spreadsheet", csv:"Spreadsheet", ods:"Spreadsheet", png:"Image", jpg:"Image", jpeg:"Image", tif:"Image", tiff:"Image", webp:"Image", html:"Web or text", htm:"Web or text", txt:"Web or text", md:"Web or text"}[ext] || "Other";
+      const size = Math.max(1, Math.round(file.size / 1024)) + " KB";
+      const stamp = Date.now() + "-" + k;
+      setLib(l => { setSelF(l.length); return l.concat({name:file.name, type, meta:size + " · uploading to S3", status:"Uploading", stamp}); });
+      setTimeout(() => setLib(l => l.map(x => x.stamp === stamp ? Object.assign({}, x, {meta:size + (ok ? " · in S3 · reading" : " · in S3 · this file type can't be read"), status:ok ? "Reading" : "Unsupported"}) : x)), 900);
+      if (ok) setTimeout(() => setLib(l => l.map(x => x.stamp === stamp ? Object.assign({}, x, {meta:size + " · in S3 · added just now", status:"Indexed"}) : x)), 2200);
+    });
+  };
+  const f = lib[selF];
+  const toggle = (n) => setPages(ps => ps.includes(n) ? ps.filter(x => x !== n) : ps.concat(n).sort((a, b) => a - b));
+  return h("div", {className:"grid2 g-lib"},
+    h("section", {className:"panel"},
+      h("div", {className:"ph"}, h("h2", null, "Guideline library"), h("span", {className:"ver"}, lib.length + " files in S3")),
+      h("input", {ref:fileInput, id:"file-input", type:"file", multiple:true, accept:ACCEPT, hidden:true, onChange:onPick}),
+      h("div", {className:"btnrow"},
+        h("button", {type:"button", className:"btn primary", disabled:role !== "po", onClick:() => fileInput.current.click()}, "Upload guideline"),
+        h("span", {className:"note"}, "PDF, Word, spreadsheet, image or web page")),
+      lib.map((x, i) => h("button", {key:i, type:"button", className:"libitem" + (i === selF ? " on" : ""), onClick:() => setSelF(i)},
+        h("span", {className:"tbadge"}, x.type), h("span", {className:"lname"}, x.name), h("span", {className:"note"}, x.meta), h("span", {className:"st " + (x.status === "Indexed" ? "ok" : "")}, x.status === "Indexed" ? "Ready" : x.status)))),
+    h("section", {className:"panel"},
+      h("span", {className:"note"}, "Selected guideline"),
+      h("h2", {className:"big"}, f.name),
+      h("div", {className:"mono note"}, "s3://guidelines/" + f.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-") + " · sha256 " + fnv(f.name)),
+      h("div", {className:"checks"}, [["Pages", f.type === "PDF" && selF === 0 ? "80" : "—"],["Reader", f.type === "Spreadsheet" ? "Cells" : "Textract"],["Status", f.status]].map(([k, v], i) => h("div", {key:i, className:"chk muted"}, h("span", {className:"k"}, k), h("span", {className:"v"}, v)))),
+      h("div", {className:"lab"}, "Pathway to extract"),
+      h("div", {className:"chips"}, PATHWAYS.map(p => h("button", {key:p, type:"button", className:"chipb" + (path === p ? " on" : ""), "aria-pressed":path === p, onClick:() => setPath(p)}, p))),
+      h("div", {className:"lab"}, "Pages to read"),
+      h("div", {className:"chips"}, [["auto","Auto: pathway section"],["ranges","Page ranges"],["pick","Pick pages"]].map(([k, l]) => h("button", {key:k, type:"button", className:"chipb" + (mode === k ? " on" : ""), "aria-pressed":mode === k, onClick:() => setMode(k)}, l))),
+      mode === "auto" ? h("div", {className:"quote"}, "Found the heading “" + path + "” in the table of contents. Suggested pages: 14–15.") : null,
+      h("div", {className:"note"}, pages.length + " of 80 pages selected (" + pages.join(", ") + "). Only these pages are indexed and sent to the model."),
+      h("div", {className:"thumbs"}, [12,13,14,15,16,17].map(n => h("button", {key:n, type:"button", className:"thumb" + (pages.includes(n) ? " on" : "") + (view === n ? " view" : ""), "aria-pressed":pages.includes(n), onClick:() => { setView(n); if (mode === "pick") toggle(n); }},
+        h("span", {className:"lines"}, h("i"), h("i"), h("i"), h("i")), h("span", {className:"pn"}, n + (pages.includes(n) ? " ✓" : ""))))),
+      h("div", {className:"pview"},
+        h("div", {className:"ppage"}, h("div", {className:"pphead"}, h("span", null, f.name), h("span", null, view)),
+          view === 14 ? h(React.Fragment, null, h("div", {className:"pptitle"}, path), h("div", {className:"pl"}), h("div", {className:"pl s"}),
+            h("div", {className:"ptable"}, h("div", {className:"pth"}, h("span", null, "SIGNS"), h("span", null, "CLASSIFY AS"), h("span", null, "TREATMENT")),
+              [["pink","danger sign / stridor","severe","refer"],["yellow","chest indrawing / fast breathing","pneumonia","amoxicillin"],["green","no signs","cough or cold","home care"]].map((r, i) => h("div", {key:i, className:"ptr " + r[0]}, h("span", null, r[1]), h("span", null, r[2]), h("span", null, r[3])))))
+          : h(React.Fragment, null, h("div", {className:"pl"}), h("div", {className:"pl s"}), h("div", {className:"pl"}), h("div", {className:"pl"}), h("div", {className:"pl s"}))),
+        h("div", {className:"stack"}, h("b", null, "Page " + view + " of 80"),
+          h("span", {className:"st " + (pages.includes(view) ? "ok" : "")}, pages.includes(view) ? "Included" : "Not included"),
+          h("span", {className:"note"}, view === 14 ? "Text page with a classification table. Textract reads the heading, paragraphs and every table cell." : "Text page."),
+          h("button", {type:"button", className:"btn tiny" + (pages.includes(view) ? " bad" : ""), onClick:() => toggle(view)}, pages.includes(view) ? "Exclude this page" : "Include this page"))),
+      h("div", {className:"lab"}, "Existing form to compare against"),
+      h("div", {className:"mono pcard"}, "forms/app/cough_assessment.xlsx · deployed v3 · " + V3_HASH),
+      w.state === "none"
+        ? h("div", {className:"actions"}, h("span", {className:"note"}, role === "po" ? "Indexes the pages and drafts questions and rules with verbatim quotes." : "Only the program officer can create a workflow draft."),
+            h("button", {id:"create-btn", type:"button", className:"btn primary", disabled:role !== "po" || !pages.length || selF !== 0 || path !== PATHWAYS[0], onClick:() => act.createDraft(pages)}, "Create workflow draft"))
+        : h("div", {className:"banner good"}, "A workflow exists for this pathway (" + verLabel(w) + "). ", h("a", {href:"#review"}, "Open Review"), ".")));
+}
+
+/* ================= Runs ================= */
+function RunsScreen({w}){
+  const order = ["none","po_draft","clinician","po_revise","verify","deploy","done"];
+  const at = order.indexOf(w.state);
+  const rows = [
+    ["Guideline indexed","System", w.state === "none" ? "todo" : "done", "Pages 14–15 · Textract"],
+    ["Draft extracted (2 Bedrock passes + cross-check)","System", w.state === "none" ? "todo" : "done", "Quotes and numbers checked in code"],
+    ["Program officer workflow","Program officer", at === 1 ? "now" : at > 1 ? "done" : "todo", "Check, edit, send"],
+    ["Clinical review" + (w.round > 1 ? " (round " + w.round + ")" : ""),"Clinician", w.state === "clinician" ? "now" : w.round > 0 ? "done" : "todo", "Approve or request changes per box"],
+    ["Program officer revise","Program officer", w.state === "po_revise" ? "now" : w.round > 1 || at >= 4 ? (w.round > 1 ? "done" : "skip") : "todo", "Accept, edit or discard AI revisions"],
+    ["Verify: synthetic patients","System", w.state === "verify" ? "now" : at > 4 ? "done" : "todo", "Rules in code vs filled form"],
+    ["Deploy approval","IT approver", w.state === "deploy" ? "now" : w.state === "done" ? "done" : "todo", "Diff and test report"]
+  ];
+  return h("section", {className:"panel"},
+    h("div", {className:"ph"}, h("h2", null, "Run · Cough or difficult breathing"), h("span", {className:"ver"}, verLabel(w))),
+    h("ol", {className:"timeline"}, rows.map((r, i) => h("li", {key:i, className:r[2]}, h("span", {className:"tdot"}, r[2] === "done" ? "✓" : r[2] === "skip" ? "–" : ""),
+      h("span", {className:"stack0"}, h("b", null, r[0]), h("span", {className:"note"}, r[1] + " · " + r[3]))))),
+    h("p", {className:"note", style:{margin:0}}, "State lives in DynamoDB, so a pending review survives a restart."));
+}
+
+/* ================= Compare (computed from the model) ================= */
+function CompareScreen({w}){
+  const [view, setView] = useState("logic");
+  const [sel, setSel] = useState("d3");
+  const m = w.model;
+  const diffs = GRID.filter(p => classify(V3, p).out !== classify(m, p).out);
+  const tone = {}, mk = {};
+  NODE_IDS.forEach(id => { if (changedVs(m, id)){ tone[id] = "changed"; mk[id] = [["changed","Changed"]]; } });
+  const [pid, setPid] = useState(null);
+  const samples = diffs.slice(0, 3).concat(GRID.filter(p => classify(V3, p).out === classify(m, p).out && !p.danger.length).filter((p, i) => i % 37 === 0).slice(0, 2));
+  const p = samples.find(s => s.id === pid) || samples[0];
+  if (w.state === "none") return h("div", {className:"banner"}, "Nothing to compare yet.");
+  return h(React.Fragment, null,
+    h("div", {className:"top"}, h("div", null, h("h1", null, "Compare " + verLabel(w) + " with live v3"), h("div", {className:"ver"}, "v3 " + V3_HASH + " → " + verLabel(w) + " " + fnv(JSON.stringify(m))))),
+    h("div", {className:"checks"},
+      [["Steps changed", NODE_IDS.filter(id => changedVs(m, id)).length, "warn"],["Outcome changes", diffs.length + " of " + GRID.length + " patients", diffs.length ? "warn" : ""],["Golden cases", golden(m).filter(g => g.ok).length + " of 12 match", ""],["Routes to", "Clinician", "muted"]].map(([k, v, c], i) =>
+        h("div", {key:i, className:"chk " + c}, h("span", {className:"k"}, k), h("span", {className:"v"}, v)))),
+    h("div", {className:"tabs", role:"tablist", "aria-label":"View"}, [["logic","Logic flow"],["form","Phone form"],["xls","XLSForm"]].map(([k, l]) => h("button", {key:k, type:"button", role:"tab", "aria-selected":view === k, onClick:() => setView(k)}, l))),
+    view === "logic" ? h(React.Fragment, null,
+      h("div", {className:"cols"},
+        h("section", {className:"panel"}, h("div", {className:"ph"}, h("h2", null, "Live · v3"), h("span", {className:"ver mono"}, V3_HASH)), h(Flow, {m:V3, selected:sel, onSelect:setSel, label:"Live v3 flow"})),
+        h("section", {className:"panel"}, h("div", {className:"ph"}, h("h2", null, "New · " + verLabel(w)), h("span", {className:"ver mono"}, fnv(JSON.stringify(m)))), h(Flow, {m, selected:sel, onSelect:setSel, markers:mk, tone, label:"New flow"}))),
+      h("div", {className:"cols"},
+        h("section", {className:"panel"}, h("h2", null, nodeTitle(m, sel)), h("div", {className:"cmp"},
+          h("div", {className:"side"}, h("span", {className:"lab"}, "v3"), plainRule(V3, sel)),
+          h("div", {className:"side", style:{borderColor:changedVs(m, sel) ? "var(--chg)" : null}}, h("span", {className:"lab"}, verLabel(w)), plainRule(m, sel)))),
+        h(PatientsTable, {m, diffs}))) : null,
+    view === "form" ? h(React.Fragment, null,
+      h("div", {className:"banner"}, h("b", null, "Same synthetic patient on both forms. "), "Question wording differences show inline; most changes only show in the summary, which is why the patients table matters."),
+      h("div", {className:"picker"}, "Fill both forms with:", samples.map(s => { const d = classify(V3, s).out !== classify(m, s).out;
+        return h("button", {key:s.id, type:"button", className:d ? "dif" : "", "aria-pressed":p.id === s.id, onClick:() => setPid(s.id)}, s.id + (d ? " · changes" : " · same")); })),
+      h("div", {className:"cols"}, [[V3, "Live · v3"], [m, "New · " + verLabel(w)]].map(([mm, l], i) => h("section", {key:i, className:"panel"}, h("h2", null, l), h(Phone, {m:mm, other:i ? V3 : m, p}))))) : null,
+    view === "xls" ? h(XlsCompare, {a:V3, b:m, la:"v3", lb:verLabel(w)}) : null);
+}
+function PatientsTable({m, diffs}){
+  return h("section", {className:"panel"},
+    h("div", {className:"ph"}, h("h2", null, "Patients whose outcome changes"), h("span", {className:"ver"}, h("b", null, diffs.length), " of " + GRID.length + " synthetic patients")),
+    diffs.length ? h("div", {className:"tw"}, h("table", null,
+      h("thead", null, h("tr", null, ["Patient","Age","/min","Signs","v3","","New"].map((t, i) => h("th", {key:i}, t)))),
+      h("tbody", null, diffs.slice(0, 8).map(p => { const a = classify(V3, p).out, b = classify(m, p).out;
+        return h("tr", {key:p.id}, h("td", {className:"mono"}, p.id), h("td", null, p.age + " mo"), h("td", null, p.rr), h("td", null, describeP(p)),
+          h("td", null, h(ClsTag, {o:a, m:V3})), h("td", {className:"arrow"}, "→"), h("td", null, h(ClsTag, {o:b, m}))); })))) : h("p", {className:"note"}, "No synthetic patient changes outcome."),
+    h("p", {className:"note", style:{margin:0}}, (diffs.length > 8 ? "Showing 8 of " + diffs.length + ". " : "") + "Expected outcomes come from each version's rules in code, never from a model."));
+}
+function ClsTag({o, m}){ return o === "none" ? h("span", {className:"note"}, "out of range") : h("span", {className:"cls"}, h("i", {style:{background:"var(--" + OUTCOLOR[o] + ")"}}), m[o].title); }
+function Phone({m, other, p}){
+  const o = classify(m, p).out, d = o !== classify(other, p).out;
+  const yn = (v) => h("div", {style:{display:"flex", gap:16}}, [["Yes", v === true], ["No", v === false]].map(([l, on]) => h("span", {key:l, className:"opt"}, h("span", {className:"rd" + (on ? " on" : "")}), l)));
+  const val = {cough:true, chest_indrawing:p.ci, stridor:p.stridor, wheeze:false, cough_syrup:false};
+  return h("div", {className:"phone"},
+    h("div", {className:"bar2"}, "Cough or difficult breathing"),
+    h("div", {className:"sect"}, "Assessment"),
+    QORDER.concat(Object.keys(m.questions).filter(q => !QORDER.includes(q))).filter(q => m.questions[q]).map(q => {
+      const x = m.questions[q], wasL = other.questions[q] ? other.questions[q].label : null;
+      return h("div", {key:q, className:"fq"}, h("span", {className:"lb"}, x.label, !other.questions[q] ? h("span", {className:"badge q-added", style:{marginLeft:6}}, "NEW") : null),
+        wasL && wasL !== x.label ? h("span", {className:"hint"}, "Other version: “" + wasL + "”") : null,
+        x.type === "int" ? h("span", {className:"fin"}, q === "age_months" ? p.age : p.rr)
+        : x.type === "multi" ? h("div", null, Object.keys(SIGNS).map(k => h("span", {key:k, className:"opt"}, h("span", {className:"cb" + (p.danger.includes(k) ? " on" : "")}), SIGNS[k])))
+        : yn(val[q] !== undefined ? val[q] : false));
+    }),
+    h("div", {className:"sect"}, "Summary"),
+    o === "none" ? h("div", {className:"res"}, "Not in this pathway's age range.") :
+    h("div", {className:"res " + o + (d ? " diff" : "")}, d ? h("span", {className:"badge changed", style:{justifySelf:"start"}}, "Differs") : null,
+      h("b", null, m[o].title), h("span", null, m[o].note), o === "o2" ? h("span", {className:"note"}, "Follow-up task due day " + m.f1.due + ".") : null),
+    h("div", {className:"submit"}, "Submit"));
+}
+function XlsCompare({a, b, la, lb}){
+  const rows = rowDiff(xlsRows(a), xlsRows(b));
+  const n = rows.filter(r => r.k === "add").length;
+  const cell = (m) => xlsRows(m).find(r => r[1] === "classification")[4];
+  const fold = (s) => s.replace(/, if\(/g, ",\n if(");
+  const code = (title, sub, lines) => h("div", {className:"panel"}, h("h2", null, title), h("span", {className:"note"}, sub),
+    h("pre", {className:"code"}, lines.map(([k, t], i) => h("span", {key:i, className:k}, (k === "d" ? "- " : k === "a" ? "+ " : "  ") + t))));
+  return h(React.Fragment, null,
+    h("div", {className:"panel"}, h("h2", null, "How the approved logic becomes a form"),
+      h("div", {className:"pipe"}, [["Logic model","JSON, approved by hash",true],["Our compiler","deterministic, no AI",true],["XLSForm","cough_assessment.xlsx",true],["cht-conf","convert-app-forms (pyxform)",false],["XForm","ODK XML",false],["CHT app","renders with Enketo",false]].map(([t, s, ours], i, arr) =>
+        h(React.Fragment, {key:i}, h("span", {className:"st2" + (ours ? " ours" : "")}, h("b", null, t), h("span", null, s)), i < arr.length - 1 ? h("span", {className:"ar"}, "→") : null)))),
+    h("div", {className:"panel"}, h("div", {className:"ph"}, h("h2", null, "survey sheet · " + la + " → " + lb), h("span", {className:"ver"}, n + " row" + (n === 1 ? "" : "s") + " added or changed · generated from the model")),
+      h("div", {className:"tw"}, h("table", {className:"xls"}, h("thead", null, h("tr", null, ["","type","name","label","relevant","calculate / constraint"].map((t, i) => h("th", {key:i}, t)))),
+        h("tbody", null, rows.map((r, i) => h("tr", {key:i, className:r.k}, h("td", {className:"m"}, r.k === "del" ? "−" : r.k === "add" ? "+" : ""), r.r.map((c, j) => h("td", {key:j}, c)))))))),
+    h("div", {className:"three"},
+      code("1 · Logic model (JSON)", "What the clinician approves", lineDiff(rulesJSON(a), rulesJSON(b))),
+      code("2 · XLSForm cell", "classification · rules in order become nested if()", lineDiff(fold(cell(a)), fold(cell(b)))),
+      code("3 · XForm bind (ODK XML)", "Written by pyxform inside cht-conf", lineDiff(fold(toXForm(cell(a))), fold(toXForm(cell(b)))))),
+    h("p", {className:"note", style:{margin:0}}, "Round-trip check: the compiler parses the XLSForm cell back into the logic model and fails the build if they differ."));
+}
+
+/* ================= Verify ================= */
+function VerifyScreen({w, act}){
+  if (!["verify","deploy","done"].includes(w.state)) return h("div", {className:"banner"}, "Verify runs after the clinician approves the content. Current state: " + w.state.replace("_", " ") + ".");
+  const m = w.model, v = w.verify;
+  return h(React.Fragment, null,
+    h("div", {className:"top"}, h("div", null, h("h1", null, "Verify " + w.approved.ver), h("div", {className:"ver"}, "Approved hash " + w.approved.hash + " · build from that hash only")),
+      w.state === "verify" ? h("button", {type:"button", className:"btn primary", onClick:act.runVerify}, "Run synthetic check") : null),
+    !v ? h("div", {className:"banner"}, "The system builds the form with cht-conf, then runs every synthetic patient through (a) the approved rules in code and (b) the filled form in cht-conf-test-harness. Any mismatch returns the change to the program officer.")
+    : h(React.Fragment, null,
+      h("div", {className:"checks"}, [["Patients", GRID.length, ""],["Rules vs form", v.match + " / " + GRID.length + " match", v.match === GRID.length ? "" : "bad"],["Branch coverage", v.cov + " of 4 rules", ""],["Follow-up tasks", v.tasks + " checked on day " + m.f1.due, ""],["Mutation test", v.mut + " patients caught", ""],["cht-conf build", "Passed", ""]].map(([k, x, c], i) =>
+        h("div", {key:i, className:"chk " + c}, h("span", {className:"k"}, k), h("span", {className:"v"}, x)))),
+      h("section", {className:"panel"}, h("div", {className:"ph"}, h("h2", null, "Patients"), h("span", {className:"ver"}, "First 12 shown")),
+        h("div", {className:"tw"}, h("table", null, h("thead", null, h("tr", null, ["Patient","Inputs","Expected (rules)","Actual (form)","Match"].map((t, i) => h("th", {key:i}, t)))),
+          h("tbody", null, GRID.filter((p, i) => i % 23 === 0).slice(0, 12).map(p => { const e = classify(m, p).out;
+            return h("tr", {key:p.id}, h("td", {className:"mono"}, p.id), h("td", null, p.age + " mo, " + p.rr + "/min, " + describeP(p)), h("td", null, h(ClsTag, {o:e, m})), h("td", null, h(ClsTag, {o:e, m})), h("td", {className:"okc"}, "✓")); })))),
+        h("p", {className:"note", style:{margin:0}}, "Mutation test: a copy with the younger threshold raised by one must fail. It did, for " + v.mut + " patients, so the tests have teeth.")),
+      w.state !== "verify" ? h("div", {className:"banner good"}, "Passed. Sent to the IT approver. ", h("a", {href:"#release"}, "Open Release"), ".") : null));
+}
+
+/* ================= Changes (IT deploy approval) ================= */
+function ChangesScreen({w, role, act}){
+  if (!["deploy","done"].includes(w.state)) return h("div", {className:"banner"}, "Changes opens for the IT approver after Verify passes. Current state: " + w.state.replace("_", " ") + ".");
+  const m = w.model;
+  const taskA = "events: [{ dueDate: report + " + V3.f1.due + " days, start: " + V3.f1.due + ", end: " + (V3.f1.end - V3.f1.due) + " }]";
+  const taskB = "events: [{ dueDate: report + " + m.f1.due + " days, start: " + m.f1.due + ", end: " + (m.f1.end - m.f1.due) + " }]";
+  return h(React.Fragment, null,
+    h("div", {className:"top"}, h("div", null, h("h1", null, "Changes for deploy"), h("div", {className:"ver"}, "v3 " + V3_HASH + " → " + w.approved.ver + " " + w.approved.hash)),
+      w.state === "deploy" ? h("button", {type:"button", className:"btn primary", disabled:role !== "it", onClick:act.approveDeploy}, "Approve deploy") : h("span", {className:"st ok"}, "Deployed")),
+    w.state === "deploy" && role !== "it" ? h("div", {className:"note"}, "Only the IT approver can approve the deploy. The clinician approved the content, so they can't also deploy it.") : null,
+    h("div", {className:"checks"}, [["Content approval","Clinician · round " + w.approved.round, ""],["Synthetic check","Passed · " + GRID.length + " patients", ""],["Golden cases", golden(m).filter(g => g.ok).length + " of 12", ""],["Rollback","Redeploy v3 " + V3_HASH, "muted"]].map(([k, x, c], i) =>
+      h("div", {key:i, className:"chk " + c}, h("span", {className:"k"}, k), h("span", {className:"v"}, x)))),
+    h(XlsCompare, {a:V3, b:m, la:"v3", lb:w.approved.ver}),
+    h("div", {className:"panel"}, h("h2", null, "tasks.js"), h("pre", {className:"code"}, taskA === taskB ? h("span", {className:"c"}, "  " + taskB + "   (unchanged)") : [h("span", {key:1, className:"d"}, "- " + taskA), h("span", {key:2, className:"a"}, "+ " + taskB)])));
+}
+
+/* ================= Audit ================= */
+function AuditScreen({w}){
+  return h("section", {className:"panel"},
+    h("div", {className:"ph"}, h("h2", null, "Audit log"), h("span", {className:"ver"}, "Append-only · " + w.audit.length + " events")),
+    w.audit.length ? h("div", {className:"tw"}, h("table", null, h("thead", null, h("tr", null, ["Time","Event","By","Version","Hash","Note"].map((t, i) => h("th", {key:i}, t)))),
+      h("tbody", null, w.audit.slice().reverse().map((a, i) => h("tr", {key:i}, h("td", {style:{whiteSpace:"nowrap"}}, a.t), h("td", null, a.event), h("td", null, a.actor), h("td", {className:"mono"}, a.ver), h("td", {className:"mono"}, a.hash), h("td", null, a.note)))))) : h("p", {className:"note"}, "No events yet."));
+}
+
+/* ================= Release = Verify + Changes; History = versions + audit ================= */
+function ReleaseScreen({w, role, act}){
+  if (!["verify","deploy","done"].includes(w.state)) return h("div", {className:"banner"}, "Release opens after the clinician approves. Then every synthetic patient runs through the new form, and the IT approver deploys it.");
+  return h(React.Fragment, null, h(VerifyScreen, {w, act}), ["deploy","done"].includes(w.state) ? h(ChangesScreen, {w, role, act}) : null);
+}
+function HistoryScreen({w, act}){
+  return h("div", {style:{display:"grid", gap:16, minWidth:0}}, h(AuditScreen, {w}), h(VersionsPanel, {w}),
+    h("div", null, h("button", {type:"button", className:"btn", onClick:act.reset}, "Reset demo")));
+}
+function NextStrip({w, n, role, pick}){
+  const at = STAGES.findIndex(s => s.key === w.state);
+  const shown = STAGES.filter(s => s.key !== "po_revise" || w.state === "po_revise");
+  return h("div", {className:"nx" + (n.mine ? " mine" : ""), role:"region", "aria-label":"What to do next"},
+    h("div", {className:"nx-in"},
+      h("div", {className:"nx-main"},
+        h("div", {className:"nx-steps", "aria-label":"Progress"}, shown.map((s, i) => {
+          const k = STAGES.indexOf(s), cls = k < at ? "done" : k === at ? "now" : "";
+          return h(React.Fragment, {key:s.key}, i ? h("i", {"aria-hidden":"true"}, "/") : null,
+            h("span", {className:cls, "aria-current":k === at ? "step" : null}, (k < at ? "✓ " : "") + (s.key === "clinician" && w.round ? s.label + " · round " + w.round : s.label))); })),
+        h("div", {className:"nx-title"}, n.title),
+        n.todo.length ? h("div", {className:"nx-todo"}, n.todo.slice(0, 6).map(t => h("button", {key:t.id, type:"button", className:"chipb", onClick:() => pick(t.id)}, t.label)), n.todo.length > 6 ? h("span", {className:"note"}, "+" + (n.todo.length - 6) + " more") : null) : null),
+      h("div", {className:"btnrow"},
+        n.secondary ? h("button", {type:"button", className:"btn", onClick:n.secondary.fn}, n.secondary.label) : null,
+        n.primary ? h("button", {type:"button", className:"btn " + (n.primary.bad ? "bad" : n.mine ? "primary" : ""), onClick:n.primary.fn}, n.primary.label) : null)));
+}
+
+/* ================= App shell ================= */
+const SCREENS = [["guidelines","Guidelines"],["review","Review"],["compare","Compare"],["release","Release"],["history","History"]];
+const ALIAS = {verify:"release", changes:"release", audit:"history"};
+const ROLES = [["po","Program officer"],["clinician","Clinician"],["it","IT approver"]];
+const ROLE_NAME = {po:"Program officer", clinician:"Clinician", it:"IT approver"};
+function App(){
+  const getS = () => { let s = (location.hash || "").slice(1); s = ALIAS[s] || s; return SCREENS.some(x => x[0] === s) ? s : "guidelines"; };
+  const [screen, setScreen] = useState(getS);
+  const [role, setRole] = useState("po");
+  const [w, setW] = useState(initialWf);
+  const [sel, setSel] = useState("d3");
+  useEffect(() => { const on = () => { setScreen(getS()); window.scrollTo(0, 0); }; window.addEventListener("hashchange", on); return () => window.removeEventListener("hashchange", on); }, []);
+  const checks = useMemo(() => runChecks(w.model), [JSON.stringify(w.model)]);
+  const go = (s) => { s = ALIAS[s] || s; if ((location.hash || "").slice(1) === s) setScreen(s); else location.hash = s; };
+  const pick = (id) => {
+    if (id.startsWith("F-")){ const f = w.flags.find(x => x.id === id); setSel(f.about); go("review"); setTimeout(() => { const el = document.getElementById("flag-" + id); if (el){ el.scrollIntoView({block:"center"}); const i = el.querySelector("input, button"); if (i) i.focus(); } }, 60); return; }
+    setSel(id); go("review");
+    setTimeout(() => { const el = document.getElementById("np-h"); if (el && window.innerWidth < 960) el.scrollIntoView({block:"start"}); }, 60);
+  };
+  const nextAfter = (x, current) => {
+    const g = gate(x, runChecks(x.model));
+    const list = x.state === "clinician" ? g.reqLeft : x.state === "po_revise" ? g.unresolved : [];
+    const nxt = list.find(id => id !== current);
+    if (nxt) setTimeout(() => setSel(nxt), 350);
+  };
+  const act = {
+    createDraft:(pages) => setW(() => {
+      let x = Object.assign(initialWf(), {state:"po_draft"});
+      x = logged(x, "Program officer", "Created workflow draft", "Pages " + pages.join(", ") + " of IMCI chart booklet");
+      x = logged(x, "System", "Drafted by Bedrock (inputs pass, rules pass, cross-check pass)", "Every quote and number checked against the PDF in code");
+      x = addVersion(x, "AI draft", "System");
+      location.hash = "review"; return x; }),
+    edit:(id, fn, field) => setW(x => {
+      if (role !== "po" || !(x.state === "po_draft" || x.state === "po_revise")) return x;
+      const m = clone(x.model); fn(m);
+      const key = id + ":" + field; let y = Object.assign({}, x, {model:m});
+      if (x.lastKey !== key || field === "reset" || field === "remove" || field === "restore"){
+        y = Object.assign(y, {hist:x.hist.concat([x.model]), rev:x.rev + 1});
+        y = addVersion(y, "PO edited " + id, "Program officer"); y = logged(y, "Program officer", "Edited " + id, field);
+      } else { const v = y.versions.slice(); v[v.length - 1] = Object.assign({}, v[v.length - 1], {meta:fnv(JSON.stringify(m)) + " · Program officer · " + fmtTime(y.clock)}); y.versions = v; }
+      y.lastKey = key;
+      if (x.state === "po_revise" && x.reviews[id] && x.reviews[id].status === "changes") y.fixed = Object.assign({}, x.fixed, {[id]:true});
+      return y; }),
+    undo:() => setW(x => x.hist.length ? logged(Object.assign({}, x, {model:x.hist[x.hist.length - 1], hist:x.hist.slice(0, -1), lastKey:null}), "Program officer", "Undid last edit", "") : x),
+    send:() => setW(x => {
+      let y;
+      if (x.state === "po_draft") y = Object.assign({}, x, {state:"clinician", round:1, rev:0, required:requiredFor(x.model), reviews:{}});
+      else {
+        const changed = NODE_IDS.concat(Object.keys(Object.assign({}, x.model.questions, V3.questions)).map(q => "q:" + q)).filter(id => nodeSig(x.model, id) !== nodeSig(x.sent, id));
+        const prevReq = Object.keys(x.reviews).filter(k => x.reviews[k].status === "changes");
+        const required = Array.from(new Set(changed.concat(prevReq)));
+        const keep = {}; Object.keys(x.reviews).forEach(k => { if (x.reviews[k].status === "approved" && !required.includes(k)) keep[k] = x.reviews[k]; });
+        y = Object.assign({}, x, {state:"clinician", round:x.round + 1, rev:0, required, reviews:keep});
+      }
+      y = Object.assign(y, {sent:clone(x.model), sug:{}, fixed:{}, lastKey:null, hist:[]});
+      y = addVersion(y, "Sent to clinician, round " + y.round, "Program officer");
+      return logged(y, "Program officer", "Sent to clinician (round " + y.round + ")", y.required.length + " boxes to review"); }),
+    decide:(id, d) => setW(x => {
+      const reviews = Object.assign({}, x.reviews);
+      if (d) reviews[id] = Object.assign({round:x.round}, d); else delete reviews[id];
+      if (d) nextAfter(Object.assign({}, x, {reviews}), id);
+      return logged(Object.assign({}, x, {reviews}), "Clinician", d ? (d.status === "approved" ? "Approved " + id : "Requested change on " + id) : "Cleared decision on " + id, d && d.note ? d.note : ""); }),
+    flag:(fid, i, note) => setW(x => {
+      const f = x.flags.find(z => z.id === fid), o = f.opts[i];
+      let y = Object.assign({}, x);
+      if (o.escalate){ y.flags = x.flags.map(z => z.id === fid ? Object.assign({}, z, {clinical:true, escalated:true}) : z); return logged(y, "Program officer", "Escalated flag " + fid + " to clinician", note); }
+      y.flags = x.flags.map(z => z.id === fid ? Object.assign({}, z, {res:{choice:o.label, note, by:ROLE_NAME[role], round:x.round}}) : z);
+      if (o.fb && role === "clinician"){ const about = o.fb.about || f.about; y.reviews = Object.assign({}, x.reviews, {[about]:{status:"changes", type:o.fb.type, note:o.fb.note + " (flag " + fid + ")", value:o.fb.value, round:x.round}}); }
+      return logged(y, ROLE_NAME[role], "Decided flag " + fid + ": " + o.label, note); }),
+    returnToPO:() => setW(x => {
+      const sug = {}; let k = 0, c = 0;
+      Object.keys(x.reviews).forEach(id => { const r = x.reviews[id]; if (r.status === "changes" && r.round === x.round){ sug[id] = suggest(x.model, id, r); if (sug[id].kind === "change") k++; else c++; } });
+      let y = Object.assign({}, x, {state:"po_revise", sug, fixed:{}, rev:0, lastKey:null});
+      y = logged(y, "Clinician", "Returned to PO with feedback (round " + x.round + ")", Object.keys(sug).length + " change requests");
+      return logged(y, "System", "AI revisions drafted from feedback", k + " proposed, " + c + " need clarification"); }),
+    sug:(id, outcome) => setW(x => {
+      const s = x.sug[id]; let y = Object.assign({}, x, {sug:Object.assign({}, x.sug, {[id]:Object.assign({}, s, {outcome})})});
+      if ((outcome === "accepted" || outcome === "edited") && s.kind === "change"){
+        const m = clone(x.model); s.apply(m);
+        y = Object.assign(y, {model:m, hist:x.hist.concat([x.model]), rev:x.rev + 1, lastKey:null});
+        y = addVersion(y, outcome === "accepted" ? "AI revision accepted (" + id + ")" : "AI revision applied, then edited (" + id + ")", "Program officer");
+      }
+      if (outcome === "accepted") nextAfter(y, id);
+      return logged(y, "Program officer", (outcome === "accepted" ? "Accepted" : outcome === "edited" ? "Applied and editing" : "Discarded") + " AI revision on " + id, s.kind === "change" ? s.field + ": " + s.to : s.text); }),
+    approveAll:() => setW(x => {
+      setTimeout(() => go("release"), 0);
+      let y = Object.assign({}, x, {state:"verify", approved:{ver:"v4." + x.round, hash:fnv(JSON.stringify(x.model)), round:x.round}});
+      y = addVersion(y, "Approved by clinician", "Clinician");
+      return logged(y, "Clinician", "Approved all (round " + x.round + ")", "Approval bound to " + y.approved.hash); }),
+    runVerify:() => setW(x => {
+      const m = x.model, mut = clone(m); mut.d3.young += 1;
+      const v = {match:GRID.length, cov:new Set(GRID.map(p => classify(m, p).rule).filter(r => r !== "start")).size, tasks:GRID.filter(p => classify(m, p).out === "o2").length, mut:GRID.filter(p => classify(mut, p).out !== classify(m, p).out).length};
+      let y = Object.assign({}, x, {verify:v, state:"deploy"});
+      y = logged(y, "System", "cht-conf build passed; synthetic check passed", v.match + "/" + GRID.length + " match · mutation caught " + v.mut);
+      return logged(y, "System", "Sent to IT approver", ""); }),
+    setRole:(r, scr) => { setRole(r); go(scr); },
+    reset:() => reset(),
+    approveDeploy:() => setW(x => logged(Object.assign({}, x, {state:"done"}), "IT approver", "Approved deploy", "Upload to CHT test instance; rollback target v3 " + V3_HASH))
+  };
+  const reset = () => { setW(initialWf()); setSel("d3"); location.hash = "guidelines"; };
+  const n = nextStep(w, role, checks, screen, act, go, pick);
+  const actionScreen = n.mine ? STAGES.find(s => s.key === w.state).screen : null;
+  const stateText = {none:"No workflow", po_draft:"Draft · program officer", clinician:"With clinician · round " + w.round, po_revise:"Revising · program officer", verify:"Approved · verify next", deploy:"Waiting for IT", done:"Deployed"}[w.state];
+  return h(React.Fragment, null,
+    h("header", {className:"apphead"},
+      h("div", {className:"hin"},
+        h("span", {className:"brand"}, "Guideline to Form"),
+        h("nav", {className:"nav", "aria-label":"Screens"}, SCREENS.map(([k, l]) => h("a", {key:k, href:"#" + k, className:(screen === k ? "on" : "") + (actionScreen === k ? " act" : ""), "aria-current":screen === k ? "page" : null}, l, actionScreen === k ? h("span", {className:"ndot", "aria-label":"your next step is here"}) : null))),
+        h("label", {className:"nx-who", htmlFor:"role"}, "Viewing as",
+          h("select", {id:"role", value:role, onChange:e => setRole(e.target.value)}, ROLES.map(([k, l]) => h("option", {key:k, value:k}, l)))))),
+    h(NextStrip, {w, n, role, pick}),
+    h("main", {className:"app"},
+      screen === "guidelines" ? h(GuidelinesScreen, {w, role, act}) : null,
+      screen === "review" ? h(ReviewScreen, {w, role, sel, setSel, act, checks}) : null,
+      screen === "compare" ? h(CompareScreen, {w}) : null,
+      screen === "release" ? h(ReleaseScreen, {w, role, act}) : null,
+      screen === "history" ? h(HistoryScreen, {w, act}) : null,
+      h("div", {className:"foot"}, h("span", null, "Mock-up. Example data based on the WHO IMCI 2008 to 2014 revision. Not clinical advice."), h("span", null, "\u201cViewing as\u201d stands in for three separate logins."))));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+})();
+
+</script>
+</body>
+</html>
+
+</body></html>

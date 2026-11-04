@@ -1,0 +1,25 @@
+{
+  "name": "guideline-pipeline",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Guideline intake pipeline: upload to S3, S3 event to queue, worker runs extract, digest and logic model steps. Local mode emulates S3 and SQS on disk.",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.ts",
+    "start": "node src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "sample-pdf": "node scripts/make-sample-pdf.ts"
+  },
+  "dependencies": {
+    "unpdf": "^1.9.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "5.8"
+  }
+}

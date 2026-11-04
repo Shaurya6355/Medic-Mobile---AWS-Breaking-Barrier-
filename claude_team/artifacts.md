@@ -27,4 +27,23 @@ Status: current | outdated | replaced by ART-NNN
 
 ## Artifacts
 
-No artifacts recorded yet.
+### ART-001 | Guideline to Form mockup
+Created: 2026-11-03 by Vishnu Athreya
+Type: mock up
+What it shows or is for: Clickable single-file React mockup of the guideline-to-form review app (all roles and states). Source for the Frontend port.
+Location: committed (Frontend/docs/mockup.html, with Frontend/docs/SPEC.md)
+How to regenerate or open it: Open the HTML file in a browser. It loads React and dagre from cdnjs.
+Related system: Approval steps and review UI
+Related: INT-002, DEC-003
+Status: current
+
+### ART-002 | Synthetic cough guideline sample PDF and logic model sample
+Created: 2026-11-03 by Vishnu Athreya (agent)
+Type: sample data
+What it shows or is for: Two-page synthetic guideline PDF with a text layer, for testing upload, extraction and the quote check (all 8 template quotes appear in it). Plus the sample logic model JSON the review screen renders.
+Location: committed (Backend/samples/cough-guideline-sample.pdf, Frontend/docs/samples/logic-model.sample.json, Backend/src/pipeline/templates/logic-model.template.json)
+How to regenerate or open it: cd Backend && npm run sample-pdf. Not clinical advice.
+Related system: Guideline intake
+Related: INT-003, DEC-006
+Status: current
+

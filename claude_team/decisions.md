@@ -56,3 +56,58 @@ Other options considered (and why not):
 - Link only to the original location: depends on each laptop having the same path.
 Revisit if: the documents are updated by Medic.
 Related: INT-001
+
+### DEC-003 | Trimmed review UI for the first frontend build
+Status: decided
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Approval steps and review UI
+Decision: Build a trimmed version of the mockup. Kept: Guidelines, Review, Release, History screens; dagre flow; flags; checks; AI revision card; next-step strip; role switcher. Dropped for now: Compare screen (phone preview, side-by-side flows, outcome-change table), page thumbnails and page preview, plain-language rules tab, undo and reset-to-draft, the JSON/XLSForm/XForm code diffs and tasks.js diff, Runs screen.
+Assumptions: The core approval flow matters more for the demo than the comparison views. Dropped parts are still in Frontend/docs/mockup.html and can be ported later.
+Why: Human asked to trim the UI significantly and make it work.
+Other options considered (and why not):
+- Full port of the mockup: more surface to wire to a backend in the time available.
+Revisit if: reviewers need the v3 vs new comparison before approving. Note that dagre plus react-router does not match the cht-ui-builder stack (React Flow, Zustand), so DEC-001 may require a change here.
+Related: INT-002, DEC-001
+
+### DEC-004 | Intake pipeline runs in local mode first
+Status: decided
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Guideline intake
+Decision: Build the pipeline against on-disk emulators of S3, SQS and the state table behind interfaces, with local text extraction instead of Textract.
+Assumptions: No AWS credentials on this laptop yet. AWS adapters can replace the emulators without changing the worker or the HTTP API.
+Why: Human chose fully local, no AWS, for now.
+Other options considered (and why not):
+- Build against real AWS now: no credentials or bucket available.
+- Canned demo only: would not exercise a real upload, event and extraction.
+Revisit if: AWS sandbox access is set up.
+Related: INT-003
+
+### DEC-005 | S3 event to queue to worker, no Lambda
+Status: decided
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Guideline intake
+Decision: The bucket notification sends ObjectCreated events under uploads/ to a queue; a worker in the backend container polls it (visibility timeout, 3 receives, then dead-letter).
+Assumptions: SQS is acceptable under the Technical Environment Document's optional services; this has not been checked against the document.
+Why: Human chose the event-driven route. Lambda for application logic is out of scope (claude.md).
+Other options considered (and why not):
+- Backend starts processing after the browser reports the upload: simpler, not event-driven.
+Revisit if: SQS turns out to be out of scope.
+Related: INT-003
+
+### DEC-006 | Logic model step is a placeholder until AgentCore
+Status: decided
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Logic drafting
+Decision: No model call. The step returns the sample cough-pathway template through a LogicModelBuilder interface; output is Zod-validated and quote-checked like any future model output. The UI labels it as a placeholder.
+Assumptions: The team plans AgentCore, choosing models per task, instead of a direct Bedrock call. Whether AgentCore fits the rule that model calls go through Bedrock needs checking.
+Why: Human asked to keep the model step blank for now.
+Other options considered (and why not):
+- Direct Bedrock call: team is moving to AgentCore.
+- Leave the step empty: the review screen would have nothing to render.
+Revisit if: AgentCore integration starts, or the logic model format is generalised beyond the cough pathway.
+Related: INT-003, DEC-001
+
