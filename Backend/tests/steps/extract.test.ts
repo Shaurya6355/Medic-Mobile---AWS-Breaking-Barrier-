@@ -154,4 +154,17 @@ describe("extract step", () => {
     const { ctx } = await setup(model);
     await expect(createExtractStep({ modelId: "m1", promptPath }).run(ctx)).rejects.toBeInstanceOf(ModelOutputError);
   });
+
+  it("fails non-transient on a zero-page document without calling the model", async () => {
+    const model = new FakeModelClient([{ raw: JSON.stringify(emptyOutput()) }]);
+    const { ctx, artifacts } = await setup(model);
+    await artifacts.put(
+      artifactKey("r1", "ingest", "input_blocks.json"),
+      JSON.stringify({ ...tinyDoc, page_count: 0, pages: [] }),
+    );
+    const err = await createExtractStep({ modelId: "m1", promptPath }).run(ctx).catch((e) => e);
+    expect(err.name).toBe("Error");
+    expect(err.message).toMatch(/No pages to extract/);
+    expect(model.calls).toHaveLength(0);
+  });
 });

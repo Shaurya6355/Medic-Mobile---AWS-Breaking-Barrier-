@@ -52,6 +52,8 @@ export function createExtractStep(opts: { modelId: string; promptPath: string; m
         new TextDecoder().decode(await ctx.artifacts.get(artifactKey(runId, "ingest", "input_blocks.json"))),
       ) as InputDoc;
 
+      if (doc.pages.length === 0) throw new Error("No pages to extract");
+
       const content: ModelContent[] = [
         {
           type: "text",

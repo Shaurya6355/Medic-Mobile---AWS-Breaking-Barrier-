@@ -126,4 +126,20 @@ describe("ingest step", () => {
     await expect(step.run(ctx)).rejects.toThrow("boom");
     await expect(stat(path.dirname(seen))).rejects.toThrow();
   });
+
+  it.each([
+    ["empty", [], /No pages selected/],
+    ["fractional", [2.5], /2\.5/],
+    ["zero", [0], /0/],
+    ["negative", [-1, 2], /-1/],
+  ])("rejects invalid page selection (%s) before exec or writes", async (_n, pages, re) => {
+    const calls: { cmd: string; args: string[] }[] = [];
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(3, calls) });
+    const { ctx, artifacts } = await setup(pages as number[]);
+    const err = await step.run(ctx).catch((e) => e);
+    expect(err.name).toBe("Error");
+    expect(err.message).toMatch(re);
+    expect(calls).toHaveLength(0);
+    expect(await artifacts.exists(artifactKey("r1", "ingest", "input_blocks.json"))).toBe(false);
+  });
 });

@@ -33,6 +33,14 @@ export function createIngestStep(opts: { pythonBin: string; scriptPath: string; 
     runState: "ingesting",
     async run(ctx) {
       const runId = ctx.run.runId;
+      const selected = ctx.run.pages;
+      if (selected) {
+        if (selected.length === 0) throw new Error("No pages selected");
+        const invalid = selected.filter((n) => !Number.isInteger(n) || n < 1);
+        if (invalid.length > 0) {
+          throw new Error(`Invalid page numbers selected: ${invalid.join(", ")}`);
+        }
+      }
       const pdfKey = inputPdfKey(runId);
       if (!(await ctx.artifacts.exists(pdfKey))) {
         throw new Error(`Input PDF not found for run ${runId}`);
@@ -48,7 +56,6 @@ export function createIngestStep(opts: { pythonBin: string; scriptPath: string; 
 
         const doc = JSON.parse(await readFile(path.join(outDir, "input_blocks.json"), "utf8")) as InputDoc;
 
-        const selected = ctx.run.pages;
         if (selected) {
           const outOfRange = selected.filter((n) => n < 1 || n > doc.page_count);
           if (outOfRange.length > 0) {
