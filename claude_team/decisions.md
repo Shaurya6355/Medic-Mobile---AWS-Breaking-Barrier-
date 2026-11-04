@@ -182,3 +182,47 @@ Other options considered (and why not):
 - Whole orchestrator on AgentCore Runtime: sessions are invoked and stopped when idle, which does not fit a queue consumer and sweep.
 Revisit if: organisers refuse API Gateway/EventBridge, or a single step must exceed 15 minutes.
 Related: DEC-006, DEC-008, DEC-009, DEC-010
+
+### DEC-012 | Two-model extraction: Claude Haiku 5.5 extracts, Llama 4 Scout 17B Instruct cross-checks
+Status: decided
+Date: 2026-11-03
+Decided by: human (Nirubama12)
+Feature or area: extraction and cross-check stages (Backend/extraction, Backend/cross-check)
+Decision: Extraction runs on Claude Haiku 5.5. In parallel, cross-check runs the same task on Llama 4 Scout 17B Instruct, both through Amazon Bedrock. A deterministic validator in Backend/validation compares the two outputs and produces a list of flags for the clinician UI. Haiku's output is the source for logic-model version 1; Llama's output is used only to raise flags.
+Assumptions: Llama 4 Scout was the second best model in the human's comparison (the comparison results are not recorded in the repository yet). Llama 4 Scout accepts the 12 page images and system prompt through Converse and can return the full schema; neither is verified.
+Why: A second, independent model catches copy errors and omissions that one model repeats silently, and the tech document asks for an independently prompted cross-check.
+Other options considered (and why not):
+- Same model run twice: shares the same blind spots.
+- A second Claude model: the human's comparison ranked Llama second best.
+- A model judging the two outputs: prohibited (no model-as-judge); comparison is deterministic code.
+Revisit if: Llama cannot take the page images or returns invalid JSON often (flags become noise), or the cost per run is too high.
+Related: INT-007, DEC-003, DEC-005
+
+### DEC-013 | Compare the extraction schema outputs until the logic model schema exists
+Status: open
+Date: 2026-11-03
+Decided by: proposed by Claude session, awaiting human confirmation
+Feature or area: validation (Backend/validation)
+Decision: Until a real logic model schema is agreed, both models emit the extraction schema (nodes, edges, variables, danger_signs, thresholds, actions, followups, unclear_items) and the validator compares those. Items are aligned by cited block_id and quote, not by model-chosen ids.
+Assumptions: The extraction schema carries enough structure to compare. INT-006 mentions a sample logic model file (cough-pathway-logic-tree-v0.9.json, schema_version 2.0) that is untracked; it has not been reviewed for this purpose.
+Why: Unblocks the validator and flag schema now. Node ids differ between models, so block_id and quote are the only stable anchors.
+Other options considered (and why not):
+- Wait for the logic model schema: blocks the validator work.
+- Align by node id or text similarity: unstable across models, and fuzzy matching is harder to trust.
+Revisit if: the logic model schema is agreed, then the comparison moves to it.
+Related: INT-007, DEC-012
+
+### DEC-014 | Validator flag rules: alignment, severity and what counts as a difference
+Status: decided (provisional, tune after the first real Llama run)
+Date: 2026-11-03
+Decided by: Claude session, from the human's request for a deterministic comparer (Backend/validation)
+Feature or area: validation, flags for the clinician UI
+Decision: The comparer pairs items across the two outputs by the block they cite (block_id), best field agreement first, never by model-chosen ids. It compares only fields that come from the document or carry clinical meaning (thresholds: op, value, unit, age_band; actions: drug, dose, age band, frequency, duration, trigger; danger signs: text, cough_relevant; follow-ups: text, due text, trigger; node and edge text, kind, parent, goto target, branch). It does not compare ids, variable names or labels. Severity: high for any clinical value, missing threshold, action, danger sign, follow-up or edge, a quote not found in its block, an invalid output list, different input, or an ambiguity both models raised; medium for wording, structure and an ambiguity only one model raised; low for page number, action type and missing variables. The validator recomputes every quote check itself and does not trust the _run block.
+Assumptions: Two models describing the same box cite at least one common block_id. Wording differences in free-text fields are worth a person's glance. Agreement is not correctness, so the output carries a notice saying so.
+Why: Ids differ between models, so block_id is the only stable anchor, and it gives every flag a page and quote for the clinician. Excluding model-chosen names avoids noise that would hide real flags.
+Other options considered (and why not):
+- Align by node id or fuzzy text similarity: unstable, and fuzzy matching is hard to audit.
+- A model judging the differences: prohibited.
+- Compare every field: floods the clinician with naming noise.
+Revisit if: the first Bedrock runs show too many or too few flags, or the logic model schema replaces the extraction schema (DEC-013).
+Related: INT-008, DEC-012, DEC-013
