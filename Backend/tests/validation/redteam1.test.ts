@@ -22,10 +22,7 @@ const baseline = (): any => {
 
 const doc = realDocument();
 const extraction = realExtraction();
-// golden-proposed.json uses the outcome id of v1.json for the outside-age result
-const golden = goldenCases((g) => {
-  for (const c of g) if (c.expected_outcome === "refer_outside_age_range") c.expected_outcome = "outside_age_range";
-});
+const golden = goldenCases();
 const settings = demoSettings();
 
 /** The checks this work changed; the baseline must have no blocking finding from them. */

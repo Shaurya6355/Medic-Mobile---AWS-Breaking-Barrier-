@@ -207,7 +207,7 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
   draft.questions.forEach((q) => claim(q.id, "question"));
   draft.derived.forEach((d) => claim(d.id, "derived item"));
   draft.outcomes.forEach((o) => claim(o.id, "outcome"));
-  const AGE_OUTCOME = "outside_age_range";
+  const AGE_OUTCOME = "refer_outside_age_range";
   if (draftIds.has(AGE_OUTCOME)) problem(`The id "${AGE_OUTCOME}" is reserved for the rule code adds; use another id.`);
 
   const citeSources = (ids: readonly string[] | undefined, where: string): ExSrc[] => {

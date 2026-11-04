@@ -264,10 +264,10 @@ describe("what code adds", () => {
       id: "R1",
       priority: 1,
       when: { any: [{ field: "age_months", op: "less_than", value: 1 }, { field: "age_months", op: "at_least", value: 36 }] },
-      outcome: "outside_age_range",
+      outcome: "refer_outside_age_range",
       origin: "team",
     });
-    const o = m.outcomes.find((x) => x.id === "outside_age_range")!;
+    const o = m.outcomes.find((x) => x.id === "refer_outside_age_range")!;
     expect(o).toMatchObject({ origin: "team", severity: 1 });
     expect(o.actions.every((a) => a.origin === "guideline" && a.dose_by_age === undefined)).toBe(true);
     expect(m.open_questions.find((q) => q.affects.includes("R1"))?.route_to).toBe("clinician");
@@ -275,7 +275,7 @@ describe("what code adds", () => {
   it("keeps draft rule order and renumbers priorities after the age rule", () => {
     const m = ok(draft());
     expect(m.rules.map((r) => [r.id, r.priority, r.outcome])).toEqual([
-      ["R1", 1, "outside_age_range"],
+      ["R1", 1, "refer_outside_age_range"],
       ["R2", 2, "refer"],
       ["R3", 3, "treat"],
       ["R4", 4, "refer"],
