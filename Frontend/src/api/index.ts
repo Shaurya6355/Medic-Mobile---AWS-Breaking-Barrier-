@@ -122,7 +122,7 @@ export const sendToClinician = (id: string) => mutate(id, wf.sendToClinician);
 export const submitReview = (id: string, itemId: ItemId, decision: Decision | null) => mutate(id, w => wf.submitReview(w, itemId, decision));
 export const decideFlag = (id: string, flagId: string, choice: number, note: string) => mutate(id, w => wf.decideFlag(w, flagId, choice, note));
 export const returnToPO = (id: string) => mutate(id, wf.returnToPO);
-export const decideSuggestion = (id: string, itemId: ItemId, outcome: SuggestionOutcome) => mutate(id, w => wf.decideSuggestion(w, itemId, outcome));
+export const decideSuggestion = (id: string, itemId: ItemId, outcome: SuggestionOutcome, patch?: Patch) => mutate(id, w => wf.decideSuggestion(w, itemId, outcome, patch));
 export const approve = (id: string) => mutate(id, wf.approveAll);
 export const runVerify = (id: string) => mutate(id, wf.runVerify);
 export const approveDeploy = (id: string) => mutate(id, wf.approveDeploy);

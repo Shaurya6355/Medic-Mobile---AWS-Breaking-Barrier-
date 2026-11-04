@@ -1,6 +1,6 @@
 /* Workflow types. The logic model itself is the pathway spec (shared/pathway/types.ts), the same JSON the
    backend pipeline produces. Everything here must survive JSON round-trips (stored by the backend later). */
-import type { Answers, ItemId, Patch, Spec } from "../../../shared/pathway/index.ts";
+import type { Answers, ItemId, Patch, Path, Spec } from "../../../shared/pathway/index.ts";
 
 export type { Answers, ItemId, Patch, Spec };
 /** The logic model under review: a pathway spec. */
@@ -19,7 +19,9 @@ export interface Review extends Decision { round: number }
 
 export type SuggestionOutcome = "accepted" | "edited" | "discarded";
 export type Suggestion =
-  | { kind: "clarify"; text: string; outcome?: SuggestionOutcome }
+  | { kind: "clarify"; text: string; outcome?: SuggestionOutcome;
+      /** The field the feedback is about, so the PO can type the change and accept it. */
+      target?: { label: string; path: Path; kind: string; value: string; page?: number } }
   | { kind: "change"; field: string; from: string; to: string; patch: Patch; outcome?: SuggestionOutcome };
 
 export interface FlagOption {

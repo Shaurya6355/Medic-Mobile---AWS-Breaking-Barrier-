@@ -57,7 +57,7 @@ export default function App() {
     decide: (item, d) => { if (w) run(api.submitReview(w.id, item, d), x => { if (d) nextAfter(x, item); }); },
     flag: (fid, choice, note) => { if (w) run(api.decideFlag(w.id, fid, choice, note)); },
     returnToPO: () => { if (w) run(api.returnToPO(w.id)); },
-    sug: (item, outcome) => { if (w) run(api.decideSuggestion(w.id, item, outcome), x => { if (outcome === "accepted") nextAfter(x, item); }); },
+    sug: (item, outcome, patch) => { if (w) run(api.decideSuggestion(w.id, item, outcome, patch), x => { if (outcome === "accepted") nextAfter(x, item); }); },
     approveAll: () => { if (w) run(api.approve(w.id), () => nav("/release")); },
     runVerify: () => { if (w) run(api.runVerify(w.id)); },
     approveDeploy: () => { if (w) run(api.approveDeploy(w.id)); },

@@ -8,7 +8,7 @@ export interface Actions {
   decide: (item: ItemId, d: Decision | null) => void;
   flag: (flagId: string, choice: number, note: string) => void;
   returnToPO: () => void;
-  sug: (item: ItemId, outcome: SuggestionOutcome) => void;
+  sug: (item: ItemId, outcome: SuggestionOutcome, patch?: Patch) => void;
   approveAll: () => void;
   runVerify: () => void;
   approveDeploy: () => void;

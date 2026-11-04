@@ -104,3 +104,10 @@ What others must do or know: Flags never reach the clinician unless the PO sends
 Open items: none new.
 Related: DEC-008, INT-006
 
+
+### INT-008 | 2026-11-04 | Vishnu Athreya (agent) | Review split layout, one-click decisions, PO can always accept
+What changed: Review screen is a split: rule table or flow on the left, a sticky inspector on the right with tabs Open items, Step, Questions, Checks. Clicking an open item, a table row or a flow box opens the Step tab and centres the flow on that box. The question tray and legend no longer sit under the table. Flow boxes that are open for the current role are yellow; Changed is a badge only. Flag options that need no note decide in one click; the clinician approving a step also agrees with that step's open flags. In po_revise the PO can always accept: when the AI suggestion has no exact value, the PO types it into the prefilled field and accepts it (decideSuggestion takes an optional override patch).
+Files or resources touched: Frontend/src/screens/ReviewScreen.tsx, Frontend/src/components/{Flow,FeedbackCard,panels}.tsx, Frontend/src/domain/{types,workflow}.ts, Frontend/src/{App.tsx,actions.ts,api/index.ts,styles.css}.
+What others must do or know: api.decideSuggestion(id, item, outcome, patch?) has a new optional argument.
+Open items: none new.
+Related: INT-007

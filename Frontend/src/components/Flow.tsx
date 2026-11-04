@@ -9,7 +9,8 @@ import type { Model } from "../domain/types";
 
 export type Badge = [cls: string, label: string];
 export type Markers = Record<string, Badge[]>;
-export type Tone = Record<string, "changed" | "bad">;
+/** changed: differs from live (IT view). open: an open item for this role (yellow). bad: a blocking check (red edge). */
+export type Tone = Record<string, "changed" | "open" | "bad">;
 
 type Kind = GKind;
 interface FlowNode { id: string; type: Kind; color?: string; text: string; sub?: string }
@@ -52,12 +53,12 @@ function estHeight(n: FlowNode, width: number = WIDTH[n.type]): number {
   return 16 + 16 + main * 18 + sub * 16 + (sub ? 4 : 0) + (n.type === "outcome" ? 6 : 0) + 8;
 }
 type Dir = "TB" | "LR";
-type BoxData = { n: FlowNode; badges: Badge[]; tone?: "changed" | "bad"; sel: boolean; dim: boolean; dir: Dir };
+type BoxData = { n: FlowNode; badges: Badge[]; tone?: Tone[string]; sel: boolean; dim: boolean; dir: Dir };
 
 /** One box in the flow. Read-only: no handles to drag from, clicks only select. */
 function Box({ data }: NodeProps<Node<BoxData>>) {
   const { n, badges, tone, sel, dim, dir } = data;
-  const cls = ["node", n.type, n.color ? "o-" + n.color : "", tone === "changed" ? "d-changed" : "", tone === "bad" ? "d-changed bad" : "", sel ? "sel" : "", dim ? "dim" : ""].join(" ");
+  const cls = ["node", n.type, n.color ? "o-" + n.color : "", tone === "changed" || tone === "open" ? "d-changed" : "", tone === "bad" ? "d-changed bad" : "", sel ? "sel" : "", dim ? "dim" : ""].join(" ");
   return (
     <div className={cls} style={{ width: WIDTH[n.type] }} aria-label={KICK[n.type] + ": " + n.text}>
       <Handle type="target" position={dir === "TB" ? Position.Top : Position.Left} isConnectable={false} />
@@ -91,11 +92,17 @@ interface Props {
 }
 
 /** Zooms to the boxes for the step being worked on; with nothing selected, to the top of the flow. */
-function Focus({ ids, fallback }: { ids: string[]; fallback: string[] }) {
+function Focus({ ids, fallback, center }: { ids: string[]; fallback: string[]; center?: string }) {
   const rf = useReactFlow();
-  const key = ids.join("|") || "-";
+  const key = (center ?? "") + ":" + (ids.join("|") || "-");
   useEffect(() => {
-    const t = setTimeout(() => rf.fitView({ nodes: (ids.length ? ids : fallback).map(id => ({ id })), duration: 450, padding: ids.length ? 0.25 : 0.06, maxZoom: 1.1 }), 30);
+    const n = center ? rf.getNode(center) : undefined;
+    if (n) {
+      // A box in the flow: centre on it at a readable zoom.
+      const t = setTimeout(() => rf.setCenter(n.position.x + (n.measured?.width ?? 230) / 2, n.position.y + (n.measured?.height ?? 80) / 2, { zoom: 1.05, duration: 450 }), 30);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => rf.fitView({ nodes: (ids.length ? ids : fallback).map(id => ({ id })), duration: 450, padding: ids.length ? 0.35 : 0.06, maxZoom: 1.15 }), 30);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
@@ -122,6 +129,9 @@ export function Flow({ m, selected, onSelect, markers = {}, tone = {}, label, ne
     labelBgPadding: [4, 2] as [number, number], labelBgBorderRadius: 4,
   }));
 
+  // Zoom close: a box in the flow plus what it leads to (its outcome, its task); otherwise the rules that read it.
+  const inGraph = !!selected && fns.some(n => n.id === selected);
+  const zoomTo = inGraph ? [selected!, ...fes.filter(([a, , l]) => a === selected && l !== "no").map(([, b]) => b)] : related;
   // Open readable: fit the start box, the first three rules and what they lead to. The fit button shows everything.
   const firstRules = fns.filter(n => n.type === "decision").slice(0, 3).map(n => n.id);
   const focus = fns.filter(n => n.type === "start" || firstRules.includes(n.id) || fes.some(([a, b, l]) => firstRules.includes(a) && b === n.id && l === "yes")).map(n => ({ id: n.id }));
@@ -142,7 +152,7 @@ export function Flow({ m, selected, onSelect, markers = {}, tone = {}, label, ne
             <button type="button" className="btn primary" disabled={!next.left} onClick={next.onNext}>{next.left ? "Next item ▶ (" + next.left + " left)" : "Nothing left to do"}</button>
           </Panel>
         ) : null}
-        <Focus ids={related} fallback={focus.map(f => f.id)} />
+        <Focus ids={zoomTo} fallback={focus.map(f => f.id)} center={inGraph ? selected : related[0]} />
         <Controls showInteractive={false} />
         <Background gap={16} />
       </ReactFlow>

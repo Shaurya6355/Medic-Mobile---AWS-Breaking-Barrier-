@@ -80,11 +80,51 @@ function sourcePath(m: Model, id: ItemId): Path | null {
   return null;
 }
 
+/** The field a change request is about, for the PO to type the change into when the AI could not. */
+function targetFor(m: Model, id: ItemId, fb: Review): Extract<Suggestion, { kind: "clarify" }>["target"] {
+  const [k, key] = splitItem(id);
+  if (k === "q" && !getQ(m, key)) return undefined;
+  const sl = slots(m, id), note = fb.note || "";
+  const of = (s?: Slot) => (s ? { label: s.label, path: s.path, kind: s.kind, value: show(s.value) } : undefined);
+  switch (fb.type) {
+    case "wording": return of(bestSlot(sl.filter(s => s.kind === "text" || s.kind === "area"), note));
+    case "value": return of(bestSlot(sl.filter(s => s.kind === "number" || s.kind === "numberOrNull"), note));
+    case "logic": return of(sl.find(s => s.kind === "cond" && s.key !== "show"));
+    case "show": {
+      const q = k === "q" ? key : usesOf(m, id)[0];
+      return q ? { label: "Shown when (" + q + ")", path: ["questions", q, "shown_when"], kind: "cond", value: show(getQ(m, q)?.shown_when) } : undefined;
+    }
+    case "source": {
+      const p = sourcePath(m, id);
+      if (!p) return undefined;
+      const [quote, where] = srcOf(m, id);
+      return { label: "Cited quote", path: p, kind: "source", value: quote, page: Number((where.match(/page (\d+)/) || [])[1]) || 1 };
+    }
+    default: return of(sl[0]);
+  }
+}
+/** A value written into the note: quoted text, or what follows "to" / "should be" / "should read". */
+function fromNote(note: string): string {
+  const q = note.match(/[“"‘']([^”"’']{2,})[”"’']/);
+  if (q) return q[1].trim();
+  const t = note.match(/\b(?:to|should be|should read|instead)\s*:?\s*(.+)$/i);
+  return t ? t[1].trim().replace(/[.]$/, "") : "";
+}
+
 export function suggest(m: Model, id: ItemId, fb: Review): Suggestion {
-  const note = (fb.note || "").trim(), val = (fb.value || "").trim(), lower = (note + " " + val).toLowerCase();
+  const s = draftSuggestion(m, id, fb);
+  return s.kind === "clarify" ? { ...s, target: targetFor(m, id, fb) } : s;
+}
+function draftSuggestion(m: Model, id: ItemId, fb: Review): Suggestion {
+  const note = (fb.note || "").replace(/\s*\(flag [^)]*\)\s*$/, "").trim();
+  const typed = (fb.value || "").trim();
+  const guess = fromNote(note);
+  // Wording and citations only take a quoted value from the note; conditions take whatever parses.
+  const val = typed || (fb.type === "wording" || fb.type === "source" ? (/[“"‘']/.test(note) ? guess : "") : fb.type === "logic" || fb.type === "show" ? [guess, note].find(c => { try { parse(c); return true; } catch { return false; } }) ?? "" : "");
+  const lower = (note + " " + val).toLowerCase();
   const clar = (text: string): Suggestion => ({ kind: "clarify", text });
   const mk = (field: string, from: unknown, to: unknown, patch: Patch): Suggestion => ({ kind: "change", field, from: show(from), to: show(to), patch });
-  if (!val && note.length < 25) return clar("Needs clarification: the note does not say what to change. Ask the clinician for the exact wording or value, or edit it yourself.");
+  if (!val && note.length < 25 && !/\d/.test(note)) return clar("The note does not say exactly what to change. Type the change below and accept it, or edit the step yourself.");
   const [k, key] = splitItem(id);
   if (k === "q" && !getQ(m, key)) return clar("This question is not in v4. Restore it first, then apply the change.");
   const sl = slots(m, id);
@@ -94,7 +134,7 @@ export function suggest(m: Model, id: ItemId, fb: Review): Suggestion {
   const isSug = (x: unknown): x is Suggestion => !!x && typeof x === "object" && "kind" in x;
   switch (fb.type) {
     case "wording": {
-      if (!val) return clar("Needs clarification: no new wording was given.");
+      if (!val) return clar("No exact value in the feedback: no new wording was given.");
       const texts = sl.filter(s => s.kind === "text" || s.kind === "area");
       const s = k === "out" ? (/name|title|classif/.test(note.toLowerCase()) ? texts[0] : texts.find(t => t.kind === "area") ?? texts[0]) : bestSlot(texts, note);
       if (!s) return clar("Wording does not apply to this box. Say what should change.");
@@ -105,20 +145,20 @@ export function suggest(m: Model, id: ItemId, fb: Review): Suggestion {
       const num = nums ? Number(nums[nums.length - 1]) : NaN;
       const cands = sl.filter(s => s.kind === "number" || s.kind === "numberOrNull");
       if (!cands.length) return clar("This box has no numeric value. Say which value should change, or request a wording or rule logic change.");
-      if (isNaN(num)) return clar("Needs clarification: no number was given.");
+      if (isNaN(num)) return clar("No exact value in the feedback: no number was given.");
       const s = bestSlot(cands, note)!;
       return mk(s.label, s.value, num, { op: "set", path: s.path, value: num });
     }
     case "logic": {
       const s = sl.find(x => x.kind === "cond" && x.key !== "show");
       if (!s) return clar("This box has no rule logic. Pick the rule or derived value to change.");
-      if (!val) return clar("Needs clarification: give the new condition, for example: danger_sign is yes and fast_breathing is yes");
+      if (!val) return clar("No exact value in the feedback: give the new condition, for example: danger_sign is yes and fast_breathing is yes");
       const c = condFrom(val);
       if (isSug(c)) return c;
       return mk(s.label, s.value, c, { op: "set", path: s.path, value: c });
     }
     case "show": {
-      if (!val) return clar("Needs clarification: give the new show condition, for example: cough is yes");
+      if (!val) return clar("No exact value in the feedback: give the new show condition, for example: cough is yes");
       const qs = usesOf(m, id);
       const target = k === "q" ? key : qs.find(q => lower.includes(q.replace(/_/g, " ")) || lower.includes(q)) || qs[0];
       if (!target) return clar("Show conditions belong to questions. Pick the question.");
@@ -127,7 +167,7 @@ export function suggest(m: Model, id: ItemId, fb: Review): Suggestion {
       return mk("Shown when (" + target + ")", getQ(m, target)?.shown_when, c, { op: "set", path: ["questions", target, "shown_when"], value: c });
     }
     case "source": {
-      if (!val) return clar("Needs clarification: say which passage to cite instead.");
+      if (!val) return clar("No exact value in the feedback: say which passage to cite instead.");
       const p = sourcePath(m, id);
       if (!p) return clar("This box has no citation.");
       const [old, where] = srcOf(m, id);
@@ -228,7 +268,11 @@ export function submitReview(w: Workflow, item: ItemId, d: Decision | null): Wor
   const reviews = { ...w.reviews };
   if (d) reviews[item] = { ...d, round: w.round }; else delete reviews[item];
   const event = d ? (d.status === "approved" ? "Approved " + item : "Requested change on " + item) : "Cleared decision on " + item;
-  return logged({ ...w, reviews }, "Clinician", event, d?.note || "");
+  // Approving a step agrees with its open flags too: one click, no note.
+  const flags = d?.status === "approved"
+    ? w.flags.map(f => f.clinical && !f.res && f.about === item ? { ...f, res: { choice: CLIN_OPTS[0].label, note: "", by: "Clinician", round: w.round } } : f)
+    : w.flags;
+  return logged({ ...w, reviews, flags }, "Clinician", event, d?.note || "");
 }
 
 export function decideFlag(w: Workflow, flagId: string, choice: number, note: string): Workflow {
@@ -264,17 +308,20 @@ export function returnToPO(w: Workflow): Workflow {
   return logged(y, "System", "AI revisions drafted from feedback", k + " proposed, " + c + " need clarification");
 }
 
-export function decideSuggestion(w: Workflow, item: ItemId, outcome: SuggestionOutcome): Workflow {
+/** `patch` overrides the suggested change: the PO typed the value themselves (always possible, even when the AI asked for clarification). */
+export function decideSuggestion(w: Workflow, item: ItemId, outcome: SuggestionOutcome, patch?: Patch): Workflow {
   expect(w, "po_revise");
   const s = w.sug[item];
   if (!s) throw new Error("No suggestion for " + item);
+  const p = patch ?? (s.kind === "change" ? s.patch : null);
+  if (outcome !== "discarded" && !p) throw new Error("Nothing to apply: type the change first");
   let y: Workflow = { ...w, sug: { ...w.sug, [item]: { ...s, outcome } } };
-  if ((outcome === "accepted" || outcome === "edited") && s.kind === "change") {
-    y = { ...y, model: applyPatch(w.model, s.patch), rev: w.rev + 1, lastKey: null };
+  if (outcome !== "discarded" && p) {
+    y = { ...y, model: applyPatch(w.model, p), rev: w.rev + 1, lastKey: null };
     y = addVersion(y, outcome === "accepted" ? "AI revision accepted (" + item + ")" : "AI revision applied, then edited (" + item + ")", "Program officer");
   }
   const verb = outcome === "accepted" ? "Accepted" : outcome === "edited" ? "Applied and editing" : "Discarded";
-  return logged(y, "Program officer", verb + " AI revision on " + item, s.kind === "change" ? s.field + ": " + s.to : s.text);
+  return logged(y, "Program officer", verb + (patch ? " own revision on " : " AI revision on ") + item, patch ? "typed by the program officer" : s.kind === "change" ? s.field + ": " + s.to : s.text);
 }
 
 export function approveAll(w: Workflow): Workflow {

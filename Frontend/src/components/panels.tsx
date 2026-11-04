@@ -9,10 +9,11 @@ type OnFlag = (id: string, choice: number, note: string) => void;
 
 /** One flag as a card: what was raised, where it comes from, and the decision. */
 export function FlagCard({ f, w, role, onFlag, onSelect, pos }: { f: Flag; w: Workflow; role: Role; onFlag: OnFlag; onSelect?: (id: string) => void; pos?: string }) {
-  const [i, setI] = useState(0);
+  // Options that need no note decide in one click; the others open a note box first.
+  const [i, setI] = useState<number | null>(null);
   const [note, setNote] = useState("");
   const canDecide = !f.res && (f.clinical ? role === "clinician" && w.state === "clinician" : role === "po" && (w.state === "po_draft" || w.state === "po_revise"));
-  const needs = !!f.opts[i]?.needsNote;
+  const o = i === null ? null : f.opts[i];
   return (
     <div id={"flag-" + f.id} className={"issue fcard " + (f.res ? "done" : f.clinical ? "blocking" : "warning")}>
       <div className="ih">
@@ -28,14 +29,21 @@ export function FlagCard({ f, w, role, onFlag, onSelect, pos }: { f: Flag; w: Wo
         <div className="dec">{f.res.choice}{f.res.note ? " · “" + f.res.note + "”" : ""}{" · " + f.res.by + (f.res.round ? ", round " + f.res.round : ", before round 1")}</div>
       ) : canDecide ? (
         <div className="dform">
-          <div className="chips">
-            {f.opts.map((o, k) => <button key={k} type="button" className={"chipb" + (i === k ? " on" : "")} aria-pressed={i === k} onClick={() => setI(k)}>{o.label}</button>)}
+          <div className="btnrow">
+            {f.opts.map((x, k) => (
+              <button key={k} type="button" className={"btn tiny " + (x.needsNote ? (i === k ? "on" : "") : "ok")} aria-pressed={x.needsNote ? i === k : undefined}
+                onClick={() => (x.needsNote ? setI(i === k ? null : k) : onFlag(f.id, k, ""))}>{x.label}</button>
+            ))}
           </div>
-          <label className="sr" htmlFor={f.id + "-n"}>Note</label>
-          <input id={f.id + "-n"} type="text" placeholder={needs ? "Note (required)" : "Note (optional)"} value={note} onChange={e => setNote(e.target.value)} />
-          <button type="button" className="btn tiny primary" disabled={needs && !note.trim()} onClick={() => { onFlag(f.id, i, note.trim()); setNote(""); setI(0); }}>
-            {f.opts[i]?.escalate ? "Send to clinician" : f.opts[i]?.fb ? "Request change" : "Record decision"}
-          </button>
+          {o ? (
+            <>
+              <label className="sr" htmlFor={f.id + "-n"}>Note</label>
+              <input id={f.id + "-n"} type="text" autoFocus placeholder={o.escalate ? "What should the clinician answer? (required)" : "What should change? (required)"} value={note} onChange={e => setNote(e.target.value)} />
+              <button type="button" className="btn tiny primary" disabled={!note.trim()} onClick={() => { onFlag(f.id, i!, note.trim()); setNote(""); setI(null); }}>
+                {o.escalate ? "Send to clinician" : "Request change"}
+              </button>
+            </>
+          ) : null}
         </div>
       ) : (
         <div className="note">{f.clinical ? "Waiting for the clinician." : "Waiting for the program officer."}</div>
@@ -52,15 +60,17 @@ export function FlagsPanel({ w, role, onFlag, onSelect, sel }: { w: Workflow; ro
   if (sel !== lastSel) { setLastSel(sel); const j = list.findIndex(f => f.about === sel && !f.res); if (j >= 0) setK(j); }
   if (!list.length) return null;
   const at = Math.min(k, list.length - 1), f = list[at], open = list.filter(x => !x.res).length;
+  // Moving through the deck selects the flag's step, so the flow zooms to it.
+  const go = (j: number) => { setK(j); setLastSel(list[j].about); onSelect(list[j].about); };
   return (
     <section className="panel">
       <div className="ph">
         <h2>Flags</h2>
         <span className="deck">
           <span className="ver">{open} open</span>
-          <button type="button" className="btn tiny" aria-label="Previous flag" disabled={at === 0} onClick={() => setK(at - 1)}>{"◀"}</button>
+          <button type="button" className="btn tiny" aria-label="Previous flag" disabled={at === 0} onClick={() => go(at - 1)}>{"◀"}</button>
           <span className="note">{(at + 1) + " of " + list.length}</span>
-          <button type="button" className="btn tiny" aria-label="Next flag" disabled={at === list.length - 1} onClick={() => setK(at + 1)}>{"▶"}</button>
+          <button type="button" className="btn tiny" aria-label="Next flag" disabled={at === list.length - 1} onClick={() => go(at + 1)}>{"▶"}</button>
         </span>
       </div>
       <FlagCard key={f.id + (f.res ? ":done" : "") + (f.clinical ? ":c" : "")} f={f} w={w} role={role} onSelect={onSelect}
@@ -68,7 +78,7 @@ export function FlagsPanel({ w, role, onFlag, onSelect, sel }: { w: Workflow; ro
           onFlag(id, c, n);
           const order = [...list.keys()].map(j => (at + 1 + j) % list.length);
           const nx = order.find(j => j !== at && !list[j].res);
-          if (nx !== undefined) setK(nx);
+          if (nx !== undefined) go(nx);
         }} />
     </section>
   );
