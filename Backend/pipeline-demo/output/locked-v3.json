@@ -4,9 +4,32 @@
     "n": 3,
     "parent": 2,
     "author": "demo-clinician-tomas",
-    "createdAt": 1793782840000,
+    "authorRole": "clinician",
+    "createdAt": 1793782842000,
     "artifactKey": "runs/pipeline-demo/versions/v3-<uuid>.json",
-    "bodySha256": "70fbcc9f45bff164bd76b11602dd0b018bcbea18ad642ae86e9ba9525a7b77f2"
+    "bodySha256": "f1dab5e23818a9e1e05707d6323cb150875dfd1b444e2d6783a9f62b08f62ddd",
+    "signatures": [
+      {
+        "runId": "pipeline-demo",
+        "n": 3,
+        "modelSha": "9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96",
+        "role": "program_officer",
+        "userId": "demo-officer-amara",
+        "signedAt": 1793782849000,
+        "settingsSha": "60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939"
+      },
+      {
+        "runId": "pipeline-demo",
+        "n": 3,
+        "modelSha": "9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96",
+        "role": "clinician",
+        "userId": "demo-clinician-tomas",
+        "signedAt": 1793782854000,
+        "settingsSha": "60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939"
+      }
+    ],
+    "status": "locked",
+    "lockedAt": 1793782854000
   },
   "model": {
     "schema_version": "1.0",
@@ -378,7 +401,7 @@
     ],
     "outcomes": [
       {
-        "id": "outside_age_range",
+        "id": "refer_outside_age_range",
         "severity": 1,
         "title": "Refer to health facility: the child's age is outside the range this form covers",
         "actions": [
@@ -775,7 +798,7 @@
             }
           ]
         },
-        "outcome": "outside_age_range",
+        "outcome": "refer_outside_age_range",
         "origin": "team"
       },
       {
@@ -989,7 +1012,7 @@
         "question": "The guideline covers children from 2 months up to 60 months. Rule R1 (added by the team) refers every other child to a health facility as the most urgent result. Is that the right handling?",
         "affects": [
           "R1",
-          "outside_age_range"
+          "refer_outside_age_range"
         ],
         "route_to": "clinician",
         "status": "resolved",

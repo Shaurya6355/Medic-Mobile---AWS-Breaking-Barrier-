@@ -5,68 +5,88 @@
     {
       "n": 1,
       "status": "superseded",
-      "modelSha": "161b103ca75943f8a8b782af2deb31832ea2e61c126821f2d5ff5e11d79f528e",
+      "modelSha": "2000cf768b4ec126420ab0f854dba3c8683c7180fb90d0516ac03622439d8dbc",
       "signatures": [],
       "gates": {
         "canOfficerSign": false,
         "canClinicianSign": false,
         "canCompile": false,
-        "summary": "The program officer cannot sign yet. Still to settle: 5 unanswered open questions. The clinician cannot sign yet: this waits for the program officer's signature, and these are for the clinician: 4 test cases that cannot be run; 9 unanswered open questions. The form cannot be built yet: 18 items still block."
+        "summary": "The program officer cannot sign yet. Still to settle: 5 unanswered open questions. The clinician cannot sign yet: this waits for the program officer's signature, and these are for the clinician: 9 unanswered open questions. The form cannot be built yet: 14 items still block."
       }
     },
     {
       "n": 2,
       "status": "superseded",
-      "modelSha": "6ca3d597b6444d5ce5261b1e126d0109db4da306c5b53889524941d09fbe8f76",
-      "signatures": [],
+      "modelSha": "e8f0021598645d51fb6aada02b392b92cf40739b13c17216371337900c799260",
+      "signatures": [
+        {
+          "runId": "pipeline-demo",
+          "n": 2,
+          "modelSha": "e8f0021598645d51fb6aada02b392b92cf40739b13c17216371337900c799260",
+          "role": "program_officer",
+          "userId": "demo-officer-amara",
+          "signedAt": 1793782839000,
+          "settingsSha": "60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939"
+        }
+      ],
       "gates": {
-        "canOfficerSign": false,
+        "canOfficerSign": true,
         "canClinicianSign": false,
         "canCompile": false,
-        "summary": "The program officer cannot sign yet. Still to settle: 5 open questions answered by the wrong person. The clinician cannot sign yet: this waits for the program officer's signature, and these are for the clinician: 4 test cases that cannot be run; 9 unanswered open questions. The form cannot be built yet: 18 items still block."
+        "summary": "The program officer can sign now. The clinician cannot sign yet. Still to settle: 9 unanswered open questions. The form cannot be built yet: 9 items still block."
       }
     },
     {
       "n": 3,
-      "status": "superseded",
-      "modelSha": "b6450add01d9fa3c7aa215282f6bb81fe393e7620f72122bdd327188442a8bad",
-      "signatures": [],
+      "status": "locked",
+      "modelSha": "9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96",
+      "signatures": [
+        {
+          "runId": "pipeline-demo",
+          "n": 3,
+          "modelSha": "9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96",
+          "role": "program_officer",
+          "userId": "demo-officer-amara",
+          "signedAt": 1793782849000,
+          "settingsSha": "60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939"
+        },
+        {
+          "runId": "pipeline-demo",
+          "n": 3,
+          "modelSha": "9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96",
+          "role": "clinician",
+          "userId": "demo-clinician-tomas",
+          "signedAt": 1793782854000,
+          "settingsSha": "60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939"
+        }
+      ],
       "gates": {
-        "canOfficerSign": false,
-        "canClinicianSign": false,
-        "canCompile": false,
-        "summary": "The program officer cannot sign yet. Still to settle: 5 open questions answered by the wrong person. The clinician cannot sign yet: this waits for the program officer's signature, and these are for the clinician: 4 test cases that cannot be run; 9 open questions answered by the wrong person. The form cannot be built yet: 18 items still block."
+        "canOfficerSign": true,
+        "canClinicianSign": true,
+        "canCompile": true,
+        "summary": "The program officer can sign now. The clinician can sign once the program officer has signed. The form can be built once both have signed."
       }
     },
     {
       "n": 4,
       "status": "awaiting_officer",
-      "modelSha": "fcca33cba0c80e0d0f70c1dfd3fe3759b62646570185e97517e4103cf47a607f",
+      "modelSha": "97d4f32b4ceadb7c92d230c9818e618e9fdbe5a3fb217b46e9b3805c5237f9fe",
       "signatures": [],
       "gates": {
-        "canOfficerSign": false,
-        "canClinicianSign": false,
-        "canCompile": false,
-        "summary": "The program officer cannot sign yet. Still to settle: 5 open questions answered by the wrong person. The clinician cannot sign yet: this waits for the program officer's signature, and these are for the clinician: 4 test cases that cannot be run; 9 open questions answered by the wrong person. The form cannot be built yet: 18 items still block."
+        "canOfficerSign": true,
+        "canClinicianSign": true,
+        "canCompile": true,
+        "summary": "The program officer can sign now. The clinician can sign once the program officer has signed. The form can be built once both have signed."
       }
     }
   ],
   "compile": {
-    "v3": "refused",
+    "v3": "pass",
     "refused": [
       1,
       2,
       4
     ]
   },
-  "problems": [
-    "step 4: officer can sign, clinician still blocked",
-    "step 4: officer signature recorded; waiting for the clinician",
-    "step 4: clinician refused with 422: 0 open question(s) routed to the clinician",
-    "step 5: officer signature recorded",
-    "step 5: refused: one person cannot sign both roles",
-    "step 5: version LOCKED and run locked (AR-05)",
-    "step 6: compile of v3: refused",
-    "step 7: locked version untouched; the edit waits for new signatures"
-  ]
+  "problems": []
 }
