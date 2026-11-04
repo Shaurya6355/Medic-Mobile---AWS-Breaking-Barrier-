@@ -37,6 +37,15 @@ describe("parseModelJson", () => {
       expect(err.message).toContain("a:");
     }
   });
+  it("attaches usage to ModelOutputError when given", () => {
+    const usage = { inputTokens: 7, outputTokens: 3, modelId: "m1" };
+    const e1 = (() => { try { parseModelJson("nope", schema, usage); } catch (e) { return e; } })() as ModelOutputError;
+    expect(e1.usage).toEqual(usage);
+    const e2 = (() => { try { parseModelJson('{"a":"no"}', schema, usage); } catch (e) { return e; } })() as ModelOutputError;
+    expect(e2.usage).toEqual(usage);
+    const e3 = (() => { try { parseModelJson("nope", schema); } catch (e) { return e; } })() as ModelOutputError;
+    expect(e3.usage).toBeUndefined();
+  });
 });
 
 describe("FakeModelClient", () => {
@@ -69,6 +78,14 @@ describe("FakeModelClient", () => {
   it("throws ModelOutputError on bad canned output", async () => {
     const f = new FakeModelClient([{ raw: "nope" }]);
     await expect(f.generateJson(req())).rejects.toBeInstanceOf(ModelOutputError);
+  });
+  it("attaches the call's usage to ModelOutputError", async () => {
+    const usage = { inputTokens: 5, outputTokens: 6, modelId: "m2" };
+    const f = new FakeModelClient([{ raw: "nope", usage }, { raw: "nope" }]);
+    const e1 = (await f.generateJson(req()).catch((e) => e)) as ModelOutputError;
+    expect(e1.usage).toEqual(usage);
+    const e2 = (await f.generateJson(req()).catch((e) => e)) as ModelOutputError;
+    expect(e2.usage).toEqual({ inputTokens: 0, outputTokens: 0, modelId: "us.m" });
   });
   it("throws when queue is empty", async () => {
     const f = new FakeModelClient([]);

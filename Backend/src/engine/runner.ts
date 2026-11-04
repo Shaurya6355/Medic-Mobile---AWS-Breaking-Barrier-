@@ -1,6 +1,6 @@
 import { cost, type PriceTable } from "../metrics/cost.js";
 import type { StepRecord } from "../domain/types.js";
-import { TransientError, type Step, type StepContext } from "./step.js";
+import { TransientError, usageOf, type Step, type StepContext, type StepUsage } from "./step.js";
 
 export interface RunStepOptions {
   maxAttempts: number;
@@ -16,6 +16,15 @@ const MAX_ERROR_CHARS = 500;
 
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
+}
+
+function usagePatch(prices: PriceTable, u: StepUsage): Partial<StepRecord> {
+  return {
+    inputTokens: u.inputTokens,
+    outputTokens: u.outputTokens,
+    modelId: u.modelId,
+    costUsd: cost(prices, u.modelId, u.inputTokens, u.outputTokens),
+  };
 }
 
 export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions): Promise<StepRecord> {
@@ -55,13 +64,7 @@ export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions
         latencyMs: endedAt - startedAt,
         artifactRefs: result.artifactRefs,
       };
-      if (result.usage) {
-        const { inputTokens, outputTokens, modelId } = result.usage;
-        patch.inputTokens = inputTokens;
-        patch.outputTokens = outputTokens;
-        patch.modelId = modelId;
-        patch.costUsd = cost(opts.prices, modelId, inputTokens, outputTokens);
-      }
+      if (result.usage) Object.assign(patch, usagePatch(opts.prices, result.usage));
     } catch (e) {
       const endedAt = ctx.now();
       transient = e instanceof TransientError;
@@ -71,6 +74,8 @@ export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions
         latencyMs: endedAt - startedAt,
         error: errorText(e),
       };
+      const usage = usageOf(e);
+      if (usage) Object.assign(patch, usagePatch(opts.prices, usage));
     }
 
     await store.updateStep(run.runId, step.name, attempt, patch);

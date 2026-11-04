@@ -13,9 +13,15 @@ export interface StepContext {
   now(): number;
 }
 
+export interface StepUsage {
+  inputTokens: number;
+  outputTokens: number;
+  modelId: string;
+}
+
 export interface StepResult {
   artifactRefs: Record<string, string>;
-  usage?: { inputTokens: number; outputTokens: number; modelId: string };
+  usage?: StepUsage;
 }
 
 export interface Step {
@@ -29,4 +35,28 @@ export class TransientError extends Error {
     super(message);
     this.name = "TransientError";
   }
+}
+
+// A non-transient failure that happened after a model call had already been paid
+// for. The runner records the usage on the failed attempt (DEC-003).
+export class UsageError extends Error {
+  constructor(
+    message: string,
+    public readonly usage?: StepUsage,
+  ) {
+    super(message);
+    this.name = "UsageError";
+  }
+}
+
+const isCount = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0;
+
+// The usage carried by a thrown value, if it has a well-formed `usage` property.
+export function usageOf(e: unknown): StepUsage | undefined {
+  if (typeof e !== "object" || e === null) return undefined;
+  const u = (e as { usage?: unknown }).usage;
+  if (typeof u !== "object" || u === null) return undefined;
+  const { inputTokens, outputTokens, modelId } = u as Record<string, unknown>;
+  if (!isCount(inputTokens) || !isCount(outputTokens) || typeof modelId !== "string" || modelId === "") return undefined;
+  return { inputTokens, outputTokens, modelId };
 }

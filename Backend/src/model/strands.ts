@@ -50,16 +50,14 @@ export function createStrandsModelClient(opts: { region: string }): ModelClient 
         const agent = new Agent({ model, systemPrompt: req.system, printer: false, retryStrategy: null });
         const result = await agent.invoke(toStrandsContent(req.content));
         const raw = result.toString();
-        const usage = result.metrics?.accumulatedUsage;
-        return {
-          value: parseModelJson(raw, req.schema),
-          raw,
-          usage: {
-            inputTokens: usage?.inputTokens ?? 0,
-            outputTokens: usage?.outputTokens ?? 0,
-            modelId: req.modelId,
-          },
+        const acc = result.metrics?.accumulatedUsage;
+        const usage = {
+          inputTokens: acc?.inputTokens ?? 0,
+          outputTokens: acc?.outputTokens ?? 0,
+          modelId: req.modelId,
         };
+        // A parse failure carries usage so the paid call is still recorded.
+        return { value: parseModelJson(raw, req.schema, usage), raw, usage };
       } catch (e) {
         if (isTransientBedrockError(e)) {
           throw new TransientError(e instanceof Error ? e.message : String(e));

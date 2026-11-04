@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { artifactKey, pageImageName } from "../artifacts/artifactStore.js";
-import type { Step } from "../engine/step.js";
+import { UsageError, type Step } from "../engine/step.js";
 import { ModelOutputError, type ModelContent } from "../model/modelClient.js";
 import { ExtractionOutput } from "./extractionSchema.js";
 
@@ -94,7 +94,10 @@ export function createExtractStep(opts: { modelId: string; promptPath: string; m
           .slice(0, MAX_LISTED)
           .map((b) => `${b.block_id}: ${b.quote.length > MAX_QUOTE ? b.quote.slice(0, MAX_QUOTE) : b.quote}`)
           .join("; ");
-        throw new Error(`Extraction has ${bad.length} quote(s) not found in their cited block: ${listed}`);
+        throw new UsageError(
+          `Extraction has ${bad.length} quote(s) not found in their cited block: ${listed}`,
+          result.usage,
+        );
       }
 
       const outKey = artifactKey(runId, "extract", "extraction_output.json");

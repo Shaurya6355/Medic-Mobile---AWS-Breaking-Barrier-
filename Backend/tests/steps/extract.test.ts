@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { MemoryArtifactStore, artifactKey } from "../../src/artifacts/artifactStore.js";
+import { runStep } from "../../src/engine/runner.js";
 import type { StepContext } from "../../src/engine/step.js";
+import { TransientError } from "../../src/engine/step.js";
 import { FakeModelClient, ModelOutputError } from "../../src/model/modelClient.js";
 import { createExtractStep, findBadQuotes } from "../../src/steps/extract.js";
 import { ExtractionOutput } from "../../src/steps/extractionSchema.js";
@@ -140,7 +142,8 @@ describe("extract step", () => {
     const model = new FakeModelClient([{ raw, usage }]);
     const { ctx, artifacts } = await setup(model);
     const err = await createExtractStep({ modelId: "m1", promptPath }).run(ctx).catch((e) => e);
-    expect(err.name).toBe("Error");
+    expect(err).not.toBeInstanceOf(TransientError);
+    expect(err.usage).toEqual(usage);
     expect(err.message).toContain("12");
     expect(err.message.match(/p3\.b1: /g)).toHaveLength(10);
     expect(err.message).toContain("x".repeat(80));
@@ -153,6 +156,19 @@ describe("extract step", () => {
     const model = new FakeModelClient([{ raw: "not json" }]);
     const { ctx } = await setup(model);
     await expect(createExtractStep({ modelId: "m1", promptPath }).run(ctx)).rejects.toBeInstanceOf(ModelOutputError);
+  });
+
+  it("records the usage of a call whose output is invalid JSON on the failed step record", async () => {
+    const model = new FakeModelClient([{ raw: "not json", usage }]);
+    const { ctx } = await setup(model);
+    const prices = { m1: { inPerMTok: 1_000_000, outPerMTok: 2_000_000 } };
+    const rec = await runStep(createExtractStep({ modelId: "m1", promptPath }), ctx, {
+      maxAttempts: 3,
+      backoffMs: () => 0,
+      sleep: async () => {},
+      prices,
+    });
+    expect(rec).toMatchObject({ status: "failed", attempt: 1, inputTokens: 10, outputTokens: 5, modelId: "m1", costUsd: 20 });
   });
 
   it("fails non-transient on a zero-page document without calling the model", async () => {

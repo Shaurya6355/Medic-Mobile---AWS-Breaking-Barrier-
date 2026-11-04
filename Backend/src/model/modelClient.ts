@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { UsageError, type StepUsage } from "../engine/step.js";
 
 export type ModelContent =
   | { type: "text"; text: string }
@@ -20,23 +21,25 @@ export interface ModelClient {
   }>;
 }
 
-export class ModelOutputError extends Error {
+// usage: tokens of the call that produced the bad output, so the cost is recorded.
+export class ModelOutputError extends UsageError {
   constructor(
     message: string,
     public readonly raw: string,
     public readonly issues?: string[],
+    usage?: StepUsage,
   ) {
-    super(message);
+    super(message, usage);
     this.name = "ModelOutputError";
   }
 }
 
-export function parseModelJson<T>(raw: string, schema: z.ZodType<T>): T {
+export function parseModelJson<T>(raw: string, schema: z.ZodType<T>, usage?: StepUsage): T {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new ModelOutputError(`Model output is not valid JSON: ${raw}`, raw);
+    throw new ModelOutputError(`Model output is not valid JSON: ${raw}`, raw, undefined, usage);
   }
   const result = schema.safeParse(parsed);
   if (!result.success) {
@@ -45,6 +48,7 @@ export function parseModelJson<T>(raw: string, schema: z.ZodType<T>): T {
       `Model output failed schema validation: ${issues.join("; ")}`,
       raw,
       issues,
+      usage,
     );
   }
   return result.data;
@@ -68,11 +72,8 @@ export class FakeModelClient implements ModelClient {
     const next = this.queue.shift();
     if (next === undefined) throw new Error("FakeModelClient: response queue is empty");
     if (next instanceof Error) throw next;
-    const value = parseModelJson(next.raw, req.schema);
-    return {
-      value,
-      usage: next.usage ?? { inputTokens: 0, outputTokens: 0, modelId: req.modelId },
-      raw: next.raw,
-    };
+    const usage = next.usage ?? { inputTokens: 0, outputTokens: 0, modelId: req.modelId };
+    const value = parseModelJson(next.raw, req.schema, usage);
+    return { value, usage, raw: next.raw };
   }
 }

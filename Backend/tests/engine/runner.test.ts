@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MemoryArtifactStore } from "../../src/artifacts/artifactStore.js";
 import { runStep } from "../../src/engine/runner.js";
-import { TransientError, type Step, type StepContext } from "../../src/engine/step.js";
+import { TransientError, UsageError, type Step, type StepContext } from "../../src/engine/step.js";
 import { MemoryStore } from "../../src/store/memoryStore.js";
 import type { ModelClient } from "../../src/model/modelClient.js";
 
@@ -133,6 +133,36 @@ describe("runStep", () => {
     const failed = (await store.listAudit("r1")).filter((e) => e.type === "step_failed");
     const detail = failed[1]!.detail as { error: string };
     expect(detail.error.length).toBeLessThanOrEqual(500);
+  });
+
+  it("records tokens, model and cost of a failed attempt whose error carries usage", async () => {
+    const { ctx, opts } = await setup();
+    const usage = { inputTokens: 1_000_000, outputTokens: 500_000, modelId: "m1" };
+    const rec = await runStep(stepFrom([async () => { throw new UsageError("bad output", usage); }]), ctx, opts);
+    expect(rec).toMatchObject({
+      status: "failed",
+      error: "bad output",
+      inputTokens: 1_000_000,
+      outputTokens: 500_000,
+      modelId: "m1",
+      costUsd: 10.5,
+    });
+    // Duck-typed: any thrown error with a well-formed usage property counts.
+    const other = Object.assign(new Error("x"), { usage: { inputTokens: 2, outputTokens: 1, modelId: "zz" } });
+    const rec2 = await runStep(stepFrom([async () => { throw other; }], "o"), ctx, opts);
+    expect(rec2).toMatchObject({ inputTokens: 2, outputTokens: 1, modelId: "zz" });
+    expect(rec2.costUsd).toBeUndefined();
+  });
+
+  it("ignores a malformed usage property on a thrown error", async () => {
+    const { ctx, opts } = await setup();
+    for (const usage of [null, "x", { inputTokens: -1, outputTokens: 1, modelId: "m1" }, { inputTokens: 1, outputTokens: 1 }]) {
+      const e = Object.assign(new Error("x"), { usage });
+      const rec = await runStep(stepFrom([async () => { throw e; }], `m${String(usage)}`), ctx, opts);
+      expect(rec).toMatchObject({ status: "failed", inputTokens: 0, outputTokens: 0 });
+      expect(rec.modelId).toBeUndefined();
+      expect(rec.costUsd).toBeUndefined();
+    }
   });
 
   it("ends failed after exhausting transient attempts", async () => {
