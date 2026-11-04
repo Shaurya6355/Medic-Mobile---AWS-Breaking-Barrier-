@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { OFFICER_AGENT_ID } from "../../src/signoff/identity.js";
 import type { Store } from "../../src/store/store.js";
 import { AlreadyExists, Conflict } from "../../src/store/store.js";
 import type { Rejection, Run, Signature, StepRecord, Version } from "../../src/domain/types.js";
@@ -245,13 +246,13 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
 
     it("records the officer then the clinician and locks the version (AR-03, AR-05)", async () => {
       const s = await twoVersions();
-      const afterOfficer = await s.addSignature(sig(2, "program_officer", "o1"));
-      expect(afterOfficer.signatures).toEqual([sig(2, "program_officer", "o1")]);
+      const afterOfficer = await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
+      expect(afterOfficer.signatures).toEqual([sig(2, "program_officer", OFFICER_AGENT_ID)]);
       expect(afterOfficer.status ?? "draft").toBe("draft");
       const afterClinician = await s.addSignature(sig(2, "clinician", "c1"));
       expect(afterClinician.status).toBe("locked");
       expect(afterClinician.lockedAt).toBe(200);
-      expect(afterClinician.signatures).toEqual([sig(2, "program_officer", "o1"), sig(2, "clinician", "c1")]);
+      expect(afterClinician.signatures).toEqual([sig(2, "program_officer", OFFICER_AGENT_ID), sig(2, "clinician", "c1")]);
       expect(await s.getVersion("r1", 2)).toEqual(afterClinician);
       // The body pointer is never rewritten (AR-01).
       expect(afterClinician.artifactKey).toBe("k/2");
@@ -265,44 +266,52 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
 
     it("refuses a second officer signature", async () => {
       const s = await twoVersions();
-      await s.addSignature(sig(2, "program_officer", "o1"));
-      await expect(s.addSignature(sig(2, "program_officer", "o2"))).rejects.toBeInstanceOf(Conflict);
+      await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
+      await expect(s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID))).rejects.toBeInstanceOf(Conflict);
+    });
+
+    it("refuses a program officer signature that is not the officer agent's (forged id)", async () => {
+      for (const who of ["o1", "alice", "officer-agent@system.evil"]) {
+        const s = await twoVersions();
+        await expect(s.addSignature(sig(2, "program_officer", who)), who).rejects.toBeInstanceOf(Conflict);
+        expect((await s.getVersion("r1", 2))!.signatures ?? []).toEqual([]);
+      }
     });
 
     it("refuses the same person signing both roles (separation of duties)", async () => {
       const s = await twoVersions();
-      await s.addSignature(sig(2, "program_officer", "same"));
-      await expect(s.addSignature(sig(2, "clinician", "same"))).rejects.toBeInstanceOf(Conflict);
+      await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
+      await expect(s.addSignature(sig(2, "clinician", OFFICER_AGENT_ID))).rejects.toBeInstanceOf(Conflict);
       expect((await s.getVersion("r1", 2))!.status ?? "draft").toBe("draft");
     });
 
     it("refuses a clinician signature on other content than the officer signed (AR-07)", async () => {
       const s = await twoVersions();
-      await s.addSignature(sig(2, "program_officer", "o1"));
+      await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
       await expect(s.addSignature(sig(2, "clinician", "c1", { modelSha: "d".repeat(64) }))).rejects.toBeInstanceOf(Conflict);
     });
 
     it("refuses any signature on a locked version", async () => {
       const s = await twoVersions();
-      await s.addSignature(sig(2, "program_officer", "o1"));
+      await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
       await s.addSignature(sig(2, "clinician", "c1"));
       await expect(s.addSignature(sig(2, "clinician", "c2"))).rejects.toBeInstanceOf(Conflict);
-      await expect(s.addSignature(sig(2, "program_officer", "o2"))).rejects.toBeInstanceOf(Conflict);
+      await expect(s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID))).rejects.toBeInstanceOf(Conflict);
     });
 
     it("refuses a signature on a version that is not the latest (an edit starts over, AR-04)", async () => {
       const s = await twoVersions();
-      await expect(s.addSignature(sig(1, "program_officer", "o1"))).rejects.toBeInstanceOf(Conflict);
+      await expect(s.addSignature(sig(1, "program_officer", OFFICER_AGENT_ID))).rejects.toBeInstanceOf(Conflict);
     });
 
     it("refuses a signature on a version that does not exist", async () => {
       const s = await twoVersions();
-      await expect(s.addSignature(sig(7, "program_officer", "o1"))).rejects.toBeInstanceOf(Conflict);
+      await expect(s.addSignature(sig(7, "program_officer", OFFICER_AGENT_ID))).rejects.toBeInstanceOf(Conflict);
     });
 
     it("a locked version stays locked after a newer version is added (AR-09)", async () => {
       const s = await twoVersions();
-      await s.addSignature(sig(2, "program_officer", "o1"));
+      await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
       await s.addSignature(sig(2, "clinician", "c1"));
       await s.addVersion(ver("r1", 3, 2));
       expect((await s.getVersion("r1", 2))!.status).toBe("locked");
@@ -311,22 +320,22 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
 
     // ---------- DEC-020: normalised identity, settings binding, rejection (AR-06) ----------
     it("separation of duties compares normalised userIds (case, spaces, zero-width, fullwidth)", async () => {
-      for (const variant of ["Alice", " alice ", "alice\u200b", "\uff41\uff4c\uff49\uff43\uff45", "ALICE\ufeff"]) {
+      for (const variant of ["Officer-Agent@System", " officer-agent@system ", "officer-agent@system\u200b", "OFFICER-AGENT@SYSTEM\ufeff"]) {
         const s = await twoVersions();
-        await s.addSignature(sig(2, "program_officer", "alice"));
+        await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
         await expect(s.addSignature(sig(2, "clinician", variant)), JSON.stringify(variant)).rejects.toBeInstanceOf(Conflict);
       }
     });
 
     it("stores the normalised userId", async () => {
       const s = await twoVersions();
-      const v = await s.addSignature(sig(2, "program_officer", " Officer.One "));
-      expect(v.signatures![0]!.userId).toBe("officer.one");
+      const v = await s.addSignature(sig(2, "program_officer", " Officer-Agent@System "));
+      expect(v.signatures![0]!.userId).toBe(OFFICER_AGENT_ID);
     });
 
     it("refuses a clinician signature given with other compile settings than the officer's", async () => {
       const s = await twoVersions();
-      await s.addSignature(sig(2, "program_officer", "o1", { settingsSha: "1".repeat(64) }));
+      await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID, { settingsSha: "1".repeat(64) }));
       await expect(s.addSignature(sig(2, "clinician", "c1", { settingsSha: "2".repeat(64) }))).rejects.toBeInstanceOf(Conflict);
       const v = await s.addSignature(sig(2, "clinician", "c1", { settingsSha: "1".repeat(64) }));
       expect(v.status).toBe("locked");
@@ -345,17 +354,17 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
 
     it("rejectVersion marks the latest officer-signed version rejected and keeps its signatures (AR-06, AR-10)", async () => {
       const s = await twoVersions();
-      await s.addSignature(sig(2, "program_officer", "o1"));
+      await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
       const v = await s.rejectVersion("r1", 2, rejection());
       expect(v.status).toBe("rejected");
       expect(v.rejection).toEqual(rejection());
-      expect(v.signatures).toEqual([sig(2, "program_officer", "o1")]);
+      expect(v.signatures).toEqual([sig(2, "program_officer", OFFICER_AGENT_ID)]);
       expect(await s.getVersion("r1", 2)).toEqual(v);
     });
 
     it("a rejected version can never be signed or rejected again", async () => {
       const s = await twoVersions();
-      await s.addSignature(sig(2, "program_officer", "o1"));
+      await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
       await s.rejectVersion("r1", 2, rejection());
       await expect(s.addSignature(sig(2, "clinician", "c1"))).rejects.toBeInstanceOf(Conflict);
       await expect(s.rejectVersion("r1", 2, rejection())).rejects.toBeInstanceOf(Conflict);
@@ -364,9 +373,9 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
     it("rejectVersion refuses: no officer signature, other content, the officer themselves, locked, not latest", async () => {
       const s = await twoVersions();
       await expect(s.rejectVersion("r1", 2, rejection())).rejects.toBeInstanceOf(Conflict);
-      await s.addSignature(sig(2, "program_officer", "o1"));
+      await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
       await expect(s.rejectVersion("r1", 2, rejection({ modelSha: "d".repeat(64) }))).rejects.toBeInstanceOf(Conflict);
-      await expect(s.rejectVersion("r1", 2, rejection({ userId: " O1" }))).rejects.toBeInstanceOf(Conflict);
+      await expect(s.rejectVersion("r1", 2, rejection({ userId: " Officer-Agent@System" }))).rejects.toBeInstanceOf(Conflict);
       await expect(s.rejectVersion("r1", 1, rejection())).rejects.toBeInstanceOf(Conflict);
       await s.addSignature(sig(2, "clinician", "c1"));
       await expect(s.rejectVersion("r1", 2, rejection())).rejects.toBeInstanceOf(Conflict);
@@ -374,10 +383,25 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
 
     it("concurrent clinician signatures: exactly one succeeds", async () => {
       const s = await twoVersions();
-      await s.addSignature(sig(2, "program_officer", "o1"));
+      await s.addSignature(sig(2, "program_officer", OFFICER_AGENT_ID));
       const results = await Promise.allSettled([s.addSignature(sig(2, "clinician", "c1")), s.addSignature(sig(2, "clinician", "c2"))]);
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
       expect((await s.getVersion("r1", 2))!.signatures).toHaveLength(2);
+    });
+
+    it("agent state: create once, compare-and-set on status, one record per base version", async () => {
+      const s = await makeStore();
+      await s.createRun(run("r1"));
+      const rec = { runId: "r1", baseVersion: 2, status: "started" as const, attempts: 0, costUsd: 0, updatedAt: 1, leaseOwner: "w1" };
+      expect(await s.getAgentState("r1", 2)).toBeUndefined();
+      await s.putAgentState(rec, null);
+      await expect(s.putAgentState(rec, null)).rejects.toBeInstanceOf(Conflict);
+      expect(await s.getAgentState("r1", 2)).toEqual(rec);
+      await expect(s.putAgentState({ ...rec, status: "fixing" }, "fixing")).rejects.toBeInstanceOf(Conflict);
+      await s.putAgentState({ ...rec, status: "fixing", attempts: 1 }, "started");
+      expect((await s.getAgentState("r1", 2))!.status).toBe("fixing");
+      expect(await s.getAgentState("r1", 3)).toBeUndefined();
+      expect(await s.listComments("r1", 2)).toEqual([]);
     });
   });
 }

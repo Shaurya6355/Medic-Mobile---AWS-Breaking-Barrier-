@@ -98,6 +98,28 @@ export interface Version {
   lockedAt?: number;
   // Written only by Store.rejectVersion (AR-06).
   rejection?: Rejection;
+  // Who made this version (pipeline, officer agent, tree edit, API save) and the change record (Phase 2c).
+  origin?: VersionOrigin;
+  changeNote?: string;
+  // Artifact key of runs/<id>/changes/v<n>.json and its sha256 (tamper evidence, like bodySha256).
+  changeKey?: string;
+  changeSha256?: string;
+}
+
+export type VersionOrigin = "pipeline" | "officer_agent" | "tree_edit" | "restore" | "api";
+
+export type AgentStatus = "started" | "fixing" | "signed" | "escalated" | "over_budget" | "failed";
+
+// One per (runId, baseVersion): where the officer agent got to. Updated by compare-and-set on status.
+export interface AgentState {
+  runId: string;
+  baseVersion: number;
+  status: AgentStatus;
+  attempts: number;
+  costUsd: number;
+  lastError?: string;
+  updatedAt: number;
+  leaseOwner: string;
 }
 
 export interface Comment {

@@ -1,5 +1,5 @@
 import type { RunState } from "../contract/schemas.js";
-import type { Comment, Rejection, Run, Signature, StepRecord, Version } from "../domain/types.js";
+import type { AgentState, Comment, Rejection, Run, Signature, StepRecord, Version } from "../domain/types.js";
 
 export class AlreadyExists extends Error {
   constructor(message: string) {
@@ -54,4 +54,10 @@ export interface Store {
   // Clears the lease only if owner holds it; otherwise (or for an unknown run) a no-op.
   releaseLease(runId: string, owner: string): Promise<void>;
   listResumable(now: number): Promise<Run[]>;
+  // Runs currently in `state` (oldest first). Used to re-trigger the officer agent for runs in awaiting_officer.
+  listByState(state: RunState): Promise<Run[]>;
+  getAgentState(runId: string, baseVersion: number): Promise<AgentState | undefined>;
+  // Compare-and-set on status: expectedStatus null = create (Conflict if one exists); otherwise Conflict
+  // unless the stored status equals expectedStatus.
+  putAgentState(record: AgentState, expectedStatus: AgentState["status"] | null): Promise<void>;
 }

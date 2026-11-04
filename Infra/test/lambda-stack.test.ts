@@ -131,6 +131,9 @@ describe("http api", () => {
         "POST /runs/{id}/versions/{n}/reject", "POST /runs/{id}/resume", "GET /runs/{id}/metrics",
         "POST /runs/{id}/versions/{n}/revisions", "GET /runs/{id}/versions/{n}/revisions",
         "GET /runs/{id}/revisions/{rid}", "POST /runs/{id}/revisions/{rid}/confirm",
+        "GET /runs/{id}/activity", "POST /runs/{id}/chat", "GET /runs/{id}/versions/{n}/flow",
+        "POST /runs/{id}/versions/{n}/edits/preview", "POST /runs/{id}/versions/{n}/edits",
+        "GET /runs/{id}/versions/{a}/diff/{b}", "GET /runs/{id}/versions/{n}/change", "POST /runs/{id}/versions/{n}/restore",
       ].sort(),
     );
   });

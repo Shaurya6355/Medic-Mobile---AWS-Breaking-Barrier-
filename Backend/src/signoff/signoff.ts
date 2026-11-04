@@ -24,12 +24,12 @@ import {
   type StoreIo,
 } from "./checks.js";
 import type { FlagsDocument } from "../validation/flags.js";
-import { InvalidUserId, normaliseUserId, sameUser } from "./identity.js";
+import { InvalidUserId, OFFICER_AGENT_ID, normaliseUserId, sameUser } from "./identity.js";
 import { approvalStatus, validSignatures, verifyLock, type ApprovalStatus } from "./rules.js";
 
 /**
  * Sign-off of logic model versions (BRD AR-01 to AR-10, section 4; DEC-019). Humans approve, code enforces:
- * - the program officer signs first, the clinician second, two different people;
+ * - the officer agent signs first (DEC-038), the clinician second; the agent is never a person's userId;
  * - a signature names the modelSha the signer reviewed and binds to exactly that content;
  * - a signature is refused while the findings gate for that role has blocking findings;
  * - both signatures on the same sha lock the version; any later edit is a new version with none;
@@ -308,9 +308,17 @@ export class Signoff {
     // AUTH SEAM (DEC-015): req.role and req.userId are trusted as given. With Cognito, the role comes from
     // the token's group and this check rejects a user signing at the other role's endpoint.
     if (req.role !== role) throw new SignoffError(403, "role_mismatch", `This endpoint is for the ${role} signature; the request says ${req.role}`);
+    // The program officer slot belongs to the officer agent (DEC-038); no HTTP caller can fill it.
+    if (role === "program_officer") throw new SignoffError(403, "agent_only", "The program officer signature is given by the officer agent, not by a person");
+    return this.signInternal(runId, n, role, Signoff.userIdOf(req.userId), req.modelSha);
+  }
 
-    const userId = Signoff.userIdOf(req.userId);
+  /** The officer agent's signature (in-process only): same checks, gates, state and audit as any signature. */
+  async signAsAgent(runId: string, n: number, modelSha: string): Promise<SignResult> {
+    return this.signInternal(runId, n, "program_officer", OFFICER_AGENT_ID, modelSha);
+  }
 
+  private async signInternal(runId: string, n: number, role: SignerRole, userId: string, modelSha: string): Promise<SignResult> {
     const run = await this.heal(await this.mustRun(runId));
     const { record, loaded } = await this.fresh(runId, n);
     const v = loaded.version;
@@ -326,7 +334,7 @@ export class Signoff {
       throw new SignoffError(422, "invalid_logic_model", "The version is not a valid logic model and cannot be signed", { issues: loaded.issues });
     }
     Signoff.checkBytes(loaded);
-    if (req.modelSha !== loaded.sha) {
+    if (modelSha !== loaded.sha) {
       throw new SignoffError(409, "sha_mismatch", "The version's content is not what you reviewed; reload it and review again", { modelSha: loaded.sha });
     }
     const valid = validSignatures(v.signatures, loaded.sha, v);
@@ -534,9 +542,9 @@ function nextStep(status: ApprovalStatus, rec: FindingsRecord): string {
     case "invalid":
       return "The signatures no longer match the content of this version. It cannot be built.";
     case "rejected":
-      return "Rejected by the clinician with a comment. The program officer makes the fix as a new version; this one is kept but can never be signed or built.";
+      return "Rejected by the clinician with a comment. The officer agent makes the fix as a new version; this one is kept but can never be signed or built.";
     case "awaiting_officer":
-      return rec.gates.canOfficerSign ? "Waiting for the program officer's signature." : `Waiting for fixes before the program officer can sign. ${rec.gates.summary}`;
+      return rec.gates.canOfficerSign ? "Waiting for the officer agent's signature." : `Waiting for fixes before the officer agent can sign. ${rec.gates.summary}`;
     case "awaiting_clinician":
       return rec.gates.canClinicianSign ? "Waiting for the clinician's signature." : `Waiting for the clinician to settle their items. ${rec.gates.summary}`;
   }

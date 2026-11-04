@@ -288,13 +288,13 @@ describe("what code adds", () => {
     const q = m.open_questions.find((x) => x.question.startsWith("The entry limits"))!;
     expect(q.affects.sort()).toEqual(["age_months", "days", "rate"]);
   });
-  it("items without a guideline quote are origin team and listed for the officer", () => {
+  it("items without a guideline quote are origin team and listed for the clinician", () => {
     const m = ok(draft());
     expect(m.outcomes.find((o) => o.id === "home")).toMatchObject({ origin: "team" });
     expect(m.outcomes.find((o) => o.id === "home")!.actions[0]!.origin).toBe("team");
     expect(m.rules.find((r) => r.outcome === "treat")).toMatchObject({ origin: "team" });
     const q = m.open_questions.find((x) => x.question.includes("no supporting quote"))!;
-    expect(q.route_to).toBe("program_officer");
+    expect(q.route_to).toBe("clinician");
     expect(q.affects).toEqual(expect.arrayContaining(["home", "R3"]));
   });
   it("every unclear item becomes an open question, once", () => {

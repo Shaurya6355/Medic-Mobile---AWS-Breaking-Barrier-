@@ -25,7 +25,7 @@ describe("compile job (scripts/compileLocked.ts)", () => {
   it("builds a locked version and skips cht-conf with a clear reason when asked to (or when it is not installed)", async () => {
     const { store, artifacts, signoff } = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await signoff.sign("r1", 1, "program_officer", { role: "program_officer", userId: "o1", modelSha: sha });
+    await signoff.signAsAgent("r1", 1, sha);
     await signoff.sign("r1", 1, "clinician", { role: "clinician", userId: "c1", modelSha: sha });
     const out = join(root, "built");
     const res = await runCompileJob({ store, artifacts, runId: "r1", n: 1, settings: demoSettings(), inputs: async () => testInputs(), outDir: out, log: () => {}, runCht: false });
@@ -39,7 +39,7 @@ describe("compile job (scripts/compileLocked.ts)", () => {
   it("records the job as a compile process of that version (DEC-003)", async () => {
     const { store, artifacts, signoff } = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await signoff.sign("r1", 1, "program_officer", { role: "program_officer", userId: "o1", modelSha: sha });
+    await signoff.signAsAgent("r1", 1, sha); // the officer slot is filled by the officer agent
     await signoff.sign("r1", 1, "clinician", { role: "clinician", userId: "c1", modelSha: sha });
     await runCompileJob({ store, artifacts, runId: "r1", n: 1, settings: demoSettings(), inputs: async () => testInputs(), outDir: join(root, "recorded"), log: () => {}, runCht: false });
     const compile = (await store.listSteps("r1")).filter((r) => r.step === "compile");

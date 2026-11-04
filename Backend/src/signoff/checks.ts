@@ -260,6 +260,39 @@ export async function computeFindings(
 ): Promise<{ record: FindingsRecord; key: string; loaded: LoadedVersion; inputs: CheckInputs }> {
   const loaded = await loadVersion(io, runId, n);
   const inputs = override ?? (await inputsFor(io, runId));
+  const record = await analyse(io, runId, n, loaded, inputs);
+  const inputsSha = inputsShaOf(inputs);
+  const key = findingsKey(runId, loaded.sha, inputsSha);
+  await io.artifacts.put(key, JSON.stringify(record), "application/json");
+  await io.artifacts.put(flagsKey(runId, loaded.sha, inputsSha), JSON.stringify(flagsDocumentOf(record, inputs)), "application/json");
+  return { record, key, loaded, inputs };
+}
+
+/**
+ * The findings an edited model would get as the next version after `baseN`, computed now and NOT stored
+ * (no artifact, no version). Same checks and history rules as computeFindings; for previews only.
+ */
+export async function previewFindings(
+  io: StoreIo,
+  runId: string,
+  baseN: number,
+  model: Model,
+  who: { author: string; authorRole?: SignerRole },
+): Promise<FindingsRecord> {
+  const base = await loadVersion(io, runId, baseN);
+  const next = baseN + 1;
+  const loaded: LoadedVersion = {
+    version: { ...base.version, n: next, parent: baseN, author: who.author, ...(who.authorRole !== undefined ? { authorRole: who.authorRole } : {}) },
+    raw: model,
+    model,
+    issues: [],
+    sha: modelSha(model),
+    bytesSha: "",
+  };
+  return analyse(io, runId, next, loaded, await inputsFor(io, runId));
+}
+
+async function analyse(io: StoreIo, runId: string, n: number, loaded: LoadedVersion, inputs: CheckInputs): Promise<FindingsRecord> {
   const ctx = await loadCheckContext(io.artifacts, runId);
   const history = await loadHistory(io, runId, loaded);
   // A body that does not parse still goes through runChecks: schemaReferences turns every parse issue
@@ -274,14 +307,13 @@ export async function computeFindings(
     // Read by the open-question check (validation/context.ts HistoryContext).
     history,
   } as Parameters<typeof runChecks>[0]);
-  const inputsSha = inputsShaOf(inputs);
-  const record = buildRecord(
+  return buildRecord(
     {
       checksVersion: CHECKS_VERSION,
       runId,
       n,
       modelSha: loaded.sha,
-      inputsSha,
+      inputsSha: inputsShaOf(inputs),
       settingsSha: settingsShaOf(inputs.compileSettings),
       checkedAt: io.now(),
       modelValid: loaded.model !== undefined,
@@ -300,10 +332,6 @@ export async function computeFindings(
     },
     loaded.model !== undefined,
   );
-  const key = findingsKey(runId, loaded.sha, inputsSha);
-  await io.artifacts.put(key, JSON.stringify(record), "application/json");
-  await io.artifacts.put(flagsKey(runId, loaded.sha, inputsSha), JSON.stringify(flagsDocumentOf(record, inputs)), "application/json");
-  return { record, key, loaded, inputs };
 }
 
 /** The flags document for a findings record: only the cross-check's findings, and whether the comparison ran. */

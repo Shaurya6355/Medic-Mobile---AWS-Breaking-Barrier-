@@ -47,6 +47,16 @@ export const API_ROUTES: readonly string[] = [
   "GET /runs/{id}/revisions/{rid}",
   "POST /runs/{id}/revisions/{rid}/confirm",
   "POST /runs/{id}/resume",
+  // Clinician features of the officer-agent model: activity feed, chat, tree flow and edits, history.
+  // Same auth seam as sign-off (role and user from the body until Cognito, DEC-015).
+  "GET /runs/{id}/activity",
+  "POST /runs/{id}/chat",
+  "GET /runs/{id}/versions/{n}/flow",
+  "POST /runs/{id}/versions/{n}/edits/preview",
+  "POST /runs/{id}/versions/{n}/edits",
+  "GET /runs/{id}/versions/{a}/diff/{b}",
+  "GET /runs/{id}/versions/{n}/change",
+  "POST /runs/{id}/versions/{n}/restore",
   // Timing and cost of a run. Read-only: reads the same step records as GET /runs/{id}.
   "GET /runs/{id}/metrics",
 ];

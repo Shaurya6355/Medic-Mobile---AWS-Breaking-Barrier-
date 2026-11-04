@@ -19,7 +19,7 @@ const empty = (d: string) => !existsSync(d) || readdirSync(d).length === 0;
 async function locked(signers: "none" | "officer" | "both") {
   const s = await seed("awaiting_officer", [fullyResolved()]);
   const sha = shaOf(fullyResolved());
-  if (signers !== "none") await s.signoff.sign("r1", 1, "program_officer", { role: "program_officer", userId: "officer-1", modelSha: sha });
+  if (signers !== "none") await s.signoff.signAsAgent("r1", 1, sha);
   if (signers === "both") await s.signoff.sign("r1", 1, "clinician", { role: "clinician", userId: "clinician-1", modelSha: sha });
   return { ...s, sha };
 }

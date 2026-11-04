@@ -141,8 +141,8 @@ All three users are non-technical. None of them should ever need to read XLSForm
 
 | Role | What they do in the tool | What they cannot do |
 | --- | --- | --- |
-| Program officer | Uploads the guideline and picks the pathway. Reviews the AI draft. Resolves flags. Edits the table. Signs each version first. | Release to IT. Sign a version the clinician hasn't seen after it. |
-| Clinician | Reviews the table and flowchart. Edits the table directly. Rejects with a comment on a specific rule. Signs each version second. Marks a change as urgent. | Sign before the officer. Start a change request (after the MVP). |
+| Program officer (played by the officer agent, DEC-038) | Reviews the AI draft. Fixes citations and file details. Answers only the open questions routed to the program officer. Signs each version first, as the officer agent. A person uploads the guideline and picks the pathway. | Release to IT. Change rules, thresholds, outcomes or action text. Answer clinician questions. Sign a version the clinician hasn't seen after it. |
+| Clinician (the only human approver) | Reviews the table and flowchart. Edits the tree through a closed set of edits with a preview. Rejects with a comment on a specific rule. Signs each version second. Marks a change as urgent. | Sign before the officer. Start a change request (after the MVP). |
 | IT | Sees signed versions, what changed, and the test report. Releases to the CHT instance. | Edit the logic. Approve clinical content. |
 
 **Separation of duties**
@@ -210,10 +210,10 @@ Non-negotiable. Every rule must be testable, and the demo must show them holding
 | --- | --- |
 | AR-01 | Every edit creates a new version, whoever makes it. No exceptions. A version is never changed in place. |
 | AR-02 | A new version starts with zero signatures. |
-| AR-03 | The program officer signs first. The clinician signs second. |
-| AR-04 | If the clinician edits, a new version is created. It goes back to the officer to sign, then to the clinician. |
+| AR-03 | The officer agent signs first, as the program officer (a person cannot sign as program officer). The clinician signs second and is the only human approver. |
+| AR-04 | If the clinician edits, a new version is created. It goes back to the officer agent to check and sign, then to the clinician. |
 | AR-05 | Once both have signed, the version is locked and can never be edited. |
-| AR-06 | If the clinician rejects, the version returns to the officer with the clinician's comment on the specific rule. The rejected version stays in the history and can never be released. The officer's fix is a new version. |
+| AR-06 | If the clinician rejects, the version returns to the officer agent (which escalates what it may not fix) with the clinician's comment on the specific rule. The rejected version stays in the history and can never be released. The officer's fix is a new version. |
 | AR-07 | A signature applies to one exact version. What the signers saw is exactly what gets built. |
 | AR-08 | Only a version with both signatures can go to IT. |
 | AR-09 | Only the most recent signed version can be released. A newer unsigned draft never blocks it. |
@@ -302,6 +302,7 @@ Optional if time allows: the urgent release path (RR-01 to RR-03).
 | OQ-05 | Which criteria will Medic use to pick a build? | Medic |
 | OQ-06 | Medic said in person to add more workflows if we finish early. Medic's documents list more than one pathway as out of scope. Is a second pathway a stretch goal? | Team, Medic |
 | OQ-07 | Medic said "IT is agentic, so should approve immediately." Medic's documents require a human release approval (RR-05). Can the release step be fully automatic, or does a person still approve? | Medic |
+| OQ-08 | Medic must confirm the role change: the program officer's review and signature are done by an officer agent and the clinician is the only human approver (DEC-038). | Medic |
 
 ## Change log
 

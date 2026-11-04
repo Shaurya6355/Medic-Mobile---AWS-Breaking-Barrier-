@@ -1,6 +1,6 @@
 import type { RunState } from "../contract/schemas.js";
-import type { Comment, Rejection, Run, Signature, StepRecord, Version } from "../domain/types.js";
-import { normaliseUserId, sameUser } from "../signoff/identity.js";
+import type { AgentState, Comment, Rejection, Run, Signature, StepRecord, Version } from "../domain/types.js";
+import { OFFICER_AGENT_ID, normaliseUserId, sameUser } from "../signoff/identity.js";
 import { AlreadyExists, Conflict } from "./store.js";
 import type { AuditEvent, Store } from "./store.js";
 
@@ -14,6 +14,7 @@ export class MemoryStore implements Store {
   private versions = new Map<string, Version[]>();
   private comments: Comment[] = [];
   private audit = new Map<string, AuditEvent[]>();
+  private agent = new Map<string, AgentState>();
 
   private mustGet(id: string): Run {
     const run = this.runs.get(id);
@@ -102,6 +103,7 @@ export class MemoryStore implements Store {
     const sigs = v.signatures ?? [];
     if (sig.role === "program_officer") {
       if (sigs.length > 0) refuse("already signed");
+      if (userId !== OFFICER_AGENT_ID) refuse("the program officer signature is the officer agent's");
     } else {
       const officer = sigs[0];
       if (sigs.length !== 1 || officer?.role !== "program_officer") refuse("needs exactly the program officer signature first");
@@ -179,5 +181,23 @@ export class MemoryStore implements Store {
       (r) => WORK_STATES.includes(r.state) && (!r.lease || r.lease.expiresAt <= now),
     );
     return structuredClone(out);
+  }
+
+  async listByState(state: RunState): Promise<Run[]> {
+    return structuredClone([...this.runs.values()].filter((r) => r.state === state).sort((a, b) => a.createdAt - b.createdAt));
+  }
+
+  async getAgentState(runId: string, baseVersion: number): Promise<AgentState | undefined> {
+    const a = this.agent.get(`${runId}#${baseVersion}`);
+    return a ? structuredClone(a) : undefined;
+  }
+
+  async putAgentState(record: AgentState, expectedStatus: AgentState["status"] | null): Promise<void> {
+    const key = `${record.runId}#${record.baseVersion}`;
+    const cur = this.agent.get(key);
+    if (expectedStatus === null ? cur !== undefined : cur?.status !== expectedStatus) {
+      throw new Conflict(`Agent state for ${key} is ${cur?.status ?? "absent"}, expected ${expectedStatus ?? "absent"}`);
+    }
+    this.agent.set(key, structuredClone(record));
   }
 }

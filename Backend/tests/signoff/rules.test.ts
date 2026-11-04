@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { OFFICER_AGENT_ID } from "../../src/signoff/identity.js";
 import type { Signature } from "../../src/domain/types.js";
 import { approvalStatus, validSignatures, verifyLock } from "../../src/signoff/rules.js";
 
@@ -13,7 +14,7 @@ const sig = (role: Signature["role"], userId: string, over: Partial<Signature> =
   signedAt: role === "program_officer" ? 10 : 20,
   ...over,
 });
-const officer = sig("program_officer", "officer-1");
+const officer = sig("program_officer", OFFICER_AGENT_ID);
 const clinician = sig("clinician", "clinician-1");
 const locked = { runId: "r1", n: 2, status: "locked" as const, signatures: [officer, clinician] };
 
@@ -31,7 +32,7 @@ describe("validSignatures (AR-03, AR-07)", () => {
     expect(validSignatures([clinician], SHA, { runId: "r1", n: 2 })).toEqual([]);
   });
   it("the clinician signature does not count when the same person signed as officer", () => {
-    expect(validSignatures([officer, sig("clinician", "officer-1")], SHA, { runId: "r1", n: 2 })).toEqual([officer]);
+    expect(validSignatures([officer, sig("clinician", OFFICER_AGENT_ID)], SHA, { runId: "r1", n: 2 })).toEqual([officer]);
   });
 });
 
@@ -53,12 +54,12 @@ describe("verifyLock (AR-05, AR-08)", () => {
     expect(!r.ok && r.reason).toMatch(/different content/);
   });
   it("refuses when one person signed both roles", () => {
-    const r = verifyLock(SHA, { ...locked, signatures: [officer, sig("clinician", "officer-1")] });
-    expect(!r.ok && r.reason).toMatch(/same person/);
+    const r = verifyLock(SHA, { ...locked, signatures: [officer, sig("clinician", OFFICER_AGENT_ID)] });
+    expect(!r.ok && r.reason).toMatch(/officer agent's identity/);
   });
   it("refuses the wrong order", () => {
     const r = verifyLock(SHA, { ...locked, signatures: [clinician, officer] });
-    expect(!r.ok && r.reason).toMatch(/program officer first/);
+    expect(!r.ok && r.reason).toMatch(/officer agent first/);
   });
   it("refuses a clinician signature dated before the officer's", () => {
     const r = verifyLock(SHA, { ...locked, signatures: [officer, sig("clinician", "clinician-1", { signedAt: 5 })] });

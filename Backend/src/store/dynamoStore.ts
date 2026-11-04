@@ -9,8 +9,8 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import type { RunState } from "../contract/schemas.js";
-import type { Comment, Rejection, Run, Signature, StepRecord, Version } from "../domain/types.js";
-import { InvalidUserId, normaliseUserId } from "../signoff/identity.js";
+import type { AgentState, Comment, Rejection, Run, Signature, StepRecord, Version } from "../domain/types.js";
+import { InvalidUserId, OFFICER_AGENT_ID, normaliseUserId } from "../signoff/identity.js";
 import { AlreadyExists, Conflict } from "./store.js";
 import type { AuditEvent, Store } from "./store.js";
 
@@ -31,6 +31,8 @@ import type { AuditEvent, Store } from "./store.js";
  *                                        conditioned on the pointer still equal to the parent
  *                                        (or absent for n = 1), so concurrent saves conflict.
  *   comments  HASH runId, RANGE sk (S).  sk = "<n padded 10>#<createdAt padded 15>#<uuid>".
+ *   comments  also holds the officer agent's state: sk = "agent#<baseVersion padded 10>" (one item per
+ *                                        (runId, baseVersion)); listComments only reads "<n padded 10>#" so it never sees them.
  *   audit     HASH runId, RANGE sk (S).  sk = "<at padded 15>#<process counter padded 10>#<uuid>":
  *                                        ordered by time, then by append order within this
  *                                        process, and unique across processes via the uuid.
@@ -301,6 +303,7 @@ export class DynamoStore implements Store {
     if (sig.role === "program_officer") {
       condition += " AND (attribute_not_exists(#sigs) OR size(#sigs) = :zero)";
       values[":zero"] = 0;
+      if (sig.userId !== OFFICER_AGENT_ID) throw new Conflict(`Signature refused for ${input.runId} v${input.n} (program_officer): not the officer agent`);
       update = "SET #sigs = :one";
     } else {
       names["#role"] = "role";
@@ -510,5 +513,44 @@ export class DynamoStore implements Store {
       ExpressionAttributeValues: values,
     });
     return (items as unknown as Run[]).sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  async listByState(state: RunState): Promise<Run[]> {
+    const items = await this.scanAll({
+      TableName: this.tables.runs,
+      ConsistentRead: true,
+      FilterExpression: "#state = :s",
+      ExpressionAttributeNames: { "#state": "state" },
+      ExpressionAttributeValues: { ":s": state },
+    });
+    return (items as unknown as Run[]).sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  async getAgentState(runId: string, baseVersion: number): Promise<AgentState | undefined> {
+    const res = await this.doc.send(
+      new GetCommand({ TableName: this.tables.comments, Key: { runId, sk: `agent#${pad(baseVersion, 10)}` }, ConsistentRead: true }),
+    );
+    return res.Item ? stripKeys<AgentState>(res.Item, "sk") : undefined;
+  }
+
+  async putAgentState(record: AgentState, expectedStatus: AgentState["status"] | null): Promise<void> {
+    try {
+      await this.doc.send(
+        new PutCommand({
+          TableName: this.tables.comments,
+          Item: { ...clean(record), sk: `agent#${pad(record.baseVersion, 10)}` },
+          ...(expectedStatus === null
+            ? { ConditionExpression: "attribute_not_exists(sk)" }
+            : {
+                ConditionExpression: "#st = :expected",
+                ExpressionAttributeNames: { "#st": "status" },
+                ExpressionAttributeValues: { ":expected": expectedStatus },
+              }),
+        }),
+      );
+    } catch (e) {
+      if (isConditionFailure(e)) throw new Conflict(`Agent state for ${record.runId}#${record.baseVersion} is not ${expectedStatus ?? "absent"}`);
+      throw e;
+    }
   }
 }

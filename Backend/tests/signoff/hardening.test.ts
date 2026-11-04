@@ -1,6 +1,7 @@
 /**
  * Red team 3 holes, fixed (DEC-020). Each block names the hole it closes.
  */
+import { OFFICER_AGENT_ID } from "../../src/signoff/identity.js";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -55,7 +56,7 @@ const nextOf = (m: Model): Model => {
   return c;
 };
 async function lock(s: Awaited<ReturnType<typeof seed>>, n: number, sha: string) {
-  await s.signoff.sign("r1", n, "program_officer", officer(sha));
+  await s.signoff.signAsAgent("r1", n, sha);
   await s.signoff.sign("r1", n, "clinician", clinician(sha));
 }
 
@@ -108,7 +109,7 @@ describe("hole 2: a planted or stale findings artifact never opens a gate", () =
     const sha = shaOf(draftV1());
     const { key } = await ensureFindings(s.signoff.io, "r1", 1);
     await s.artifacts.put(key, JSON.stringify({ ...poison(sha), checksVersion: CHECKS_VERSION }));
-    const e = await errOf(s.signoff.sign("r1", 1, "program_officer", officer(sha)));
+    const e = await errOf(s.signoff.signAsAgent("r1", 1, sha));
     expect([e.status, e.code]).toEqual([422, "blocked"]);
   });
 
@@ -143,7 +144,7 @@ describe("hole 2: a planted or stale findings artifact never opens a gate", () =
     Object.assign(stored, {
       status: "locked",
       signatures: [
-        { runId: "r1", n: 1, modelSha: sha, role: "program_officer", userId: "a", signedAt: 1, settingsSha },
+        { runId: "r1", n: 1, modelSha: sha, role: "program_officer", userId: OFFICER_AGENT_ID, signedAt: 1, settingsSha },
         { runId: "r1", n: 1, modelSha: sha, role: "clinician", userId: "b", signedAt: 2, settingsSha },
       ],
     });
@@ -166,11 +167,11 @@ describe("hole 3: one person cannot sign twice under a variant of their userId",
     expect(SignRequest.safeParse({ role: "clinician", userId: "​​", modelSha: "a".repeat(64) }).success).toBe(false);
   });
 
-  for (const variant of ["Alice", " alice", "alice​", "ａｌｉｃｅ"]) {
-    it(`officer "alice" then clinician ${JSON.stringify(variant)} is refused as the same person`, async () => {
+  for (const variant of ["Officer-Agent@System", " officer-agent@system", "officer-agent@system​", "ｏｆｆｉｃｅｒ-ａｇｅｎｔ@ｓｙｓｔｅｍ"]) {
+    it(`officer agent then clinician ${JSON.stringify(variant)} is refused as the same person`, async () => {
       const s = await seed("awaiting_officer", [fullyResolved()]);
       const sha = shaOf(fullyResolved());
-      await s.signoff.sign("r1", 1, "program_officer", officer(sha, "alice"));
+      await s.signoff.signAsAgent("r1", 1, sha);
       const e = await errOf(s.signoff.sign("r1", 1, "clinician", clinician(sha, variant)));
       expect([e.status, e.code]).toEqual([403, "separation_of_duties"]);
     });
@@ -179,10 +180,11 @@ describe("hole 3: one person cannot sign twice under a variant of their userId",
   it("a userId with nothing usable left is a 400, and the stored id is the normalised one", async () => {
     const s = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    const e = await errOf(s.signoff.sign("r1", 1, "program_officer", officer(sha, "​")));
+    await s.signoff.signAsAgent("r1", 1, sha);
+    const e = await errOf(s.signoff.sign("r1", 1, "clinician", clinician(sha, "​")));
     expect([e.status, e.code]).toEqual([400, "invalid_user_id"]);
-    const r = await s.signoff.sign("r1", 1, "program_officer", officer(sha, " Officer-1 "));
-    expect(r.signature.userId).toBe("officer-1");
+    const r = await s.signoff.sign("r1", 1, "clinician", clinician(sha, " Clinician-1 "));
+    expect(r.signature.userId).toBe("clinician-1");
   });
 });
 
@@ -194,7 +196,7 @@ describe("hole 4: open questions are checked against the earlier versions", () =
     v3.meta.created_by = "demo-program_officer";
     const n3 = await addVersion(s, v3, "program_officer");
     const sha = shaOf(v3);
-    await s.signoff.sign("r1", n3, "program_officer", officer(sha));
+    await s.signoff.signAsAgent("r1", n3, sha);
     const e = await errOf(s.signoff.sign("r1", n3, "clinician", clinician(sha)));
     expect(e.code).toBe("blocked");
     const codes = (e.detail as { blockers: { code: string }[] }).blockers.map((b) => b.code);
@@ -329,7 +331,7 @@ describe("hole 9: the stored bytes of a locked version cannot change", () => {
     const t = structuredClone(m);
     t.meta.change_note = "tampered";
     await s.artifacts.put(artifactKey("r1", "versions", "v1.json"), JSON.stringify(t));
-    const e = await errOf(s.signoff.sign("r1", 1, "program_officer", officer(shaOf(m))));
+    const e = await errOf(s.signoff.signAsAgent("r1", 1, shaOf(m)));
     expect(e.code).toBe("body_changed");
   });
 });
@@ -344,7 +346,7 @@ describe("hole 10: a signer is told plainly which checks did not run", () => {
     const view = await s.signoff.findingsView("r1", 1, "clinician");
     expect(view.checksNotRun.join(" ")).toMatch(/test cases/);
     // The officer may still sign; the result names what was not checked.
-    const res = await s.signoff.sign("r1", 1, "program_officer", officer(sha)).catch((e: SignoffError) => e);
+    const res = await s.signoff.signAsAgent("r1", 1, sha).catch((e: SignoffError) => e);
     const notRun = res instanceof SignoffError ? (res.detail as { checksNotRun: string[] }).checksNotRun : res.checksNotRun;
     expect(notRun.join(" ")).toMatch(/test cases/);
   });
@@ -359,7 +361,7 @@ describe("hole 10: a signer is told plainly which checks did not run", () => {
 describe("hole 7: a run never gets stuck between versions", () => {
   it("a run left in awaiting_clinician while its newest version has no signature heals back to awaiting_officer", async () => {
     const s = await seed("awaiting_officer", [officerFixed()]);
-    await s.signoff.sign("r1", 1, "program_officer", officer(shaOf(officerFixed())));
+    await s.signoff.signAsAgent("r1", 1, shaOf(officerFixed()));
     expect((await s.store.getRun("r1"))!.state).toBe("awaiting_clinician");
     // A save while another worker holds the lease: the version is added, the run state is not moved.
     await s.store.acquireLease("r1", "other-worker", 600_000, s.clock.ms);
@@ -369,7 +371,7 @@ describe("hole 7: a run never gets stuck between versions", () => {
     await s.store.releaseLease("r1", "other-worker");
     const st = await s.signoff.status("r1", n2);
     expect(st.runState).toBe("awaiting_officer");
-    const r = await s.signoff.sign("r1", n2, "program_officer", officer(shaOf(m2)));
+    const r = await s.signoff.signAsAgent("r1", n2, shaOf(m2));
     expect(r.runState).toBe("awaiting_clinician");
   });
 
@@ -422,7 +424,7 @@ describe("hole 8: the clinician can reject a version with a comment (AR-06, RR-0
   it("rejects after the officer signed: the version is rejected, kept, and the run goes back to the officer", async () => {
     const s = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
-    await s.signoff.sign("r1", 1, "program_officer", officer(sha));
+    await s.signoff.signAsAgent("r1", 1, sha);
     const r = await s.signoff.reject("r1", 1, reject(sha));
     expect(r).toMatchObject({ status: "rejected", runState: "awaiting_officer" });
     const v = await s.store.getVersion("r1", 1);
@@ -439,10 +441,10 @@ describe("hole 8: the clinician can reject a version with a comment (AR-06, RR-0
     const m = fullyResolved();
     const s = await seed("awaiting_officer", [m]);
     const sha = shaOf(m);
-    await s.signoff.sign("r1", 1, "program_officer", officer(sha));
+    await s.signoff.signAsAgent("r1", 1, sha);
     await s.signoff.reject("r1", 1, reject(sha));
     for (const role of ["program_officer", "clinician"] as const) {
-      const e = await errOf(s.signoff.sign("r1", 1, role, role === "clinician" ? clinician(sha) : officer(sha)));
+      const e = await errOf(s.signoff.sign("r1", 1, role, role === "clinician" ? clinician(sha) : officer(sha)).catch((x) => (role === "program_officer" ? s.signoff.signAsAgent("r1", 1, sha) : Promise.reject(x))));
       expect([e.status, e.code]).toEqual([409, "rejected"]);
     }
     const e = await errOf(s.signoff.verifyLocked("r1", 1, { settings: demoSettings() }));
@@ -458,9 +460,9 @@ describe("hole 8: the clinician can reject a version with a comment (AR-06, RR-0
     const s = await seed("awaiting_officer", [fullyResolved()]);
     const sha = shaOf(fullyResolved());
     expect((await errOf(s.signoff.reject("r1", 1, reject(sha)))).code).toBe("officer_signature_required");
-    await s.signoff.sign("r1", 1, "program_officer", officer(sha));
+    await s.signoff.signAsAgent("r1", 1, sha);
     expect((await errOf(s.signoff.reject("r1", 1, reject(sha, { comment: "no" })))).status).toBe(422);
-    expect((await errOf(s.signoff.reject("r1", 1, reject(sha, { userId: "Officer-1" })))).code).toBe("separation_of_duties");
+    expect((await errOf(s.signoff.reject("r1", 1, reject(sha, { userId: " Officer-Agent@System" })))).code).toBe("separation_of_duties");
     expect((await errOf(s.signoff.reject("r1", 1, reject("0".repeat(64))))).code).toBe("sha_mismatch");
   });
 });
