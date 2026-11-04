@@ -9,7 +9,8 @@ export interface Actions {
   apply: (msgId: number, i: number) => void;
   dismiss: (msgId: number) => void;
   answer: (flagId: string, choice: "keep" | "change") => void;
-  approveAll: () => void;
+  /** Resolves when done or failed (a failure shows in the error banner). Live mode saves and signs on the backend. */
+  approveAll: () => Promise<void>;
   runVerify: () => void;
   approveDeploy: () => void;
   setRole: (r: Role) => void;

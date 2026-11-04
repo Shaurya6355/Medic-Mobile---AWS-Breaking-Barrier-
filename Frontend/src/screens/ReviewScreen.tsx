@@ -31,6 +31,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
   const [tab, setTabRaw] = useState<Tab>(readTab);
   const [chatOnBy, setChatRaw] = useState<Record<Tab, boolean>>(() => ({ view: readChat("view"), edit: readChat("edit") }));
   const [openCheck, setOpenCheck] = useState<CheckKey | null>(hashCheck);
+  const [approving, setApproving] = useState(false);
   const setTab = (t: Tab) => { setTabRaw(t); try { localStorage.setItem("reviewTab", t); } catch { /* private mode */ } };
   const chatOn = chatOnBy[tab];
   const setChat = (on: boolean) => { setChatRaw(x => ({ ...x, [tab]: on })); try { localStorage.setItem("chat-" + tab, on ? "1" : "0"); } catch { /* private mode */ } };
@@ -67,7 +68,10 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
           {canEdit ? (
             <>
               {tab === "edit" ? <button type="button" className="btn" disabled={!w.undo.length} onClick={act.undo}>Undo</button> : null}
-              <button type="button" className="btn primary" disabled={!g.ready} title={why || "Approve this version and send it to the IT approver"} onClick={act.approveAll}>Approve and send to IT</button>
+              <button type="button" className="btn primary" disabled={!g.ready || approving} title={why || "Approve this version and send it to the IT approver"}
+                onClick={async () => { setApproving(true); try { await act.approveAll(); } finally { setApproving(false); } }}>
+                {approving ? <><span className="spin" aria-hidden="true" />Saving and signing...</> : "Approve and send to IT"}
+              </button>
             </>
           ) : null}
         </div>
