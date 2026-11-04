@@ -25,6 +25,12 @@ describe("loadConfig", () => {
     expect(c).toMatchObject({ region: "eu-west-1", port: 9000, host: "127.0.0.1", leaseMs: 5000, maxPages: 10, sqsConcurrency: 2, shutdownTimeoutMs: 3000, pythonBin: "py", ingestScript: "/x.py", extractPrompt: "/p.txt" });
     expect(c.prices["us.m"]).toEqual({ inPerMTok: 1, outPerMTok: 2 });
   });
+  it("MAX_PDF_BYTES defaults to 50 MiB and can be overridden", () => {
+    expect(loadConfig(base).maxPdfBytes).toBe(52428800);
+    expect(loadConfig({ ...base, MAX_PDF_BYTES: "1000" }).maxPdfBytes).toBe(1000);
+    expect(() => loadConfig({ ...base, MAX_PDF_BYTES: "0" })).toThrow("MAX_PDF_BYTES");
+    expect(() => loadConfig({ ...base, MAX_PDF_BYTES: "abc" })).toThrow("MAX_PDF_BYTES");
+  });
   it("lists names of all missing variables, never values", () => {
     const { TABLE_RUNS, MODEL_ID, ...rest } = base;
     void TABLE_RUNS; void MODEL_ID;
@@ -43,5 +49,63 @@ describe("loadConfig", () => {
   );
   it("propagates invalid PRICES_JSON", () => {
     expect(() => loadConfig({ ...base, PRICES_JSON: "{" })).toThrow(/PRICES_JSON/);
+  });
+  it("defaults RUN_MODE to container and requires UPLOAD_QUEUE_URL there", () => {
+    expect(loadConfig(base).runMode).toBe("container");
+    expect(loadConfig({ ...base, RUN_MODE: "container" }).runMode).toBe("container");
+    const { UPLOAD_QUEUE_URL, ...noQueue } = base;
+    void UPLOAD_QUEUE_URL;
+    expect(() => loadConfig(noQueue)).toThrow(/UPLOAD_QUEUE_URL/);
+  });
+  it("agentcore mode does not require UPLOAD_QUEUE_URL", () => {
+    const { UPLOAD_QUEUE_URL, ...noQueue } = base;
+    void UPLOAD_QUEUE_URL;
+    const c = loadConfig({ ...noQueue, RUN_MODE: "agentcore" });
+    expect(c.runMode).toBe("agentcore");
+    expect(c.uploadQueueUrl).toBeUndefined();
+  });
+  it("agentcore mode still requires the other variables", () => {
+    expect(() => loadConfig({ RUN_MODE: "agentcore" })).toThrow(/TABLE_RUNS/);
+  });
+  it("lambda mode does not require UPLOAD_QUEUE_URL", () => {
+    const { UPLOAD_QUEUE_URL, ...noQueue } = base;
+    void UPLOAD_QUEUE_URL;
+    const c = loadConfig({ ...noQueue, RUN_MODE: "lambda" });
+    expect(c.runMode).toBe("lambda");
+    expect(c.uploadQueueUrl).toBeUndefined();
+  });
+  it("lambda mode still requires the other variables", () => {
+    expect(() => loadConfig({ RUN_MODE: "lambda" })).toThrow(/TABLE_RUNS/);
+  });
+  it("lambda mode defaults LEASE_MS to 960000 and other modes keep 900000", () => {
+    expect(loadConfig({ ...base, RUN_MODE: "lambda" }).leaseMs).toBe(960000);
+    expect(loadConfig(base).leaseMs).toBe(900000);
+    expect(loadConfig({ ...base, RUN_MODE: "lambda", LEASE_MS: "960001" }).leaseMs).toBe(960001);
+  });
+  it.each(["900000", "1000", "1"])("lambda mode rejects LEASE_MS=%s with a clear error", (v) => {
+    expect(() => loadConfig({ ...base, RUN_MODE: "lambda", LEASE_MS: v })).toThrow(/LEASE_MS.*900000.*lambda/);
+    expect(loadConfig({ ...base, LEASE_MS: v }).leaseMs).toBe(Number(v));
+  });
+  it.each(["AgentCore", "Lambda", "x"])("rejects RUN_MODE=%s with a clear error", (v) => {
+    expect(() => loadConfig({ ...base, RUN_MODE: v })).toThrow(/RUN_MODE must be one of: container, agentcore, lambda/);
+  });
+  it("defaults MODEL_BACKEND to bedrock and needs no runtime ARN", () => {
+    const c = loadConfig(base);
+    expect(c.modelBackend).toBe("bedrock");
+    expect(c.agentCoreRuntimeArn).toBeUndefined();
+  });
+  it("rejects an unknown MODEL_BACKEND naming the allowed values", () => {
+    expect(() => loadConfig({ ...base, MODEL_BACKEND: "x" })).toThrow(/bedrock, agentcore/);
+  });
+  it("agentcore backend requires a bedrock-agentcore runtime ARN", () => {
+    const arn = "arn:aws:bedrock-agentcore:us-west-2:123456789012:runtime/agent-abc";
+    expect(() => loadConfig({ ...base, MODEL_BACKEND: "agentcore" })).toThrow(/AGENTCORE_RUNTIME_ARN/);
+    expect(() => loadConfig({ ...base, MODEL_BACKEND: "agentcore", AGENTCORE_RUNTIME_ARN: "arn:aws:s3:::b" })).toThrow(/AGENTCORE_RUNTIME_ARN/);
+    expect(() => loadConfig({ ...base, MODEL_BACKEND: "agentcore", AGENTCORE_RUNTIME_ARN: "nope" })).toThrow(/AGENTCORE_RUNTIME_ARN/);
+    const c = loadConfig({ ...base, MODEL_BACKEND: "agentcore", AGENTCORE_RUNTIME_ARN: arn });
+    expect(c).toMatchObject({ modelBackend: "agentcore", agentCoreRuntimeArn: arn });
+  });
+  it("ignores AGENTCORE_RUNTIME_ARN when the backend is bedrock", () => {
+    expect(loadConfig({ ...base, AGENTCORE_RUNTIME_ARN: "junk" }).agentCoreRuntimeArn).toBeUndefined();
   });
 });

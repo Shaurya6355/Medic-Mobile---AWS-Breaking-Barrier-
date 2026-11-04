@@ -1,3 +1,4 @@
+import { NotFound } from "../../src/artifacts/artifactStore.js";
 import { describe, expect, it } from "vitest";
 import type { RunState } from "../../src/contract/schemas.js";
 import { MemoryArtifactStore } from "../../src/artifacts/artifactStore.js";
@@ -453,6 +454,140 @@ describe("Orchestrator", () => {
     const detail = errors[0]!.detail as { error: string };
     expect(detail.error.startsWith("poison")).toBe(true);
     expect(detail.error.length).toBeLessThanOrEqual(500);
+  });
+
+  it("lastStatusChange is undefined until the busy/idle status changes, then stamps each change", async () => {
+    let during: number | undefined;
+    const steps = flow({ ingest: [async () => { during = orch.lastStatusChange(); return { artifactRefs: { out: "x" } }; }] });
+    const { orch } = setup(steps);
+    expect(orch.lastStatusChange()).toBeUndefined();
+    const run = await orch.createRun(undefined, "doc.pdf");
+    await orch.onUploaded(run.runId);
+    expect(during).toBeDefined();
+    const after = orch.lastStatusChange();
+    expect(after).toBeGreaterThan(during as number);
+  });
+
+  it("onUploaded for an unknown run rejects with NotFound", async () => {
+    const { orch } = setup(flow());
+    await expect(orch.onUploaded("missing")).rejects.toBeInstanceOf(NotFound);
+  });
+
+  it("activeCount is 0 when idle, 1 while advancing and 0 after, even on failure", async () => {
+    let seen = -1;
+    const steps = flow({ ingest: [async () => { seen = orch.activeCount(); return { artifactRefs: { out: "x" } }; }] });
+    const { orch } = setup(steps);
+    expect(orch.activeCount()).toBe(0);
+    const run = await orch.createRun(undefined, "doc.pdf");
+    await orch.onUploaded(run.runId);
+    expect(seen).toBe(1);
+    expect(orch.activeCount()).toBe(0);
+    await expect(orch.advance("missing")).rejects.toThrow();
+    expect(orch.activeCount()).toBe(0);
+  });
+
+
+  describe("total attempt cap per step", () => {
+    const hang = () => new Promise<StepResult>(() => {});
+    const alwaysTransient = [transient];
+
+    it("counts attempts abandoned by cut-off invocations and fails the step beyond the cap of 6", async () => {
+      // Each invocation is cut off while the step hangs (never awaited); the next owner takes over
+      // after the lease expires, as the scheduled sweep does.
+      const store = new MemoryStore();
+      const clock = { t: 1000 };
+      const first = setup(flow({ extract: [hang] }), { store, clock, owner: "o0" });
+      const run = await first.orch.createRun(undefined, "doc.pdf");
+      void first.orch.onUploaded(run.runId);
+      for (let i = 1; i <= 5; i++) {
+        await new Promise((r) => setTimeout(r, 5));
+        clock.t += LEASE_MS + 1;
+        const next = setup(flow({ extract: [hang] }), { store, clock, owner: `o${i}` });
+        void next.orch.resumeAll();
+      }
+      await new Promise((r) => setTimeout(r, 5));
+      const attempts = (await store.listSteps(run.runId)).filter((r) => r.step === "extract");
+      expect(attempts).toHaveLength(6);
+
+      // Seventh takeover: the cap is reached, the step is not started again.
+      clock.t += LEASE_MS + 1;
+      const steps = flow({ extract: [hang] });
+      const last = setup(steps, { store, clock, owner: "o6" });
+      await last.orch.resumeAll();
+      const after = (await store.getRun(run.runId))!;
+      expect(after.state).toBe("failed");
+      expect(after.currentStep).toBe("extract");
+      expect(steps[1]!.calls).toBe(0);
+      const recs = (await store.listSteps(run.runId)).filter((r) => r.step === "extract");
+      const capped = recs[recs.length - 1]!;
+      expect(capped.status).toBe("failed");
+      expect(capped.error).toMatch(/attempt cap/i);
+      expect(capped.error).toMatch(/6/);
+    });
+
+    it("limits a fresh invocation to the remaining budget", async () => {
+      const store = new MemoryStore();
+      const steps = flow({ extract: alwaysTransient });
+      const { orch } = setup(steps, { store });
+      const run = await orch.createRun(undefined, "doc.pdf");
+      await store.updateRun(run.runId, { state: "extracting" });
+      for (let a = 1; a <= 4; a++) {
+        await store.appendStep({ runId: run.runId, step: "extract", attempt: a, status: "running", startedAt: 1, inputTokens: 0, outputTokens: 0, artifactRefs: {} });
+      }
+      await orch.advance(run.runId);
+      expect(steps[1]!.calls).toBe(2);
+      const after = (await store.getRun(run.runId))!;
+      expect(after.state).toBe("failed");
+      expect((await store.listSteps(run.runId)).filter((r) => r.step === "extract")).toHaveLength(6);
+    });
+
+    it("a manual resume starts a fresh budget", async () => {
+      const store = new MemoryStore();
+      const steps = flow({ extract: [ok] });
+      const { orch } = setup(steps, { store });
+      const run = await orch.createRun(undefined, "doc.pdf");
+      await store.updateRun(run.runId, { state: "extracting" });
+      for (let a = 1; a <= 6; a++) {
+        await store.appendStep({ runId: run.runId, step: "extract", attempt: a, status: "failed", startedAt: 1, endedAt: 2, inputTokens: 0, outputTokens: 0, artifactRefs: {} });
+      }
+      await orch.advance(run.runId);
+      expect((await store.getRun(run.runId))!.state).toBe("failed");
+      expect(steps[1]!.calls).toBe(0);
+      await orch.resume(run.runId);
+      expect(steps[1]!.calls).toBe(1);
+      expect((await store.getRun(run.runId))!.state).toBe("in_review");
+    });
+  });
+
+  describe("prepareResume", () => {
+    it("moves a failed run to its step state, without a lease, without running anything", async () => {
+      const steps = flow({ extract: [failHard, ok] });
+      const { store, orch } = setup(steps);
+      const run = await orch.createRun(undefined, "doc.pdf");
+      await orch.onUploaded(run.runId);
+      expect((await store.getRun(run.runId))!.state).toBe("failed");
+      const calls = steps.map((s) => s.calls);
+      await orch.prepareResume(run.runId);
+      const after = (await store.getRun(run.runId))!;
+      expect(after.state).toBe("extracting");
+      expect(after.lease).toBeUndefined();
+      expect(steps.map((s) => s.calls)).toEqual(calls);
+    });
+    it("leaves the run for listResumable, so the sweep advances it", async () => {
+      const steps = flow({ extract: [failHard, ok] });
+      const { store, orch, clock } = setup(steps);
+      const run = await orch.createRun(undefined, "doc.pdf");
+      await orch.onUploaded(run.runId);
+      await orch.prepareResume(run.runId);
+      expect((await store.listResumable(clock.t)).map((r) => r.runId)).toEqual([run.runId]);
+      await orch.resumeAll();
+      expect((await store.getRun(run.runId))!.state).toBe("in_review");
+    });
+    it("rejects a run that is not failed", async () => {
+      const { orch } = setup(flow());
+      const run = await orch.createRun(undefined, "doc.pdf");
+      await expect(orch.prepareResume(run.runId)).rejects.toThrow(/not failed/);
+    });
   });
 });
 

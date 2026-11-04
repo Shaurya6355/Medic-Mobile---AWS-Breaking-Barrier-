@@ -13,10 +13,10 @@ function tsFiles(dir: string): string[] {
 }
 
 describe("route strings live only in src/contract", () => {
-  it("finds no string literal starting with /runs outside contract/", () => {
+  it("finds no string literal starting with /runs, /ping, /invocations or /events outside contract/", () => {
     const offenders = tsFiles(srcDir)
       .filter((f) => !relative(srcDir, f).startsWith("contract" + sep))
-      .filter((f) => /["'`]\/runs/.test(readFileSync(f, "utf8")))
+      .filter((f) => /["'`]\/(runs|ping|invocations|events)/.test(readFileSync(f, "utf8")))
       .map((f) => relative(srcDir, f));
     expect(offenders).toEqual([]);
   });

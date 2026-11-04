@@ -155,6 +155,7 @@ describe("fill_logic races and edge cases", () => {
       put: (k: string, b: Uint8Array | string, c?: string) => (puts.push(k), artifacts.put(k, b, c)),
       get: (k: string) => artifacts.get(k),
       exists: (k: string) => artifacts.exists(k),
+      size: (k: string) => artifacts.size(k),
     };
     const res = await step.run({ ...ctx, store: wrapped, artifacts: spy });
     expect(puts).toEqual([]);

@@ -2,6 +2,8 @@ export interface ArtifactStore {
   put(key: string, body: Uint8Array | string, contentType?: string): Promise<void>;
   get(key: string): Promise<Uint8Array>;
   exists(key: string): Promise<boolean>;
+  // Size in bytes without reading the body (HeadObject). Throws NotFound when the key is missing.
+  size(key: string): Promise<number>;
 }
 
 export class NotFound extends Error {
@@ -31,6 +33,12 @@ export class MemoryArtifactStore implements ArtifactStore {
 
   async exists(key: string): Promise<boolean> {
     return this.objects.has(key);
+  }
+
+  async size(key: string): Promise<number> {
+    const o = this.objects.get(key);
+    if (!o) throw new NotFound(`Artifact not found: ${key}`);
+    return o.byteLength;
   }
 }
 

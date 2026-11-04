@@ -36,4 +36,15 @@ export class S3ArtifactStore implements ArtifactStore {
       throw e;
     }
   }
+
+  async size(key: string): Promise<number> {
+    try {
+      const out = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+      if (typeof out.ContentLength !== "number") throw new Error(`Artifact size unknown: ${key}`);
+      return out.ContentLength;
+    } catch (e) {
+      if (isMissing(e)) throw new NotFound(`Artifact not found: ${key}`);
+      throw e;
+    }
+  }
 }

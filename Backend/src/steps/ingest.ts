@@ -25,6 +25,35 @@ export function createDefaultExec(opts: { timeoutMs?: number } = {}): Exec {
 
 export const defaultExec: Exec = createDefaultExec();
 
+// Reads the page count with poppler's pdfinfo, so a huge PDF is refused before pdftoppm renders it.
+export function parsePdfInfoPages(output: string): number {
+  const m = /^Pages:\s*(\d+)\s*$/m.exec(output);
+  const n = m ? Number(m[1]) : 0;
+  if (!Number.isSafeInteger(n) || n < 1) throw new Error("Could not read the page count from pdfinfo output");
+  return n;
+}
+
+export type PdfPageCount = (pdfPath: string) => Promise<number>;
+
+export function createPdfInfoPageCount(opts: { bin?: string; timeoutMs?: number } = {}): PdfPageCount {
+  const bin = opts.bin ?? "pdfinfo";
+  const timeout = opts.timeoutMs ?? 30000;
+  return (pdfPath) =>
+    new Promise<number>((resolve, reject) => {
+      execFile(bin, [pdfPath], { timeout, maxBuffer: 1024 * 1024 }, (err, stdout) => {
+        if (err) {
+          reject(new Error(`Command failed: ${path.basename(bin)} (${err.killed ? `timed out after ${timeout} ms` : err.message.split("\n")[0]})`));
+          return;
+        }
+        try {
+          resolve(parsePdfInfoPages(stdout));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+}
+
 interface InputPage {
   pdf_page: number;
   image: string;
@@ -56,7 +85,17 @@ async function listPageImages(pagesDir: string): Promise<Map<number, string>> {
   return out;
 }
 
-export function createIngestStep(opts: { pythonBin: string; scriptPath: string; exec: Exec }): Step {
+export function createIngestStep(opts: {
+  pythonBin: string;
+  scriptPath: string;
+  exec: Exec;
+  // Largest input PDF to download, in bytes (checked with a size lookup, before the download).
+  maxPdfBytes?: number;
+  // With pdfPageCount: largest total page count to render. The whole document is rendered even
+  // when only some pages are selected, so the limit applies to the document, not the selection.
+  maxPages?: number;
+  pdfPageCount?: PdfPageCount;
+}): Step {
   return {
     name: "ingest",
     runState: "ingesting",
@@ -74,6 +113,12 @@ export function createIngestStep(opts: { pythonBin: string; scriptPath: string; 
       if (!(await ctx.artifacts.exists(pdfKey))) {
         throw new Error(`Input PDF not found for run ${runId}`);
       }
+      if (opts.maxPdfBytes !== undefined) {
+        const size = await ctx.artifacts.size(pdfKey);
+        if (size > opts.maxPdfBytes) {
+          throw new Error(`Input PDF is ${size} bytes, over the limit of ${opts.maxPdfBytes} bytes`);
+        }
+      }
       const pdf = await ctx.artifacts.get(pdfKey);
 
       const dir = await mkdtemp(path.join(tmpdir(), "ingest-"));
@@ -81,6 +126,12 @@ export function createIngestStep(opts: { pythonBin: string; scriptPath: string; 
         const pdfPath = path.join(dir, "guideline.pdf");
         const outDir = path.join(dir, "out");
         await writeFile(pdfPath, pdf);
+        if (opts.maxPages !== undefined && opts.pdfPageCount) {
+          const pageCount = await opts.pdfPageCount(pdfPath);
+          if (pageCount > opts.maxPages) {
+            throw new Error(`Input PDF has ${pageCount} pages, over the limit of ${opts.maxPages} pages`);
+          }
+        }
         await opts.exec(opts.pythonBin, [opts.scriptPath, pdfPath, outDir]);
 
         const doc = JSON.parse(await readFile(path.join(outDir, "input_blocks.json"), "utf8")) as InputDoc;

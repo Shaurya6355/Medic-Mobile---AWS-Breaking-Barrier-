@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildServer } from "../../src/api/server.js";
 import type { OrchestratorPort } from "../../src/api/server.js";
-import { MemoryArtifactStore, artifactKey } from "../../src/artifacts/artifactStore.js";
+import { MemoryArtifactStore, artifactKey, inputPdfKey } from "../../src/artifacts/artifactStore.js";
+import { NotFound } from "../../src/artifacts/artifactStore.js";
 import { routes } from "../../src/contract/routes.js";
 import { acceptAnyObjectValidator } from "../../src/steps/logicModelValidator.js";
 import type { LogicModelValidator } from "../../src/steps/logicModelValidator.js";
 import { MemoryStore } from "../../src/store/memoryStore.js";
 import type { Run } from "../../src/domain/types.js";
-
-function setup(opts: { validator?: LogicModelValidator; onVersionSaved?: (r: string, n: number) => Promise<void> } = {}) {
+import { Conflict } from "../../src/store/store.js";
+function setupBase(opts: { validator?: LogicModelValidator; onVersionSaved?: (r: string, n: number) => Promise<void>; clock?: { ms: number }; maxInvocationResponseBytes?: number; runMode?: "container" | "agentcore" | "lambda"; eventsConcurrency?: number; backgroundDeadlineMs?: number; eventsDeadlineMs?: number; statusChangedAtMs?: number } = {}) {
   const store = new MemoryStore();
   const artifacts = new MemoryArtifactStore();
   let t = 1000;
@@ -20,6 +21,11 @@ function setup(opts: { validator?: LogicModelValidator; onVersionSaved?: (r: str
       return run;
     }),
     resume: vi.fn(async () => {}),
+    prepareResume: vi.fn(async () => {}),
+    onUploaded: vi.fn(async () => {}),
+    resumeAll: vi.fn(async () => {}),
+    activeCount: vi.fn(() => 0),
+    lastStatusChange: vi.fn(() => opts.statusChangedAtMs),
   };
   const onVersionSaved = vi.fn(opts.onVersionSaved ?? (async () => {}));
   const server = buildServer({
@@ -30,10 +36,17 @@ function setup(opts: { validator?: LogicModelValidator; onVersionSaved?: (r: str
     presign: async (key) => `https://upload.test/${key}`,
     onVersionSaved,
     maxPages: 50,
-    now: () => 5000,
+    ...(opts.runMode ? { runMode: opts.runMode } : {}),
+    ...(opts.eventsConcurrency ? { eventsConcurrency: opts.eventsConcurrency } : {}),
+    ...(opts.eventsDeadlineMs ? { eventsDeadlineMs: opts.eventsDeadlineMs } : {}),
+    ...(opts.backgroundDeadlineMs ? { backgroundDeadlineMs: opts.backgroundDeadlineMs } : {}),
+    now: () => opts.clock?.ms ?? 5000,
+    ...(opts.maxInvocationResponseBytes ? { maxInvocationResponseBytes: opts.maxInvocationResponseBytes } : {}),
   });
   return { server, store, artifacts, orchestrator, onVersionSaved };
 }
+
+const setup = setupBase;
 
 async function seedRun(store: MemoryStore, artifacts: MemoryArtifactStore, withV1 = true, state: Run["state"] = "in_review") {
   await store.createRun({ runId: "r1", state, createdAt: 1 });
@@ -323,5 +336,356 @@ describe("length limits on user strings", () => {
     expect(res.statusCode).toBe(400);
     expect(await store.listVersions("r1")).toHaveLength(1);
     expect(onVersionSaved).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /ping", () => {
+  it.each(["container", "agentcore", "lambda"] as const)("exists in %s mode", async (runMode) => {
+    const { server } = setup({ runMode });
+    expect((await server.inject({ method: "GET", url: routes.ping() })).statusCode).toBe(200);
+  });
+  it("reports Healthy when idle and HealthyBusy when active, with the engine's change time", async () => {
+    const { server, orchestrator } = setup();
+    const get = async () => (await server.inject({ method: "GET", url: routes.ping() })).json();
+    expect(await get()).toEqual({ status: "Healthy" });
+
+    vi.mocked(orchestrator.activeCount).mockReturnValue(2);
+    vi.mocked(orchestrator.lastStatusChange).mockReturnValue(20_500);
+    expect(await get()).toEqual({ status: "HealthyBusy", time_of_last_update: 20 });
+
+    vi.mocked(orchestrator.activeCount).mockReturnValue(0);
+    vi.mocked(orchestrator.lastStatusChange).mockReturnValue(100_999);
+    expect(await get()).toEqual({ status: "Healthy", time_of_last_update: 100 });
+  });
+  it("does not stamp the time of the first ping", async () => {
+    const { server, orchestrator } = setup({ clock: { ms: 777_000 } });
+    vi.mocked(orchestrator.activeCount).mockReturnValue(1);
+    const body = (await server.inject({ method: "GET", url: routes.ping() })).json();
+    expect(body).toEqual({ status: "HealthyBusy" });
+  });
+});
+
+describe("POST /invocations", () => {
+  const setup = (o: Parameters<typeof setupBase>[0] = {}) => setupBase({ runMode: "agentcore", ...o });
+  it.each(["container", "lambda"] as const)("does not exist in %s mode", async (runMode) => {
+    const { server, orchestrator } = setupBase({ runMode });
+    const res = await server.inject({ method: "POST", url: routes.invocations(), payload: { action: "resume_all" } });
+    expect(res.statusCode).toBe(404);
+    expect(orchestrator.resumeAll).not.toHaveBeenCalled();
+  });
+  it("does not exist by default", async () => {
+    expect((await setupBase().server.inject({ method: "POST", url: routes.invocations(), payload: { action: "resume_all" } })).statusCode).toBe(404);
+  });
+  it("http: strips host, content-length, connection and transfer-encoding but keeps other headers", async () => {
+    const { server, store, artifacts } = setup();
+    await seedRun(store, artifacts);
+    const seen: Array<Record<string, unknown>> = [];
+    server.addHook("onRequest", async (req) => {
+      if (req.url.startsWith("/runs")) seen.push({ ...req.headers });
+    });
+    const res = await post(server, {
+      action: "http",
+      method: "GET",
+      path: routes.run("r1"),
+      headers: { Host: "evil.test", "Content-Length": "999", Connection: "x", "Transfer-Encoding": "chunked", "X-Keep": "yes" },
+    });
+    expect(res.json().statusCode).toBe(200);
+    expect(seen[0]?.["x-keep"]).toBe("yes");
+    expect(seen[0]?.["host"]).not.toBe("evil.test");
+    expect(seen[0]?.["content-length"]).toBeUndefined();
+    expect(seen[0]?.["transfer-encoding"]).toBeUndefined();
+  });
+  it.each(["/runs/a%2Fb", "/runs//a", "//runs", "/ping?x", "/ping?x=1#y", "/runs/%2e%2e/invocations"])("http: refuses %s", async (path) => {
+    const { server } = setup();
+    const res = await post(server, { action: "http", method: "GET", path });
+    expect([400, 404]).toContain(res.statusCode);
+    expect(res.json().statusCode).toBeUndefined();
+  });
+  const post = (server: ReturnType<typeof setup>["server"], payload: unknown) =>
+    server.inject({ method: "POST", url: routes.invocations(), payload: payload as object });
+
+  it.each([[{}], [{ action: "nope" }], [{ action: "uploaded", runId: "a/b" }], [{ action: "http", method: "GET", path: "runs" }]])(
+    "400 for invalid %j",
+    async (payload) => {
+      const { server, orchestrator } = setup();
+      const res = await post(server, payload);
+      expect(res.statusCode).toBe(400);
+      expect(orchestrator.onUploaded).not.toHaveBeenCalled();
+    },
+  );
+
+  it("uploaded: 202 and runs onUploaded in the background", async () => {
+    const { server, orchestrator } = setup();
+    const res = await post(server, { action: "uploaded", runId: "r-1" });
+    expect(res.statusCode).toBe(202);
+    expect(res.json()).toEqual({ accepted: true });
+    expect(orchestrator.onUploaded).toHaveBeenCalledWith("r-1");
+  });
+
+  it("uploaded: a rejecting onUploaded does not break the response", async () => {
+    const { server, orchestrator } = setup();
+    vi.mocked(orchestrator.onUploaded).mockRejectedValueOnce(new Error("x"));
+    const res = await post(server, { action: "uploaded", runId: "r-1" });
+    expect(res.statusCode).toBe(202);
+    await new Promise((r) => setTimeout(r, 5));
+  });
+
+  it("resume_all: 202 and runs resumeAll, errors contained", async () => {
+    const { server, orchestrator } = setup();
+    vi.mocked(orchestrator.resumeAll).mockRejectedValueOnce(new Error("x"));
+    const res = await post(server, { action: "resume_all" });
+    expect(res.statusCode).toBe(202);
+    expect(res.json()).toEqual({ accepted: true });
+    expect(orchestrator.resumeAll).toHaveBeenCalledTimes(1);
+    await new Promise((r) => setTimeout(r, 5));
+  });
+
+  it("http: forwards to a contract route and returns status, content-type and body only", async () => {
+    const { server, store, artifacts } = setup();
+    await seedRun(store, artifacts);
+    const res = await post(server, { action: "http", method: "GET", path: routes.run("r1") });
+    expect(res.statusCode).toBe(200);
+    const out = res.json();
+    expect(out.statusCode).toBe(200);
+    expect(Object.keys(out.headers)).toEqual(["content-type"]);
+    expect(out.headers["content-type"]).toContain("application/json");
+    expect(JSON.parse(out.body).run.runId).toBe("r1");
+  });
+
+  it("http: passes method, headers and body, and relays upstream errors", async () => {
+    const { server, store, artifacts } = setup();
+    await seedRun(store, artifacts);
+    const ok = await post(server, {
+      action: "http",
+      method: "POST",
+      path: routes.runs(),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ filename: "g.pdf" }),
+    });
+    expect(ok.json().statusCode).toBe(201);
+    const bad = await post(server, {
+      action: "http",
+      method: "POST",
+      path: routes.runs(),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ filename: "" }),
+    });
+    expect(bad.statusCode).toBe(200);
+    expect(bad.json().statusCode).toBe(400);
+    const missing = await post(server, { action: "http", method: "GET", path: routes.run("zz") });
+    expect(missing.json().statusCode).toBe(404);
+  });
+
+  it("http: allows a query string on a contract route", async () => {
+    const { server } = setup();
+    const res = await post(server, { action: "http", method: "GET", path: routes.runs() + "?x=1" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().statusCode).toBe(200);
+  });
+
+  it.each([routes.invocations(), routes.ping(), routes.ping() + "?a=1", routes.invocations() + "/"])("http: refuses %s (no recursion)", async (path) => {
+    const { server } = setup();
+    const res = await post(server, { action: "http", method: "POST", path });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it.each(["/nope", "/runs/a/b/c/d", "/runs/%2e%2e/ping", "/runs/../ping", "//ping"])("http: 404 for path outside the contract %s", async (path) => {
+    const { server } = setup();
+    const res = await post(server, { action: "http", method: "GET", path });
+    expect([400, 404]).toContain(res.statusCode);
+    expect(res.json().statusCode).toBeUndefined();
+  });
+
+  it("http: unknown path is 404", async () => {
+    const { server } = setup();
+    expect((await post(server, { action: "http", method: "GET", path: "/nope" })).statusCode).toBe(404);
+  });
+
+  it("http: refuses an oversized response", async () => {
+    const { server, store, artifacts } = setup({ maxInvocationResponseBytes: 200 });
+    await seedRun(store, artifacts);
+    await artifacts.put(artifactKey("r1", "versions", "v1.json"), JSON.stringify({ big: "x".repeat(500) }));
+    const res = await post(server, { action: "http", method: "GET", path: routes.version("r1", 1) });
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toEqual({ error: "response_too_large" });
+  });
+
+  it("http: rejects an oversized request body at validation", async () => {
+    const { server } = setup();
+    const res = await post(server, { action: "http", method: "POST", path: routes.runs(), body: "a".repeat(1024 * 1024 + 1) });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+describe("POST /events", () => {
+  const s3Body = (...runIds: string[]) =>
+    JSON.stringify({
+      Records: runIds.map((id) => ({ eventName: "ObjectCreated:Put", s3: { bucket: { name: "b" }, object: { key: inputPdfKey(id) } } })),
+    });
+  const sqs = (...records: Array<[string, string]>) => ({ Records: records.map(([messageId, body]) => ({ messageId, body, eventSource: "aws:sqs" })) });
+  const post = (server: ReturnType<typeof setup>["server"], payload: unknown) =>
+    server.inject({ method: "POST", url: routes.events(), payload: payload as object });
+
+  it.each(["container", "agentcore"] as const)("does not exist in %s mode", async (runMode) => {
+    const { server, orchestrator } = setup({ runMode });
+    const res = await post(server, sqs(["m1", s3Body("r1")]));
+    expect(res.statusCode).toBe(404);
+    expect(orchestrator.onUploaded).not.toHaveBeenCalled();
+  });
+  it("does not exist by default", async () => {
+    expect((await post(setup().server, { source: "aws.events" })).statusCode).toBe(404);
+  });
+
+  it("awaits onUploaded for every uploaded object and reports no failures", async () => {
+    const { server, orchestrator } = setup({ runMode: "lambda" });
+    let finished = 0;
+    (orchestrator.onUploaded as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+      finished++;
+    });
+    const res = await post(server, sqs(["m1", s3Body("r1", "r2")], ["m2", s3Body("r3")]));
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ batchItemFailures: [] });
+    expect(finished).toBe(3);
+    expect(orchestrator.onUploaded).toHaveBeenCalledWith("r1");
+    expect(orchestrator.onUploaded).toHaveBeenCalledWith("r2");
+    expect(orchestrator.onUploaded).toHaveBeenCalledWith("r3");
+  });
+
+  it("returns only failed records as batchItemFailures", async () => {
+    const { server, orchestrator } = setup({ runMode: "lambda" });
+    (orchestrator.onUploaded as ReturnType<typeof vi.fn>).mockImplementation(async (id: string) => {
+      if (id === "bad") throw new Error("boom");
+    });
+    const res = await post(server, sqs(["m1", s3Body("ok")], ["m2", s3Body("ok2", "bad")], ["m3", s3Body("ok3")]));
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ batchItemFailures: [{ itemIdentifier: "m2" }] });
+    expect(orchestrator.onUploaded).toHaveBeenCalledWith("ok3");
+  });
+
+  it("treats unparseable or irrelevant records as consumed", async () => {
+    const { server, orchestrator } = setup({ runMode: "lambda" });
+    const res = await post(server, sqs(["m1", "not json"], ["m2", JSON.stringify({ Records: [] })], ["m3", s3Body("r1")]));
+    expect(res.json()).toEqual({ batchItemFailures: [] });
+    expect(orchestrator.onUploaded).toHaveBeenCalledTimes(1);
+  });
+
+  it("limits concurrency across records", async () => {
+    const { server, orchestrator } = setup({ runMode: "lambda", eventsConcurrency: 2 });
+    let cur = 0;
+    let max = 0;
+    (orchestrator.onUploaded as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      cur++;
+      max = Math.max(max, cur);
+      await new Promise((r) => setTimeout(r, 5));
+      cur--;
+    });
+    const res = await post(server, sqs(...["a", "b", "c", "d", "e"].map((id): [string, string] => [id, s3Body(id)])));
+    expect(res.json()).toEqual({ batchItemFailures: [] });
+    expect(orchestrator.onUploaded).toHaveBeenCalledTimes(5);
+    expect(max).toBe(2);
+  });
+
+  it("scheduled event awaits resumeAll", async () => {
+    const { server, orchestrator } = setup({ runMode: "lambda" });
+    let done = false;
+    (orchestrator.resumeAll as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+      done = true;
+    });
+    const res = await post(server, { source: "aws.events", "detail-type": "Scheduled Event" });
+    expect(res.statusCode).toBe(200);
+    expect(done).toBe(true);
+    expect(res.json()).toEqual({ batchItemFailures: [] });
+  });
+
+  it("scheduled event with a failing resumeAll answers 500", async () => {
+    const { server, orchestrator } = setup({ runMode: "lambda" });
+    (orchestrator.resumeAll as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("x"));
+    expect((await post(server, { source: "aws.events" })).statusCode).toBe(500);
+  });
+
+  it("an unknown run (NotFound) is consumed, not failed", async () => {
+    const { server, orchestrator } = setup({ runMode: "lambda" });
+    (orchestrator.onUploaded as ReturnType<typeof vi.fn>).mockRejectedValue(new NotFound("Run not found: x"));
+    const res = await post(server, sqs(["m1", s3Body("gone")]));
+    expect(res.json()).toEqual({ batchItemFailures: [] });
+  });
+
+  it("one malformed or oversized record does not reject the batch", async () => {
+    const { server, orchestrator } = setup({ runMode: "lambda" });
+    const payload = {
+      Records: [
+        { messageId: "m1", body: "x".repeat(1024 * 1024 + 1) },
+        { messageId: "m2" },
+        "junk",
+        null,
+        { messageId: "m3", body: s3Body("r1") },
+      ],
+    };
+    const res = await post(server, payload);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ batchItemFailures: [] });
+    expect(orchestrator.onUploaded).toHaveBeenCalledTimes(1);
+    expect(orchestrator.onUploaded).toHaveBeenCalledWith("r1");
+  });
+
+  it("at the overall deadline every unfinished record is returned as failed", async () => {
+    const { server, orchestrator } = setup({ runMode: "lambda", eventsDeadlineMs: 30, eventsConcurrency: 1 });
+    (orchestrator.onUploaded as ReturnType<typeof vi.fn>).mockImplementation(async (id: string) => {
+      if (id !== "fast") await new Promise(() => {});
+    });
+    const res = await post(server, sqs(["m1", s3Body("fast")], ["m2", s3Body("hang")], ["m3", s3Body("never-started")]));
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ batchItemFailures: [{ itemIdentifier: "m2" }, { itemIdentifier: "m3" }] });
+    expect(orchestrator.onUploaded).not.toHaveBeenCalledWith("never-started");
+  });
+
+  it.each([[{ hello: 1 }], [{ Records: [] }], [{ Records: "x" }], [{ Records: Array.from({ length: 101 }, () => 1) }], [[]]])("rejects %j with 400", async (payload) => {
+    const { server, orchestrator } = setup({ runMode: "lambda" });
+    const res = await post(server, payload);
+    expect(res.statusCode).toBe(400);
+    expect(orchestrator.onUploaded).not.toHaveBeenCalled();
+    expect(orchestrator.resumeAll).not.toHaveBeenCalled();
+  });
+});
+
+describe("lambda mode waits for background work", () => {
+  const slow = (state: { done: boolean }) => async () => {
+    await new Promise((r) => setTimeout(r, 15));
+    state.done = true;
+  };
+
+  it("resume route in lambda mode only prepares the resume and answers at once", async () => {
+    const { server, store, artifacts, orchestrator } = setup({ runMode: "lambda" });
+    await seedRun(store, artifacts, true, "failed");
+    (orchestrator.resume as ReturnType<typeof vi.fn>).mockImplementation(() => new Promise(() => {}));
+    const t0 = Date.now();
+    const res = await server.inject({ method: "POST", url: routes.resume("r1") });
+    expect(res.statusCode).toBe(202);
+    expect(res.json()).toEqual({ runId: "r1" });
+    expect(Date.now() - t0).toBeLessThan(500);
+    expect(orchestrator.prepareResume).toHaveBeenCalledWith("r1");
+    expect(orchestrator.resume).not.toHaveBeenCalled();
+  });
+  it("resume route in lambda mode answers 409 when the run is no longer failed", async () => {
+    const { server, store, artifacts, orchestrator } = setup({ runMode: "lambda" });
+    await seedRun(store, artifacts, true, "failed");
+    (orchestrator.prepareResume as ReturnType<typeof vi.fn>).mockRejectedValue(new Conflict("raced"));
+    expect((await server.inject({ method: "POST", url: routes.resume("r1") })).statusCode).toBe(409);
+  });
+  it("scheduled resume-all stops waiting at the deadline", async () => {
+    const { server, orchestrator } = setup({ runMode: "lambda", eventsDeadlineMs: 20 });
+    (orchestrator.resumeAll as ReturnType<typeof vi.fn>).mockImplementation(() => new Promise(() => {}));
+    const res = await server.inject({ method: "POST", url: routes.events(), payload: { source: "aws.events" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ batchItemFailures: [] });
+  });
+  it("container and agentcore modes do not wait", async () => {
+    const { server, orchestrator } = setupBase({ runMode: "agentcore" });
+    const a = { done: false };
+    (orchestrator.onUploaded as ReturnType<typeof vi.fn>).mockImplementation(slow(a));
+    expect((await server.inject({ method: "POST", url: routes.invocations(), payload: { action: "uploaded", runId: "r1" } })).statusCode).toBe(202);
+    expect(a.done).toBe(false);
   });
 });

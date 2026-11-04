@@ -5,8 +5,21 @@ import type { ZodType } from "zod";
 import { artifactKey, inputPdfKey, NotFound } from "../artifacts/artifactStore.js";
 import type { ArtifactStore } from "../artifacts/artifactStore.js";
 import { routes } from "../contract/routes.js";
-import { CreateCommentRequest, CreateRunRequest, SaveVersionRequest } from "../contract/schemas.js";
-import type { CreateRunResponse } from "../contract/schemas.js";
+import { withDeadline } from "../shutdown.js";
+import { parseS3Event } from "../trigger/s3Event.js";
+import { LAMBDA_BACKGROUND_DEADLINE_MS, runBackground } from "./background.js";
+import type { RunMode } from "./background.js";
+import {
+  CreateCommentRequest,
+  CreateRunRequest,
+  INVOCATION_MAX_BODY_BYTES,
+  InvocationRequest,
+  LambdaScheduledEvent,
+  LambdaSqsEnvelope,
+  LambdaSqsRecord,
+  SaveVersionRequest,
+} from "../contract/schemas.js";
+import type { CreateRunResponse, InvocationResponse, LambdaEventResponse, PingResponse } from "../contract/schemas.js";
 import type { Run } from "../domain/types.js";
 import type { LogicModelValidator } from "../steps/logicModelValidator.js";
 import { Conflict } from "../store/store.js";
@@ -16,6 +29,11 @@ import type { Store } from "../store/store.js";
 export interface OrchestratorPort {
   createRun(pages: number[] | undefined, filename: string): Promise<Run>;
   resume(runId: string): Promise<void>;
+  prepareResume(runId: string): Promise<void>;
+  onUploaded(runId: string): Promise<void>;
+  resumeAll(): Promise<void>;
+  activeCount(): number;
+  lastStatusChange(): number | undefined;
 }
 
 export interface ServerDeps {
@@ -27,7 +45,14 @@ export interface ServerDeps {
   onVersionSaved: (runId: string, n: number) => Promise<void>;
   maxPages: number;
   now?: () => number;
+  maxInvocationResponseBytes?: number;
   logger?: boolean;
+  // Default "container". In "lambda" mode background work is awaited before responding
+  // and POST /events (Lambda Web Adapter pass-through) is registered.
+  runMode?: RunMode;
+  eventsConcurrency?: number;
+  eventsDeadlineMs?: number;
+  backgroundDeadlineMs?: number;
 }
 
 const BODY_LIMIT = 5 * 1024 * 1024;
@@ -49,9 +74,35 @@ function parseVersionNumber(raw: string, reply: FastifyReply): number | undefine
   return undefined;
 }
 
+// Pattern segments (":id") become a strict single-segment class, so encoded or
+// dotted tricks cannot reach another route through an "http" invocation.
+const proxiableRegexes = routes.proxiable.map((p) => new RegExp("^" + p.replace(/:[A-Za-z]+/g, "[A-Za-z0-9_-]+") + "$"));
+const selfPaths: readonly string[] = [routes.pattern.ping, routes.pattern.invocations];
+const DROPPED_HEADERS = new Set(["host", "content-length", "connection", "transfer-encoding"]);
+
+const messageIdOf = (rec: unknown): string | undefined => {
+  const id = typeof rec === "object" && rec !== null ? (rec as { messageId?: unknown }).messageId : undefined;
+  return typeof id === "string" && id.length > 0 ? id : undefined;
+};
+
+const errName = (e: unknown): string => (e instanceof Error ? e.name : "unknown");
+
+// Runs fn over items with at most `limit` in flight; fn must not throw.
+async function forEachLimited<T>(items: readonly T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < items.length) await fn(items[next++] as T);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const { orchestrator, store, artifacts, validator, presign, onVersionSaved, maxPages } = deps;
   const now = deps.now ?? Date.now;
+  const runMode = deps.runMode ?? "container";
+  const bgDeadline = deps.backgroundDeadlineMs ?? LAMBDA_BACKGROUND_DEADLINE_MS;
+  const background = (work: Promise<unknown>, onError: (e: unknown) => void, onDeadline?: () => void): Promise<void> =>
+    runBackground(runMode, work, onError, bgDeadline, onDeadline);
   const app = Fastify({ logger: deps.logger ?? false, bodyLimit: BODY_LIMIT });
 
   app.setErrorHandler((err: Error, req, reply) => {
@@ -183,11 +234,132 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (!run) return reply.code(404).send({ error: "not_found" });
     if (run.state !== "failed") return reply.code(409).send({ error: "not_failed" });
     const runId = run.runId;
-    orchestrator.resume(runId).catch((err: unknown) => {
-      app.log.error({ runId, errName: err instanceof Error ? err.name : "unknown" }, "resume failed");
-    });
+    if (runMode === "lambda") {
+      // An HTTP API gives up after 30 s and Lambda freezes work once the response is sent, so do
+      // only the quick failed -> step-state transition. The run is then in a work state with no
+      // lease and the scheduled sweep (listResumable) advances it within minutes.
+      await orchestrator.prepareResume(runId);
+      return reply.code(202).send({ runId });
+    }
+    await background(orchestrator.resume(runId), (err) => app.log.error({ runId, errName: errName(err) }, "resume failed"), () =>
+      app.log.warn({ runId }, "resume still running at the lambda deadline; response sent anyway"),
+    );
     return reply.code(202).send({ runId });
   });
+
+  // AgentCore Runtime HTTP contract. The busy flag comes from the in-process active set.
+  app.get(routes.pattern.ping, async () => {
+    const status: PingResponse["status"] = orchestrator.activeCount() > 0 ? "HealthyBusy" : "Healthy";
+    const changed = orchestrator.lastStatusChange();
+    const res: PingResponse = changed === undefined ? { status } : { status, time_of_last_update: Math.floor(changed / 1000) };
+    return res;
+  });
+
+  if (runMode === "agentcore") {
+  const maxResponseBytes = deps.maxInvocationResponseBytes ?? INVOCATION_MAX_BODY_BYTES;
+  const accepted: InvocationResponse = { accepted: true };
+  app.post(routes.pattern.invocations, async (req, reply) => {
+    const body = parseBody(InvocationRequest, req.body, reply);
+    if (!body) return reply;
+    if (body.action === "uploaded") {
+      const runId = body.runId;
+      await background(orchestrator.onUploaded(runId), (err) =>
+        app.log.error({ runId, errName: errName(err) }, "onUploaded failed"),
+      );
+      return reply.code(202).send(accepted);
+    }
+    if (body.action === "resume_all") {
+      await background(orchestrator.resumeAll(), (err) => app.log.error({ errName: errName(err) }, "resumeAll failed"));
+      return reply.code(202).send(accepted);
+    }
+    const pathname = body.path.split(/[?#]/)[0] ?? "";
+    if (selfPaths.includes(pathname.replace(/\/+$/, ""))) {
+      return reply.code(400).send({ error: "path_not_allowed" });
+    }
+    if (!proxiableRegexes.some((re) => re.test(pathname))) return reply.code(404).send({ error: "not_found" });
+    const headers = Object.fromEntries(Object.entries(body.headers ?? {}).filter(([k]) => !DROPPED_HEADERS.has(k.toLowerCase())));
+    const inner = await app.inject({
+      method: body.method,
+      url: body.path,
+      headers,
+      ...(body.body === undefined ? {} : { payload: body.body }),
+    });
+    if (Buffer.byteLength(inner.body) > maxResponseBytes) return reply.code(502).send({ error: "response_too_large" });
+    const contentType = inner.headers["content-type"];
+    const out: InvocationResponse = {
+      statusCode: inner.statusCode,
+      headers: typeof contentType === "string" ? { "content-type": contentType } : {},
+      body: inner.body,
+    };
+    return reply.code(200).send(out);
+  });
+  }
+
+  if (runMode === "lambda") {
+    // Non-HTTP Lambda events forwarded by the Lambda Web Adapter. Everything is awaited:
+    // Lambda freezes the process once this response is sent.
+    const concurrency = deps.eventsConcurrency ?? 4;
+    const eventsDeadline = deps.eventsDeadlineMs ?? LAMBDA_BACKGROUND_DEADLINE_MS;
+    app.post(routes.pattern.events, async (req, reply) => {
+      const envelope = LambdaSqsEnvelope.safeParse(req.body);
+      if (envelope.success) {
+        const ids = new Map<number, string>();
+        const finished = new Set<number>();
+        const failed = new Set<number>();
+        let stopped = false;
+        const indexes = envelope.data.Records.map((_, i) => i);
+        const work = forEachLimited(indexes, concurrency, async (i) => {
+          if (stopped) return;
+          const parsed = LambdaSqsRecord.safeParse(envelope.data.Records[i]);
+          if (!parsed.success) {
+            req.log.warn({ index: i }, "malformed record; consumed");
+            finished.add(i);
+            return;
+          }
+          const rec = parsed.data;
+          ids.set(i, rec.messageId);
+          try {
+            const runIds = [...new Set(parseS3Event(rec.body).map((o) => o.runId))];
+            if (runIds.length === 0) req.log.info({ messageId: rec.messageId }, "record has no uploaded input; consumed");
+            for (const runId of runIds) {
+              try {
+                await orchestrator.onUploaded(runId);
+              } catch (e) {
+                if (!(e instanceof NotFound)) throw e;
+                req.log.warn({ messageId: rec.messageId }, "unknown run; consumed");
+              }
+            }
+            finished.add(i);
+          } catch (e) {
+            req.log.error({ messageId: rec.messageId, errName: errName(e) }, "record failed; left for redelivery");
+            failed.add(i);
+          }
+        });
+        const completed = await withDeadline(work, eventsDeadline);
+        if (!completed) {
+          stopped = true;
+          req.log.error({ unfinished: indexes.length - finished.size - failed.size }, "events deadline reached; unfinished records left for redelivery");
+        }
+        const items = indexes
+          .filter((i) => failed.has(i) || !finished.has(i))
+          .flatMap((i) => {
+            const id = ids.get(i) ?? messageIdOf(envelope.data.Records[i]);
+            return id === undefined ? [] : [{ itemIdentifier: id }];
+          });
+        const res: LambdaEventResponse = { batchItemFailures: items };
+        return reply.code(200).send(res);
+      }
+      if (LambdaScheduledEvent.safeParse(req.body).success) {
+        // Same deadline as the batch handling: an invocation killed at the Lambda timeout is retried by Lambda.
+        if (!(await withDeadline(orchestrator.resumeAll(), eventsDeadline))) {
+          req.log.error("scheduled resume-all reached the deadline; remaining runs left for the next sweep");
+        }
+        const res: LambdaEventResponse = { batchItemFailures: [] };
+        return reply.code(200).send(res);
+      }
+      return reply.code(400).send({ error: "invalid_request", issues: ["unrecognised event"] });
+    });
+  }
 
   return app;
 }

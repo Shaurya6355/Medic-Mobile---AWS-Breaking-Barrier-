@@ -8,10 +8,17 @@ export interface Config {
   host: string;
   tables: { runs: string; steps: string; versions: string; comments: string; audit: string };
   artifactBucket: string;
-  uploadQueueUrl: string;
+  runMode: "container" | "agentcore" | "lambda";
+  // Absent in agentcore and lambda modes: a trigger outside the process calls /invocations instead.
+  uploadQueueUrl?: string;
   modelId: string;
+  // bedrock: Strands runs in this process; agentcore: it runs on an AgentCore Runtime (AgentService).
+  modelBackend: "bedrock" | "agentcore";
+  agentCoreRuntimeArn?: string;
   leaseMs: number;
   maxPages: number;
+  // Largest input PDF ingest will download, in bytes.
+  maxPdfBytes: number;
   sqsConcurrency: number;
   shutdownTimeoutMs: number;
   pythonBin: string;
@@ -27,7 +34,6 @@ const REQUIRED = [
   "TABLE_COMMENTS",
   "TABLE_AUDIT",
   "ARTIFACT_BUCKET",
-  "UPLOAD_QUEUE_URL",
   "MODEL_ID",
 ] as const;
 
@@ -49,9 +55,41 @@ const str = (env: NodeJS.ProcessEnv, name: string, dflt: string): string => {
   return v === undefined || v === "" ? dflt : v;
 };
 
+// Lambda invocations last at most 15 minutes (900000 ms); a lease at or below that could be
+// taken over while the invocation is still alive.
+const LAMBDA_MIN_LEASE_MS = 900000;
+
+function leaseMs(env: NodeJS.ProcessEnv, runMode: Config["runMode"]): number {
+  if (runMode !== "lambda") return positiveInt(env, "LEASE_MS", 900000);
+  const n = positiveInt(env, "LEASE_MS", 960000);
+  if (n <= LAMBDA_MIN_LEASE_MS) throw new Error(`LEASE_MS must be above ${LAMBDA_MIN_LEASE_MS} in lambda mode (the 15 minute Lambda timeout); use 960000`);
+  return n;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
-  const missing = REQUIRED.filter((n) => env[n] === undefined || env[n] === "");
+  const rawMode = str(env, "RUN_MODE", "container");
+  if (rawMode !== "container" && rawMode !== "agentcore" && rawMode !== "lambda") {
+    throw new Error("RUN_MODE must be one of: container, agentcore, lambda");
+  }
+  const runMode = rawMode;
+  const rawBackend = str(env, "MODEL_BACKEND", "bedrock");
+  if (rawBackend !== "bedrock" && rawBackend !== "agentcore") {
+    throw new Error("MODEL_BACKEND must be one of: bedrock, agentcore");
+  }
+  const modelBackend = rawBackend;
+  const required: readonly string[] = runMode === "container" ? [...REQUIRED, "UPLOAD_QUEUE_URL"] : REQUIRED;
+  const missing = required.filter((n) => env[n] === undefined || env[n] === "");
   if (missing.length > 0) throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
+  let agentCoreRuntimeArn: string | undefined;
+  if (modelBackend === "agentcore") {
+    agentCoreRuntimeArn = env["AGENTCORE_RUNTIME_ARN"];
+    if (agentCoreRuntimeArn === undefined || agentCoreRuntimeArn === "") {
+      throw new Error("AGENTCORE_RUNTIME_ARN is required when MODEL_BACKEND=agentcore");
+    }
+    if (!/^arn:aws[a-z-]*:bedrock-agentcore:[a-z0-9-]+:\d{12}:runtime\/.+/.test(agentCoreRuntimeArn)) {
+      throw new Error("AGENTCORE_RUNTIME_ARN must be a bedrock-agentcore runtime ARN");
+    }
+  }
   const req = (n: (typeof REQUIRED)[number]): string => env[n] as string;
   return {
     region: str(env, "AWS_REGION", "us-west-2"),
@@ -65,10 +103,14 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       audit: req("TABLE_AUDIT"),
     },
     artifactBucket: req("ARTIFACT_BUCKET"),
-    uploadQueueUrl: req("UPLOAD_QUEUE_URL"),
+    runMode,
+    ...(runMode === "container" ? { uploadQueueUrl: env["UPLOAD_QUEUE_URL"] as string } : {}),
     modelId: req("MODEL_ID"),
-    leaseMs: positiveInt(env, "LEASE_MS", 900000),
+    modelBackend,
+    ...(agentCoreRuntimeArn !== undefined ? { agentCoreRuntimeArn } : {}),
+    leaseMs: leaseMs(env, runMode),
     maxPages: positiveInt(env, "MAX_PAGES", 200),
+    maxPdfBytes: positiveInt(env, "MAX_PDF_BYTES", 52428800),
     sqsConcurrency: positiveInt(env, "SQS_CONCURRENCY", 4),
     shutdownTimeoutMs: positiveInt(env, "SHUTDOWN_TIMEOUT_MS", 25000),
     pythonBin: str(env, "PYTHON_BIN", "python3"),
