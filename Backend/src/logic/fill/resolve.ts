@@ -48,8 +48,8 @@ const MISSING_SHA = "0".repeat(64);
 
 // ---------- small deterministic parsers ----------
 
-const collapse = (s: string): string => s.replace(/\s+/g, " ").trim();
-const clipText = (s: string, max = TEXT_MAX): string => {
+export const collapse = (s: string): string => s.replace(/\s+/g, " ").trim();
+export const clipText = (s: string, max = TEXT_MAX): string => {
   const one = collapse(s);
   return one.length <= max ? one : `${one.slice(0, max - 3).trimEnd()}...`;
 };
@@ -113,7 +113,7 @@ const ENTRY_LIMITS: Record<string, { min: number; max: number; message: string }
 };
 const DEFAULT_LIMIT = { min: 0, max: 999, message: "Enter a whole number." };
 
-function sources(srcs: readonly ExSrc[]): Source[] {
+export function sources(srcs: readonly ExSrc[]): Source[] {
   const seen = new Set<string>();
   const out: Source[] = [];
   for (const s of srcs) {

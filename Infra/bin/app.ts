@@ -3,6 +3,7 @@ import { App, Tags } from "aws-cdk-lib";
 import { OrchestratorLambdaStack } from "../lib/lambda-stack";
 import { OrchestratorAgentCoreStack } from "../lib/agentcore-stack";
 import { OrchestratorDataStack, PROJECT_TAG_KEY, PROJECT_TAG_VALUE } from "../lib/data-stack";
+import { OrchestratorWebStack } from "../lib/web-stack";
 
 const app = new App();
 // CDK_DEFAULT_REGION is deliberately ignored: the CDK CLI sets it from the active profile and falls
@@ -17,7 +18,7 @@ const data = new OrchestratorDataStack(app, "OrchestratorDataStack", { env });
 const modelBackend = (app.node.tryGetContext("modelBackend") as string | undefined) ?? "bedrock";
 // AgentCore is opt-in (not organiser-approved yet, DEC-008): the default deploy never creates it.
 const agentCore = modelBackend === "agentcore" ? new OrchestratorAgentCoreStack(app, "OrchestratorAgentCoreStack", { env }) : undefined;
-new OrchestratorLambdaStack(app, "OrchestratorLambdaStack", {
+const lambda = new OrchestratorLambdaStack(app, "OrchestratorLambdaStack", {
   env,
   runsTable: data.runsTable,
   stepsTable: data.stepsTable,
@@ -29,5 +30,9 @@ new OrchestratorLambdaStack(app, "OrchestratorLambdaStack", {
   appPolicy: data.appPolicy,
   bedrockPolicy: data.bedrockPolicy,
   agentCoreRuntimeArn: agentCore?.runtimeArn,
+});
+new OrchestratorWebStack(app, "OrchestratorWebStack", {
+  env,
+  apiUrl: lambda.httpApi.attrApiEndpoint,
 });
 Tags.of(app).add(PROJECT_TAG_KEY, PROJECT_TAG_VALUE);

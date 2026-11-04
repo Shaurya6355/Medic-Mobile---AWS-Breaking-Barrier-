@@ -55,6 +55,15 @@ describe("function", () => {
     expect(e.MODEL_ID).toBe("us.x.y-v1:0");
     expect(JSON.parse(e.PRICES_JSON)).toEqual({ "us.x.y-v1:0": { inPerMTok: 1, outPerMTok: 2 } });
   });
+  it("passes RUN_BUDGET_USD from the runBudgetUsd context, as a number or a string, and omits it by default", () => {
+    const envOf = (t2: Template) => (Object.values(t2.findResources("AWS::Lambda::Function"))[0] as any).Properties.Environment.Variables;
+    expect(envOf(build({ runBudgetUsd: 25 })).RUN_BUDGET_USD).toBe("25");
+    expect(envOf(build({ runBudgetUsd: "12.5" })).RUN_BUDGET_USD).toBe("12.5");
+    expect(fn().Properties.Environment.Variables.RUN_BUDGET_USD).toBeUndefined();
+  });
+  it("rejects a runBudgetUsd that is not a positive number", () => {
+    for (const bad of [0, -1, "abc"]) expect(() => build({ runBudgetUsd: bad })).toThrow(/runBudgetUsd/);
+  });
   it("attaches the app managed policy to the role", () => {
     const roles = Object.values(t.findResources("AWS::IAM::Role")) as any[];
     const withPolicy = roles.filter((r) => (r.Properties.ManagedPolicyArns ?? []).some((a: any) => JSON.stringify(a).includes("OrchestratorAppPolicy") || JSON.stringify(a).includes("Fn::ImportValue")));
@@ -118,8 +127,13 @@ describe("http api", () => {
       [
         "POST /runs", "GET /runs", "GET /runs/{id}", "GET /runs/{id}/versions", "POST /runs/{id}/versions",
         "GET /runs/{id}/versions/{n}", "GET /runs/{id}/versions/{n}/comments", "POST /runs/{id}/versions/{n}/comments",
-        "GET /runs/{id}/versions/{n}/findings", "GET /runs/{id}/versions/{n}/status", "POST /runs/{id}/versions/{n}/signatures/{role}",
-        "POST /runs/{id}/versions/{n}/reject", "POST /runs/{id}/resume",
+        "GET /runs/{id}/versions/{n}/findings", "GET /runs/{id}/versions/{n}/flags", "GET /runs/{id}/versions/{n}/status", "POST /runs/{id}/versions/{n}/signatures/{role}",
+        "POST /runs/{id}/versions/{n}/reject", "POST /runs/{id}/resume", "GET /runs/{id}/metrics",
+        "POST /runs/{id}/versions/{n}/revisions", "GET /runs/{id}/versions/{n}/revisions",
+        "GET /runs/{id}/revisions/{rid}", "POST /runs/{id}/revisions/{rid}/confirm",
+        "GET /runs/{id}/activity", "POST /runs/{id}/chat", "GET /runs/{id}/versions/{n}/flow",
+        "POST /runs/{id}/versions/{n}/edits/preview", "POST /runs/{id}/versions/{n}/edits",
+        "GET /runs/{id}/versions/{a}/diff/{b}", "GET /runs/{id}/versions/{n}/change", "POST /runs/{id}/versions/{n}/restore",
       ].sort(),
     );
   });
@@ -170,5 +184,54 @@ describe("outputs and hygiene", () => {
     const agnostic = JSON.stringify(build({}, null).toJSON());
     expect(agnostic).not.toMatch(/\b\d{12}\b/);
     expect(agnostic).not.toContain("111111111111");
+  });
+});
+
+describe("revision loop async self-invoke", () => {
+  const policies = (): any[] => Object.values(t.findResources("AWS::IAM::Policy")) as any[];
+  const statements = (): any[] => policies().flatMap((p) => [p.Properties.PolicyDocument.Statement].flat());
+  const invokes = (): any[] => statements().filter((s) => [s.Action].flat().includes("lambda:InvokeFunction"));
+
+  it("grants lambda:InvokeFunction on the function itself only", () => {
+    expect(invokes()).toHaveLength(1);
+    const st = invokes()[0];
+    expect(st.Effect).toBe("Allow");
+    expect(st.Action).toBe("lambda:InvokeFunction");
+    const res = [st.Resource].flat();
+    expect(res).toHaveLength(1);
+    const json = JSON.stringify(res[0]);
+    expect(json).toContain(":function:L-orchestrator");
+    expect(json).not.toContain('"*"');
+    expect(fn().Properties.FunctionName).toBe("L-orchestrator");
+  });
+  it("has no wildcard resource on any statement of the function policies", () => {
+    for (const st of statements().filter((s) => [s.Action].flat().includes("lambda:InvokeFunction"))) {
+      expect([st.Resource].flat()).not.toContain("*");
+    }
+  });
+  it("synthesizes without a circular dependency (policy does not reference the function)", () => {
+    const st = invokes()[0];
+    expect(JSON.stringify(st.Resource)).not.toContain("OrchestratorFunction");
+  });
+  it("sets no automatic async retries", () => {
+    const cfgs = Object.values(t.findResources("AWS::Lambda::EventInvokeConfig")) as any[];
+    expect(cfgs).toHaveLength(1);
+    expect(cfgs[0].Properties.MaximumRetryAttempts).toBe(0);
+  });
+  it("keeps the API integration timeout at the 30 s maximum", () => {
+    const integ = Object.values(t.findResources("AWS::ApiGatewayV2::Integration")) as any[];
+    expect(integ).toHaveLength(1);
+    expect(integ[0].Properties.TimeoutInMillis).toBe(30000);
+  });
+  it("still exposes no /events, /invocations, /ping or catch-all route", () => {
+    const keys = (Object.values(t.findResources("AWS::ApiGatewayV2::Route")) as any[]).map((r) => r.Properties.RouteKey as string);
+    for (const k of keys) {
+      expect(k).not.toMatch(/\/(events|invocations|ping)/);
+      expect(k).not.toMatch(/\$default|ANY|\{proxy\+\}/);
+    }
+    expect(keys).toContain("POST /runs/{id}/revisions/{rid}/confirm");
+  });
+  it("keeps the lease above the function timeout", () => {
+    expect(Number(fn().Properties.Environment.Variables.LEASE_MS)).toBeGreaterThan(fn().Properties.Timeout * 1000);
   });
 });

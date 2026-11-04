@@ -20,14 +20,16 @@ import {
   type CheckInputsProvider,
   type FindingsRecord,
   type LoadedVersion,
+  ensureFlags,
   type StoreIo,
 } from "./checks.js";
+import type { FlagsDocument } from "../validation/flags.js";
 import { InvalidUserId, OFFICER_AGENT_ID, normaliseUserId, sameUser } from "./identity.js";
 import { approvalStatus, validSignatures, verifyLock, type ApprovalStatus } from "./rules.js";
 
 /**
  * Sign-off of logic model versions (BRD AR-01 to AR-10, section 4; DEC-019). Humans approve, code enforces:
- * - the officer agent signs first (DEC-024), the clinician second; the agent is never a person's userId;
+ * - the officer agent signs first (DEC-038), the clinician second; the agent is never a person's userId;
  * - a signature names the modelSha the signer reviewed and binds to exactly that content;
  * - a signature is refused while the findings gate for that role has blocking findings;
  * - both signatures on the same sha lock the version; any later edit is a new version with none;
@@ -242,6 +244,12 @@ export class Signoff {
     return (await this.ensure(runId, n)).record;
   }
 
+  /** The flags (cross-check findings) of version n as stored for the front end; computed when missing. */
+  async flagsDocument(runId: string, n: number): Promise<FlagsDocument> {
+    await this.mustRun(runId);
+    return (await this.notFoundAs404(ensureFlags(this.io, runId, n))).doc;
+  }
+
   async findingsView(runId: string, n: number, audience?: SignerRole): Promise<FindingsView> {
     const rec = await this.findingsRecord(runId, n);
     const base = {
@@ -300,7 +308,7 @@ export class Signoff {
     // AUTH SEAM (DEC-015): req.role and req.userId are trusted as given. With Cognito, the role comes from
     // the token's group and this check rejects a user signing at the other role's endpoint.
     if (req.role !== role) throw new SignoffError(403, "role_mismatch", `This endpoint is for the ${role} signature; the request says ${req.role}`);
-    // The program officer slot belongs to the officer agent (DEC-024); no HTTP caller can fill it.
+    // The program officer slot belongs to the officer agent (DEC-038); no HTTP caller can fill it.
     if (role === "program_officer") throw new SignoffError(403, "agent_only", "The program officer signature is given by the officer agent, not by a person");
     return this.signInternal(runId, n, role, Signoff.userIdOf(req.userId), req.modelSha);
   }

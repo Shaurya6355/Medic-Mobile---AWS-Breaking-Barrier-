@@ -9,7 +9,9 @@ import type { LogicModelValidator } from "../../src/steps/logicModelValidator.js
 import { MemoryStore } from "../../src/store/memoryStore.js";
 import type { Run } from "../../src/domain/types.js";
 import { Conflict } from "../../src/store/store.js";
-function setupBase(opts: { validator?: LogicModelValidator; onVersionSaved?: (r: string, n: number) => Promise<void>; clock?: { ms: number }; maxInvocationResponseBytes?: number; runMode?: "container" | "agentcore" | "lambda"; eventsConcurrency?: number; backgroundDeadlineMs?: number; eventsDeadlineMs?: number; statusChangedAtMs?: number } = {}) {
+import type { RevisionService } from "../../src/revision/service.js";
+import type { Revision } from "../../src/revision/types.js";
+function setupBase(opts: { validator?: LogicModelValidator; onVersionSaved?: (r: string, n: number) => Promise<void>; clock?: { ms: number }; maxInvocationResponseBytes?: number; runMode?: "container" | "agentcore" | "lambda"; eventsConcurrency?: number; backgroundDeadlineMs?: number; eventsDeadlineMs?: number; statusChangedAtMs?: number; revisions?: RevisionService } = {}) {
   const store = new MemoryStore();
   const artifacts = new MemoryArtifactStore();
   let t = 1000;
@@ -40,6 +42,7 @@ function setupBase(opts: { validator?: LogicModelValidator; onVersionSaved?: (r:
     ...(opts.eventsConcurrency ? { eventsConcurrency: opts.eventsConcurrency } : {}),
     ...(opts.eventsDeadlineMs ? { eventsDeadlineMs: opts.eventsDeadlineMs } : {}),
     ...(opts.backgroundDeadlineMs ? { backgroundDeadlineMs: opts.backgroundDeadlineMs } : {}),
+    ...(opts.revisions ? { revisions: opts.revisions } : {}),
     now: () => opts.clock?.ms ?? 5000,
     ...(opts.maxInvocationResponseBytes ? { maxInvocationResponseBytes: opts.maxInvocationResponseBytes } : {}),
   });
@@ -144,7 +147,7 @@ describe("GET runs", () => {
     const body = res.json();
     expect(body.run.state).toBe("extracting");
     expect(body.steps).toHaveLength(2);
-    expect(body.totals).toEqual({ inputTokens: 30, outputTokens: 12, costUsd: 0.5, latencyMs: 150 });
+    expect(body.totals).toEqual({ inputTokens: 30, outputTokens: 12, costUsd: 0.5, latencyMs: 150, unpricedModels: [] });
   });
 
   it("totals costUsd as null when none defined", async () => {
@@ -152,6 +155,36 @@ describe("GET runs", () => {
     await store.createRun({ runId: "r", state: "created", createdAt: 1 });
     const res = await server.inject({ method: "GET", url: routes.run("r") });
     expect(res.json().totals.costUsd).toBeNull();
+  });
+
+  it("run response totals include revision model calls", async () => {
+    const row = { process: "revision", versionId: "1", inputTokens: 100, outputTokens: 50, costUsd: 0.05, modelId: "m1", latencyMs: 200 };
+    const revisions = { usageRows: async () => [row] } as unknown as RevisionService;
+    const { server, store } = setup({ revisions });
+    await store.createRun({ runId: "r", state: "extracting", createdAt: 1 });
+    await store.appendStep({ runId: "r", status: "succeeded", startedAt: 1, artifactRefs: {}, step: "extract", attempt: 1, inputTokens: 10, outputTokens: 5, costUsd: 0.1, latencyMs: 100, modelId: "m1", versionId: "1" });
+    const body = (await server.inject({ method: "GET", url: routes.run("r") })).json();
+    expect(body.totals.costUsd).toBeCloseTo(0.15);
+    expect(body.byProcess.revision.latencyMs).toBe(200);
+    expect(body.byVersion["1"].inputTokens).toBe(110);
+  });
+
+  it("run response flags unpriced models", async () => {
+    const { server, store } = setup();
+    await store.createRun({ runId: "r", state: "extracting", createdAt: 1 });
+    await store.appendStep({ runId: "r", status: "succeeded", startedAt: 1, artifactRefs: {}, step: "extract", attempt: 1, inputTokens: 10, outputTokens: 5, latencyMs: 100, modelId: "m9" });
+    const body = (await server.inject({ method: "GET", url: routes.run("r") })).json();
+    expect(body.totals.unpricedModels).toEqual(["m9"]);
+    expect(body.totals.costUsd).toBeNull();
+  });
+
+  it("run response has zero totals and empty groups for a run with no steps", async () => {
+    const { server, store } = setup();
+    await store.createRun({ runId: "r", state: "created", createdAt: 1 });
+    const body = (await server.inject({ method: "GET", url: routes.run("r") })).json();
+    expect(body.totals).toEqual({ inputTokens: 0, outputTokens: 0, costUsd: null, latencyMs: 0, unpricedModels: [] });
+    expect(body.byProcess).toEqual({});
+    expect(body.byVersion).toEqual({});
   });
 
   it("returns 404 for unknown run", async () => {

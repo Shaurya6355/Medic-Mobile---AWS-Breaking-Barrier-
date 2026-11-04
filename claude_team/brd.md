@@ -141,7 +141,7 @@ All three users are non-technical. None of them should ever need to read XLSForm
 
 | Role | What they do in the tool | What they cannot do |
 | --- | --- | --- |
-| Program officer (played by the officer agent, DEC-024) | Reviews the AI draft. Fixes citations and file details. Answers only the open questions routed to the program officer. Signs each version first, as the officer agent. A person uploads the guideline and picks the pathway. | Release to IT. Change rules, thresholds, outcomes or action text. Answer clinician questions. Sign a version the clinician hasn't seen after it. |
+| Program officer (played by the officer agent, DEC-038) | Reviews the AI draft. Fixes citations and file details. Answers only the open questions routed to the program officer. Signs each version first, as the officer agent. A person uploads the guideline and picks the pathway. | Release to IT. Change rules, thresholds, outcomes or action text. Answer clinician questions. Sign a version the clinician hasn't seen after it. |
 | Clinician (the only human approver) | Reviews the table and flowchart. Edits the tree through a closed set of edits with a preview. Rejects with a comment on a specific rule. Signs each version second. Marks a change as urgent. | Sign before the officer. Start a change request (after the MVP). |
 | IT | Sees signed versions, what changed, and the test report. Releases to the CHT instance. | Edit the logic. Approve clinical content. |
 
@@ -302,7 +302,7 @@ Optional if time allows: the urgent release path (RR-01 to RR-03).
 | OQ-05 | Which criteria will Medic use to pick a build? | Medic |
 | OQ-06 | Medic said in person to add more workflows if we finish early. Medic's documents list more than one pathway as out of scope. Is a second pathway a stretch goal? | Team, Medic |
 | OQ-07 | Medic said "IT is agentic, so should approve immediately." Medic's documents require a human release approval (RR-05). Can the release step be fully automatic, or does a person still approve? | Medic |
-| OQ-08 | Medic must confirm the role change: the program officer's review and signature are done by an officer agent and the clinician is the only human approver (DEC-024). | Medic |
+| OQ-08 | Medic must confirm the role change: the program officer's review and signature are done by an officer agent and the clinician is the only human approver (DEC-038). | Medic |
 
 ## Change log
 

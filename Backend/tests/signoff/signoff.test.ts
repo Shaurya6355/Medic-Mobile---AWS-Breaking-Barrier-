@@ -27,7 +27,7 @@ describe("findings (BR-11: checks before anyone signs)", () => {
     const sha = shaOf(draftV1());
     const rec = await signoff.findingsRecord("r1", 1);
     expect(rec.modelSha).toBe(sha);
-    expect(rec.context).toEqual({ document: true, extraction: true, goldenCases: true, compileSettings: true, history: 0 });
+    expect(rec.context).toEqual({ document: true, extraction: true, goldenCases: true, compileSettings: true, crossCheck: false, history: 0 });
     expect(rec.claim).toBe("PROVEN");
     expect(rec.gates.canOfficerSign).toBe(false);
     expect(await artifacts.exists(findingsKey("r1", sha, IN))).toBe(true);

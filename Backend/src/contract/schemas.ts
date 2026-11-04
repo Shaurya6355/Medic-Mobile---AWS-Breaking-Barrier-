@@ -28,7 +28,7 @@ export const UserId = z
   .transform((raw, ctx) => {
     try {
       const id = normaliseUserId(raw);
-      // DEC-024: the officer agent's id can never arrive in a request body.
+      // DEC-038: the officer agent's id can never arrive in a request body.
       if (isReservedUserId(id)) {
         ctx.addIssue({ code: "custom", message: "this userId is reserved for the officer agent" });
         return z.NEVER;
@@ -68,6 +68,30 @@ export const RejectRequest = z
   })
   .strict();
 export type RejectRequest = z.input<typeof RejectRequest>;
+
+// Revision loop. AUTH SEAM (DEC-015): role and userId from the body until Cognito, as for SignRequest.
+// Step 1: ask the AI to turn the comments on a version into a revision instruction.
+export const CreateRevisionRequest = z
+  .object({
+    role: SignerRole,
+    userId: UserId,
+    // Restrict to the comments on these items (for example "rules.R3"); default: every comment.
+    itemRefs: z.array(z.string().min(1).max(500)).min(1).max(200).optional(),
+  })
+  .strict();
+export type CreateRevisionRequest = z.input<typeof CreateRevisionRequest>;
+
+// Step 2: confirm the instruction (optionally as the person edited it) so the AI proposes edits.
+// Answers 202 with the revision in status "applying"; the work runs in the background and the client polls
+// GET /runs/:id/revisions/:rid until the status is applied, no_change or failed.
+export const ConfirmRevisionRequest = z
+  .object({
+    role: SignerRole,
+    userId: UserId,
+    instruction: z.string().trim().min(15).max(5000).optional(),
+  })
+  .strict();
+export type ConfirmRevisionRequest = z.input<typeof ConfirmRevisionRequest>;
 
 export const FindingsQuery = z.object({ audience: SignerRole.optional() }).strict();
 export type FindingsQuery = z.infer<typeof FindingsQuery>;
@@ -159,7 +183,14 @@ export const LambdaScheduledEvent = z
   });
 export type LambdaScheduledEvent = z.infer<typeof LambdaScheduledEvent>;
 
-export const LambdaEvent = z.union([LambdaSqsEvent, LambdaScheduledEvent]);
+// The revision loop's asynchronous self-invoke (lambda mode): runs step 2 of a confirmed revision.
+// Sent by LambdaAsyncDispatcher (src/revision/dispatch.ts); not an AWS event.
+export const LambdaRevisionEvent = z
+  .object({ source: z.literal("revision"), runId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/), revisionId: z.string().regex(/^[A-Za-z0-9-]{1,128}$/) })
+  .strict();
+export type LambdaRevisionEvent = z.infer<typeof LambdaRevisionEvent>;
+
+export const LambdaEvent = z.union([LambdaSqsEvent, LambdaScheduledEvent, LambdaRevisionEvent]);
 export type LambdaEvent = z.infer<typeof LambdaEvent>;
 
 export const LambdaEventResponse = z.object({

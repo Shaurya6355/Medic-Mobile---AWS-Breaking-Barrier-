@@ -431,6 +431,72 @@ const TEMPLATES: Record<string, Template> = {
   GOLDEN_COUNT: (p) =>
     `${s(p, "total")} test cases were run through the draft: ${s(p, "agree")} give the expected result and ${s(p, "different")} do not. This is for information; the cases only show that the draft does what the clinician expects, so they are as good as the cases themselves.`,
 
+  CROSS_CHECK_SECOND_DRAFT_INVALID: (p) =>
+    `The second, independent draft could not be read as a logic model, so it was not compared with the first: ${s(p, "issue")}${Number(p["count"]) > 1 ? ` (and ${Number(p["count"]) - 1} more problems)` : ""}. Nothing has been confirmed by the comparison, so its silence is not a pass. The program officer asks for the second draft to be produced again.`,
+
+  CROSS_CHECK_NOT_COMPARED: (p) =>
+    `The first and the second draft could not be compared child by child: the combinations of answers they share number ${s(p, "combinations")}, more than the comparison goes through. Differences in questions, cut-off numbers and results are still reported, but what each child would get was not compared. The program officer asks for a smaller pathway or a higher limit.`,
+
+  CROSS_CHECK_SUMMARY: (p) =>
+    `The first and the second draft were compared for ${s(p, "compared")} combinations of answers: ${s(p, "differing")} give a different result${Number(p["differing"]) > 0 ? `, in ${s(p, "groups")} different ways` : ""}${Number(p["skipped"]) > 0 ? `, and ${s(p, "skipped")} could not be compared because one draft does not accept those answers` : ""}. This is for information. Two drafts agreeing does not make either of them right, since both could repeat the same mistake; a person still reviews the draft.`,
+
+  CROSS_CHECK_DISAGREEMENT: (p, a) =>
+    `The two independent drafts give different results. For example ${s(p, "child")}${s(p, "extra") === "" ? "" : `, and, in the second draft only, ${s(p, "extra")}`}, gets "${s(p, "firstOutcome")}" in the first draft (${s(p, "firstRule")}) and "${s(p, "secondOutcome")}" in the second (${s(p, "secondRule")}); ${s(p, "count")} of the ${s(p, "total")} combinations compared differ in this way.${
+      p["direction"] === "less_urgent_in_second" ? " The second draft treats this child as less urgent." : p["direction"] === "more_urgent_in_second" ? " The second draft treats this child as more urgent." : ""
+    } ${bookletOpt(p)} ${
+      a === "clinician"
+        ? "The clinician decides which draft is right, or whether the booklet itself is unclear. Neither draft is assumed to be correct."
+        : "The program officer sends this to the clinician, who decides which draft is right. Neither draft is assumed to be correct."
+    }`,
+
+  CROSS_CHECK_QUESTION_ONLY_IN_ONE: (p, a) =>
+    `Only the ${s(p, "draft")} draft asks the question "${s(p, "question")}" (${s(p, "answerKind")}), so the other draft decides without it. ${bookletOpt(p)} ${
+      a === "clinician" ? "The clinician decides whether the question belongs in the pathway." : "The program officer asks the clinician whether the question belongs in the pathway."
+    }`,
+
+  CROSS_CHECK_QUESTION_DIFFERS: (p, a) =>
+    `The two drafts ask "${s(p, "question")}" differently: ${s(p, "differences")}. ${bookletOpt(p)} ${
+      a === "clinician" ? "The clinician decides which way is right." : "The program officer asks the clinician which way is right."
+    }`,
+
+  CROSS_CHECK_CUTOFF_DIFFERS: (p, a) =>
+    `For "${s(p, "question")}" the first draft uses the cut-off numbers ${s(p, "first")} and the second draft uses ${s(p, "second")}. ${bookletOpt(p)} ${
+      a === "clinician" ? "The clinician decides which numbers are right by checking them against the booklet." : "The program officer asks the clinician which numbers are right, checking them against the booklet."
+    }`,
+
+  CROSS_CHECK_SCOPE_DIFFERS: (p, a) =>
+    `The two drafts cover different ages: the first covers ${s(p, "firstFrom")} up to ${s(p, "firstTo")} months and the second covers ${s(p, "secondFrom")} up to ${s(p, "secondTo")} months. ${bookletOpt(p)} ${
+      a === "clinician" ? "The clinician decides which age range is right." : "The program officer asks the clinician which age range is right."
+    }`,
+
+  CROSS_CHECK_OUTCOME_ONLY_IN_ONE: (p, a) =>
+    `Only the ${s(p, "draft")} draft has the result "${s(p, "outcome")}" (urgency ${s(p, "severity")}, where 1 is the most urgent). ${bookletOpt(p)} ${
+      a === "clinician" ? "The clinician decides whether this result belongs in the pathway." : "The program officer asks the clinician whether this result belongs in the pathway."
+    }`,
+
+  CROSS_CHECK_SEVERITY_DIFFERS: (p, a) =>
+    `The two drafts rank the result "${s(p, "outcome")}" differently: urgency ${s(p, "firstSeverity")} in the first draft and ${s(p, "secondSeverity")} in the second (1 is the most urgent).${
+      p["direction"] === "less_urgent_in_second" ? " The second draft treats it as less urgent." : " The second draft treats it as more urgent."
+    } ${bookletOpt(p)} ${a === "clinician" ? "The clinician decides how urgent it is." : "The program officer asks the clinician how urgent it is."}`,
+
+  CROSS_CHECK_FOLLOWUP_DIFFERS: (p, a) =>
+    `The two drafts differ on the follow-up of the result "${s(p, "outcome")}". First draft: ${s(p, "first")}. Second draft: ${s(p, "second")}. ${bookletOpt(p)} ${
+      a === "clinician" ? "The clinician decides which follow-up is right." : "The program officer asks the clinician which follow-up is right."
+    }`,
+
+  CROSS_CHECK_ACTION_DIFFERS: (p, a) =>
+    `The two drafts give different actions for the result "${s(p, "outcome")}". Only in the first draft: ${s(p, "onlyFirst")}. Only in the second draft: ${s(p, "onlySecond")}. ${bookletOpt(p)} ${
+      a === "clinician" ? "The clinician decides which actions are right." : "The program officer asks the clinician which actions are right."
+    }`,
+
+  CROSS_CHECK_DOSE_DIFFERS: (p, a) =>
+    `The two drafts give different doses for "${s(p, "action")}" under the result "${s(p, "outcome")}": the first draft says ${s(p, "first")}, the second says ${s(p, "second")}. ${bookletOpt(p)} ${
+      a === "clinician" ? "The clinician decides which doses are right, checking them against the booklet." : "The program officer asks the clinician which doses are right, checking them against the booklet."
+    }`,
+
+  CROSS_CHECK_OPEN_QUESTION_ONLY_IN_ONE: (p) =>
+    `Only the ${s(p, "draft")} draft raised this open question: "${s(p, "question")}". It is for the ${s(p, "route") === "program_officer" ? "program officer" : "clinician"}. The other draft saw nothing unclear here. A person still looks at it, because unclear passages are never settled silently. ${bookletOpt(p)}`,
+
   CONTEXT_NOT_PROVIDED: (p) =>
     `Some checks did not run, because the information they need was not supplied: ${s(p, "checks")}. Nothing has been confirmed by them, so their silence is not a pass. The program officer supplies ${s(p, "needs")} and runs the checks again.`,
 };

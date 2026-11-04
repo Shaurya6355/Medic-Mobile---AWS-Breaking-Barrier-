@@ -19,6 +19,11 @@ export function cost(
   return (inputTokens * price.inPerMTok + outputTokens * price.outPerMTok) / 1_000_000;
 }
 
+// Configured model ids with no entry in the price table: their cost cannot be computed (DEC-003).
+export function unpricedModelIds(prices: PriceTable, modelIds: string[]): string[] {
+  return [...new Set(modelIds.filter((id) => !Object.hasOwn(prices, id)))].sort();
+}
+
 export function loadPrices(env: NodeJS.ProcessEnv): PriceTable {
   const raw = env.PRICES_JSON;
   if (raw === undefined || raw.trim() === "") return {};

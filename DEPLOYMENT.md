@@ -39,7 +39,7 @@ CDK stacks (all in `Infra/`, region **us-west-2**, tag `project=no-code-cht-conf
 | `OrchestratorLambdaStack` | Lambda (Docker image), SQS event source, 5-minute EventBridge rule, HTTP API, throttling, CORS |
 | `OrchestratorAgentCoreStack` | **Optional, off by default.** AgentCore Runtime for `AgentService/`. Only with `-c modelBackend=agentcore`. Not organiser-approved (DEC-008); skip it for the first deploy. |
 
-Not deployed (does not exist in the CDK yet): authentication, the compile build host, a frontend, a VPC, CloudWatch alarms. See [section 8](#8-before-you-share-the-url).
+Not deployed (does not exist in the CDK yet): authentication, the compile build host, the frontend upload (the web stack exists; see Frontend/README.md), a VPC, CloudWatch alarms. See [section 8](#8-before-you-share-the-url).
 
 ---
 
@@ -257,6 +257,6 @@ The deployed API is **open to anyone who has the URL**. Every run triggers paid 
 - Authentication and authorizer (DEC-015).
 - The compile build host (DEC-014). `Backend/scripts/compileLocked.ts` needs a host with cht-conf; compile is not a Lambda step, so a locked model cannot yet be turned into a CHT project in AWS.
 - The check inputs: the Lambda image does not bundle the golden test cases or the compile settings. Until you upload `runs/<id>/inputs/golden_cases.json` and `compile_settings.json` to the bucket, the findings say the test-case and form-readiness checks did not run.
-- A frontend (only `Frontend/sample.txt` exists).
+- The frontend build is not uploaded by the CDK. Build it with `VITE_API_URL=<APIURL>` and sync `Frontend/dist` to the web stack bucket (Frontend/README.md).
 - VPC and endpoints, CloudWatch alarms and dashboards.
 - Reject, urgent marking, release to IT and the single-editor lock are partly or not built on the Backend side (see `Backend/README.md`).

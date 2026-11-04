@@ -22,6 +22,10 @@ export function contextNotice(ctx: CheckContext): Finding[] {
     checks.push("the form-readiness check");
     needs.push("the form settings");
   }
+  if (ctx.crossCheck === undefined) {
+    checks.push("the comparison with a second, independent draft");
+    needs.push("the second draft");
+  }
   if (checks.length === 0) return [];
   return [
     makeFinding({

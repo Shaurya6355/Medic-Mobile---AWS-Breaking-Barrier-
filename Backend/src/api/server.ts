@@ -1,21 +1,25 @@
-import { createHash, randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { ZodType } from "zod";
-import { artifactKey, inputPdfKey, NotFound } from "../artifacts/artifactStore.js";
+import { inputPdfKey, NotFound } from "../artifacts/artifactStore.js";
 import type { ArtifactStore } from "../artifacts/artifactStore.js";
 import { routes } from "../contract/routes.js";
+import { buildRunMetrics } from "../metrics/analyze.js";
+import { loadAwsRates } from "../metrics/awsRates.js";
 import { withDeadline } from "../shutdown.js";
 import { parseS3Event } from "../trigger/s3Event.js";
 import { registerClinicianRoutes, type ClinicianDeps } from "./clinicianRoutes.js";
 import { LAMBDA_BACKGROUND_DEADLINE_MS, runBackground } from "./background.js";
 import type { RunMode } from "./background.js";
 import {
+  ConfirmRevisionRequest,
   CreateCommentRequest,
+  CreateRevisionRequest,
   CreateRunRequest,
   FindingsQuery,
   INVOCATION_MAX_BODY_BYTES,
   InvocationRequest,
+  LambdaRevisionEvent,
   LambdaScheduledEvent,
   LambdaSqsEnvelope,
   LambdaSqsRecord,
@@ -25,6 +29,9 @@ import {
 } from "../contract/schemas.js";
 import type { CreateRunResponse, InvocationResponse, LambdaEventResponse, PingResponse } from "../contract/schemas.js";
 import type { Run } from "../domain/types.js";
+import { rowFromStep, summarize } from "../metrics/usage.js";
+import { RevisionError } from "../revision/service.js";
+import type { RevisionService } from "../revision/service.js";
 import { Signoff, SignoffError } from "../signoff/signoff.js";
 import { saveVersion } from "../versions/saveVersion.js";
 import type { LogicModelValidator } from "../steps/logicModelValidator.js";
@@ -51,6 +58,8 @@ export interface ServerDeps {
   onVersionSaved: (runId: string, n: number) => Promise<void>;
   // Sign-off service (findings, status, signatures). Default: one over the same store and artifacts.
   signoff?: Signoff;
+  // Revision loop (comments -> AI instruction -> confirm -> new version). The routes exist only when given.
+  revisions?: RevisionService;
   maxPages: number;
   now?: () => number;
   maxInvocationResponseBytes?: number;
@@ -123,6 +132,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       const detail = typeof err.detail === "object" && err.detail !== null ? err.detail : {};
       return reply.code(err.status).send({ ...detail, error: err.code, message: err.message });
     }
+    if (err instanceof RevisionError) return reply.code(err.status).send({ ...err.detail, error: err.code, message: err.message });
     if (err instanceof Conflict) {
       req.log.debug({ detail: err.message }, "conflict");
       return reply.code(409).send({ error: "conflict" });
@@ -163,14 +173,18 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const run = await store.getRun(req.params.id);
     if (!run) return reply.code(404).send({ error: "not_found" });
     const steps = await store.listSteps(run.runId);
-    const costs = steps.flatMap((s) => (s.costUsd === undefined ? [] : [s.costUsd]));
-    const totals = {
-      inputTokens: steps.reduce((a, s) => a + s.inputTokens, 0),
-      outputTokens: steps.reduce((a, s) => a + s.outputTokens, 0),
-      costUsd: costs.length === 0 ? null : costs.reduce((a, c) => a + c, 0),
-      latencyMs: steps.reduce((a, s) => a + (s.latencyMs ?? 0), 0),
-    };
-    return { run, steps, totals };
+    // Revision model calls are not pipeline steps (DEC-003). Their usage comes from the audit trail (one read),
+    // never from the revision artifacts, so a poll of this route does not grow with the number of revisions
+    // and a damaged revision cannot break it.
+    const revisionRows = deps.revisions ? await deps.revisions.usageRows(run.runId) : [];
+    const { totals, byProcess, byVersion } = summarize([...steps.map(rowFromStep), ...revisionRows]);
+    return { run, steps, totals, byProcess, byVersion };
+  });
+
+  app.get<{ Params: { id: string } }>(routes.pattern.metrics, async (req, reply) => {
+    const run = await store.getRun(req.params.id);
+    if (!run) return reply.code(404).send({ error: "not_found" });
+    return buildRunMetrics(run, await store.listSteps(run.runId), { rates: loadAwsRates() });
   });
 
   app.get<{ Params: { id: string } }>(routes.pattern.versions, async (req, reply) => {
@@ -249,6 +263,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return signoff.findingsView(req.params.id, n, q.audience);
   });
 
+  // The stored flags.json of a version (cross-check flags, one document per content and inputs).
+  app.get<{ Params: { id: string; n: string } }>(routes.pattern.flags, async (req, reply) => {
+    const n = parseVersionNumber(req.params.n, reply);
+    if (n === undefined) return reply;
+    return signoff.flagsDocument(req.params.id, n);
+  });
+
   app.get<{ Params: { id: string; n: string } }>(routes.pattern.status, async (req, reply) => {
     const n = parseVersionNumber(req.params.n, reply);
     if (n === undefined) return reply;
@@ -281,6 +302,36 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
     return reply.code(201).send(res);
   });
+
+  // ---------- revision loop ----------
+  const revisions = deps.revisions;
+  if (revisions) {
+    // AUTH SEAM (DEC-015): role and userId from the body until Cognito, as for signatures.
+    app.post<{ Params: { id: string; n: string } }>(routes.pattern.revisions, async (req, reply) => {
+      const n = parseVersionNumber(req.params.n, reply);
+      if (n === undefined) return reply;
+      const body = parseBody(CreateRevisionRequest, req.body, reply);
+      if (!body) return reply;
+      const rev = await revisions.requestRevision(req.params.id, n, { role: body.role, userId: body.userId, ...(body.itemRefs !== undefined ? { itemRefs: body.itemRefs } : {}) });
+      return reply.code(201).send(rev);
+    });
+
+    app.get<{ Params: { id: string; n: string } }>(routes.pattern.revisions, async (req, reply) => {
+      const n = parseVersionNumber(req.params.n, reply);
+      if (n === undefined) return reply;
+      return revisions.listRevisions(req.params.id, n);
+    });
+
+    app.get<{ Params: { id: string; rid: string } }>(routes.pattern.revision, async (req) => revisions.getRevision(req.params.id, req.params.rid));
+
+    app.post<{ Params: { id: string; rid: string } }>(routes.pattern.revisionConfirm, async (req, reply) => {
+      const body = parseBody(ConfirmRevisionRequest, req.body, reply);
+      if (!body) return reply;
+      // 202: step 2 runs in the background (API Gateway cuts a request at 30 s). Poll GET revision.
+      const rev = await revisions.confirmRevision(req.params.id, req.params.rid, { role: body.role, userId: body.userId, ...(body.instruction !== undefined ? { instruction: body.instruction } : {}) });
+      return reply.code(202).send(rev);
+    });
+  }
 
   app.post<{ Params: { id: string } }>(routes.pattern.resume, async (req, reply) => {
     const run = await store.getRun(req.params.id);
@@ -356,6 +407,20 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const concurrency = deps.eventsConcurrency ?? 4;
     const eventsDeadline = deps.eventsDeadlineMs ?? LAMBDA_BACKGROUND_DEADLINE_MS;
     app.post(routes.pattern.events, async (req, reply) => {
+      // The revision loop's own asynchronous invoke (LambdaAsyncDispatcher). runApply is idempotent and writes
+      // "failed" itself, so the answer is 200 even after a failure: a 5xx would only make Lambda retry (twice).
+      const rev = LambdaRevisionEvent.safeParse(req.body);
+      if (rev.success) {
+        if (!revisions) return reply.code(400).send({ error: "invalid_request", issues: ["revision loop not configured"] });
+        const { runId, revisionId } = rev.data;
+        const work = revisions.runApply(runId, revisionId).catch((e: unknown) => {
+          req.log.error({ runId, revisionId, errName: errName(e) }, "revision runApply threw");
+        });
+        if (!(await withDeadline(work, eventsDeadline))) {
+          req.log.error({ runId, revisionId }, "revision step reached the events deadline; it is reported as failed once stale");
+        }
+        return reply.code(200).send({ ok: true });
+      }
       const envelope = LambdaSqsEnvelope.safeParse(req.body);
       if (envelope.success) {
         const ids = new Map<number, string>();

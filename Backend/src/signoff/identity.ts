@@ -46,7 +46,7 @@ export function sameUser(a: string, b: string): boolean {
 }
 
 /**
- * The officer agent's identity (DEC-024). The program officer's signature slot is filled by the officer agent,
+ * The officer agent's identity (DEC-038). The program officer's signature slot is filled by the officer agent,
  * never by a person: rules.ts accepts only this id as the first signature, both stores condition the first
  * write on it, and the HTTP API refuses it in any request body, so only in-process code can use it.
  */

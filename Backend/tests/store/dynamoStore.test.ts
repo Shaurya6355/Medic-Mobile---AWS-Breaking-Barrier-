@@ -237,6 +237,15 @@ describe("DynamoStore command shapes", () => {
     expect(mock.commandCalls(QueryCommand)[0]!.args[0].input.KeyConditionExpression).toContain("begins_with");
   });
 
+  it("appendStep conditions on the key not existing and maps failure to AlreadyExists", async () => {
+    mock.on(PutCommand).resolves({});
+    const rec = { runId: "r1", step: "x", attempt: 1, status: "running" as const, startedAt: 1, inputTokens: 0, outputTokens: 0, artifactRefs: {} };
+    await make().appendStep(rec);
+    expect(mock.commandCalls(PutCommand)[0]!.args[0].input.ConditionExpression).toBe("attribute_not_exists(runId)");
+    mock.on(PutCommand).rejects(ccf());
+    await expect(make().appendStep(rec)).rejects.toBeInstanceOf(AlreadyExists);
+  });
+
   it("listResumable scans runs with a state/lease filter and follows pagination", async () => {
     mock.on(ScanCommand)
       .resolvesOnce({ Items: [{ runId: "a", state: "checking", createdAt: 1 }], LastEvaluatedKey: { runId: "a" } })

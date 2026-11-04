@@ -57,7 +57,7 @@ export function verifyLock(sha: string, v: LockEvidence, opts: { settingsSha?: s
   if (sigs.length !== 2) return no(`needs exactly two signatures, has ${sigs.length}`);
   const [a, b] = sigs as [Signature, Signature];
   if (a.role !== "program_officer" || b.role !== "clinician") return no("must be signed by the officer agent first, then the clinician");
-  if (a.userId !== OFFICER_AGENT_ID) return no("the first signature is not the officer agent's (DEC-024)");
+  if (a.userId !== OFFICER_AGENT_ID) return no("the first signature is not the officer agent's (DEC-038)");
   if (sameUser(a.userId, b.userId)) return no("the clinician signed with the officer agent's identity");
   if (b.signedAt < a.signedAt) return no("the clinician signature is dated before the officer agent signature");
   for (const s of sigs) {

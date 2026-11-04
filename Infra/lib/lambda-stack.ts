@@ -1,4 +1,4 @@
-import { CfnOutput, Duration, Size, Stack, StackProps, Tags } from "aws-cdk-lib";
+import { ArnFormat, CfnOutput, Duration, Size, Stack, StackProps, Tags } from "aws-cdk-lib";
 import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -17,6 +17,8 @@ import { DEFAULT_MODEL_ID, PROJECT_TAG_KEY, PROJECT_TAG_VALUE, resolveUiOrigins 
 // Lambda hard limit is 15 minutes. LEASE_MS must exceed it so a live invocation is never taken over.
 const FUNCTION_TIMEOUT = Duration.minutes(15);
 const LEASE_MS = 960000;
+// API Gateway HTTP APIs cut an integration at 30 seconds (the maximum; it cannot be raised).
+const API_INTEGRATION_TIMEOUT_MS = 30000;
 
 // Public contract routes (Backend/src/contract/routes.ts, `proxiable`), one explicit entry per
 // method + path. Never add /events, /invocations or /ping, and never a catch-all: the API has no
@@ -33,11 +35,30 @@ export const API_ROUTES: readonly string[] = [
   "POST /runs/{id}/versions/{n}/comments",
   // Sign-off (DEC-019). Role and user come from the body until Cognito (DEC-015) adds an authorizer.
   "GET /runs/{id}/versions/{n}/findings",
+  "GET /runs/{id}/versions/{n}/flags",
   "GET /runs/{id}/versions/{n}/status",
   "POST /runs/{id}/versions/{n}/signatures/{role}",
   // The clinician's rejection with a comment (AR-06, RR-02; DEC-020). Same DynamoDB actions as a signature.
   "POST /runs/{id}/versions/{n}/reject",
+  // Revision loop (DEC-037): comments -> AI instruction -> confirmed -> new version. Revisions are S3
+  // artifacts under runs/<id>/revisions/, covered by the existing object policy. Same auth seam as sign-off.
+  "POST /runs/{id}/versions/{n}/revisions",
+  "GET /runs/{id}/versions/{n}/revisions",
+  "GET /runs/{id}/revisions/{rid}",
+  "POST /runs/{id}/revisions/{rid}/confirm",
   "POST /runs/{id}/resume",
+  // Clinician features of the officer-agent model: activity feed, chat, tree flow and edits, history.
+  // Same auth seam as sign-off (role and user from the body until Cognito, DEC-015).
+  "GET /runs/{id}/activity",
+  "POST /runs/{id}/chat",
+  "GET /runs/{id}/versions/{n}/flow",
+  "POST /runs/{id}/versions/{n}/edits/preview",
+  "POST /runs/{id}/versions/{n}/edits",
+  "GET /runs/{id}/versions/{a}/diff/{b}",
+  "GET /runs/{id}/versions/{n}/change",
+  "POST /runs/{id}/versions/{n}/restore",
+  // Timing and cost of a run. Read-only: reads the same step records as GET /runs/{id}.
+  "GET /runs/{id}/metrics",
 ];
 
 export interface OrchestratorLambdaStackProps extends StackProps {
@@ -77,6 +98,7 @@ export class OrchestratorLambdaStack extends Stack {
       throw new Error("modelBackend=bedrock requires props.bedrockPolicy");
     }
     const ctxPrices = this.node.tryGetContext("prices") as unknown;
+    const ctxBudget = this.node.tryGetContext("runBudgetUsd") as unknown;
 
     const logGroup = new logs.LogGroup(this, "FunctionLogs", { retention: logs.RetentionDays.TWO_WEEKS });
 
@@ -101,6 +123,23 @@ export class OrchestratorLambdaStack extends Stack {
       environment.PRICES_JSON = typeof ctxPrices === "string" ? ctxPrices : JSON.stringify(ctxPrices);
     }
 
+    // Optional cap on the recorded cost of one run (Backend RUN_BUDGET_USD).
+    if (ctxBudget !== undefined && ctxBudget !== null && ctxBudget !== "") {
+      const budget = Number(ctxBudget);
+      if (!Number.isFinite(budget) || budget <= 0) throw new Error(`context runBudgetUsd must be a positive number, got ${String(ctxBudget)}`);
+      environment.RUN_BUDGET_USD = String(budget);
+    }
+
+    // Physical name, so the function can be granted permission on its own ARN as a plain string.
+    // Granting via this.function.functionArn would make role -> policy -> function -> role circular.
+    const functionName = `${this.stackName}-orchestrator`;
+    const ownArn = this.formatArn({
+      service: "lambda",
+      resource: "function",
+      resourceName: functionName,
+      arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+    });
+
     // AWS_REGION is set by the Lambda runtime. UPLOAD_QUEUE_URL is not needed in lambda mode: the
     // event source mapping delivers the messages.
     this.function = new lambda.DockerImageFunction(this, "OrchestratorFunction", {
@@ -111,6 +150,7 @@ export class OrchestratorLambdaStack extends Stack {
       architecture: lambda.Architecture.ARM_64,
       memorySize: 2048,
       ephemeralStorageSize: Size.mebibytes(2048),
+      functionName,
       timeout: FUNCTION_TIMEOUT,
       logGroup,
       environment,
@@ -118,6 +158,28 @@ export class OrchestratorLambdaStack extends Stack {
     this.function.role!.addManagedPolicy(props.appPolicy);
     // With AgentCore the Lambda never calls Bedrock itself, so it gets no model invoke permission.
     if (modelBackend === "bedrock") this.function.role!.addManagedPolicy(props.bedrockPolicy!);
+
+    // Revision loop (DEC-037): POST /runs/{id}/revisions/{rid}/confirm answers 202 at once because the
+    // proposal call to Bedrock (step 2) can take longer than the 30 s API Gateway limit. In lambda mode
+    // the function freezes after responding, so the app invokes ITSELF asynchronously (InvocationType
+    // Event, payload {"source":"revision",...}); the Web Adapter forwards it to POST /events and the UI
+    // polls GET /runs/{id}/revisions/{rid}. Step 1 (instruction from comments) stays synchronous: its
+    // prompt is small and fits well inside 30 s. One action, one function, no wildcard.
+    this.function.addToRolePolicy(
+      new iam.PolicyStatement({
+        sid: "InvokeSelfAsync",
+        actions: ["lambda:InvokeFunction"],
+        resources: [ownArn],
+      }),
+    );
+    // Async invoke retries: the worker is idempotent, but each retry may repeat a paid Bedrock call, so
+    // no automatic retry. A failed worker leaves the revision unfinished; applying older than 10 minutes
+    // is reported failed and the UI can start again. (Also applies to the 5 minute schedule, which just
+    // fires again.) Event age is left at the default.
+    new lambda.EventInvokeConfig(this, "AsyncInvokeConfig", {
+      function: this.function,
+      retryAttempts: 0,
+    });
 
     if (modelBackend === "agentcore") {
       // IAM resource types for InvokeAgentRuntime: the runtime and its endpoints (DEFAULT or named).
@@ -168,6 +230,8 @@ export class OrchestratorLambdaStack extends Stack {
       integrationType: "AWS_PROXY",
       integrationUri: this.function.functionArn,
       payloadFormatVersion: "2.0",
+      // Maximum for HTTP APIs; do not lower. Long work (revision step 2) runs in the background.
+      timeoutInMillis: API_INTEGRATION_TIMEOUT_MS,
     });
     API_ROUTES.forEach((routeKey, i) => {
       new apigwv2.CfnRoute(this, `Route${i}`, {

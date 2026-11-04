@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { NotFound, artifactKey, type ArtifactStore } from "../artifacts/artifactStore.js";
 import { FLOW_MODES, type CompileSettings } from "../compiler/types.js";
-import { loadGoldenCases, type GoldenCase } from "../validation/context.js";
+import { loadCrossCheck, loadGoldenCases, type GoldenCase } from "../validation/context.js";
+import type { CrossCheckInput } from "../validation/finding.js";
 
 /**
  * The inputs of the checks besides the model and the booklet (DEC-020): the golden cases (children whose
@@ -27,12 +28,16 @@ import { loadGoldenCases, type GoldenCase } from "../validation/context.js";
 export interface CheckInputs {
   goldenCases?: GoldenCase[];
   compileSettings?: CompileSettings;
+  /** The second, independent logic model for the cross-check comparison (a model that does not parse is kept as { invalid }). */
+  crossCheck?: CrossCheckInput;
 }
 
 export type CheckInputsProvider = (runId: string) => Promise<CheckInputs>;
 
 export const goldenCasesKey = (runId: string): string => artifactKey(runId, "inputs", "golden_cases.json");
 export const compileSettingsKey = (runId: string): string => artifactKey(runId, "inputs", "compile_settings.json");
+/** The second draft: a logic model (JSON) produced separately, for example by running fill_logic on the cross-check extraction. */
+export const crossCheckKey = (runId: string): string => artifactKey(runId, "inputs", "cross_check_model.json");
 
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const DEFAULT_GOLDEN_CASES_PATH = path.join(backendDir, "tests", "fixtures", "logic", "golden-proposed.json");
@@ -83,6 +88,9 @@ export function defaultCheckInputs(artifacts: ArtifactStore, env: Record<string,
     const st =
       (await fromRun(artifacts, compileSettingsKey(runId))) ?? fromFile(env["COMPILE_SETTINGS_PATH"], DEFAULT_COMPILE_SETTINGS_PATH, "COMPILE_SETTINGS_PATH");
     if (st !== undefined) out.compileSettings = parseCompileSettings(st);
+    // No default: without a second draft the comparison does not run and contextNotice says so.
+    const cc = (await fromRun(artifacts, crossCheckKey(runId))) ?? fromFile(env["CROSS_CHECK_MODEL_PATH"], "", "CROSS_CHECK_MODEL_PATH");
+    if (cc !== undefined) out.crossCheck = loadCrossCheck(cc);
     return out;
   };
 }

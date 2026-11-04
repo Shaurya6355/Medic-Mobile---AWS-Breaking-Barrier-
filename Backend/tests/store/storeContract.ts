@@ -89,6 +89,15 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
       await expect(s.updateStep("r1", "nope", 1, { status: "failed" })).rejects.toThrow();
     });
 
+    it("rejects a second record for the same step and attempt with AlreadyExists", async () => {
+      const s = await makeStore();
+      await s.createRun(run("r1"));
+      await s.appendStep(step("r1", "validate", 1));
+      await expect(s.appendStep(step("r1", "validate", 1))).rejects.toBeInstanceOf(AlreadyExists);
+      await s.appendStep(step("r1", "validate", 2));
+      expect(await s.listSteps("r1")).toHaveLength(2);
+    });
+
     it("enforces the single version chain", async () => {
       const s = await makeStore();
       await s.createRun(run("r1"));

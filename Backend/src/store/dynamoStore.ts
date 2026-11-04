@@ -179,12 +179,18 @@ export class DynamoStore implements Store {
   }
 
   async appendStep(rec: StepRecord): Promise<void> {
-    await this.doc.send(
-      new PutCommand({
-        TableName: this.tables.steps,
-        Item: { ...clean(rec), sk: `${rec.step}#${pad(rec.attempt, 6)}` },
-      }),
-    );
+    try {
+      await this.doc.send(
+        new PutCommand({
+          TableName: this.tables.steps,
+          Item: { ...clean(rec), sk: `${rec.step}#${pad(rec.attempt, 6)}` },
+          ConditionExpression: "attribute_not_exists(runId)",
+        }),
+      );
+    } catch (e) {
+      if (isConditionFailure(e)) throw new AlreadyExists(`Step exists: ${rec.runId}/${rec.step}/${rec.attempt}`);
+      throw e;
+    }
   }
 
   async updateStep(runId: string, step: string, attempt: number, patch: Partial<StepRecord>): Promise<void> {

@@ -16,12 +16,14 @@
     "compile:screenshots": "node compile-demo/preview/cli.mjs screenshots",
     "compile:verify": "tsx compile-demo/preview/verify-golden.mjs",
     "fill:live": "tsx scripts/fillLive.ts",
+    "metrics": "tsx scripts/runMetrics.ts",
     "pipeline:demo": "tsx pipeline-demo/run.ts",
     "compile:locked": "tsx scripts/compileLocked.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agentcore": "^3.1161.0",
     "@aws-sdk/client-dynamodb": "^3.1161.0",
+    "@aws-sdk/client-lambda": "^3.1162.0",
     "@aws-sdk/client-s3": "^3.1161.0",
     "@aws-sdk/client-sqs": "^3.1161.0",
     "@aws-sdk/lib-dynamodb": "^3.1161.0",

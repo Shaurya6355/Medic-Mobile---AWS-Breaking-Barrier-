@@ -29,6 +29,8 @@ describe("v1.json on the real pair (real booklet blocks, real extraction, propos
       // the "250 mg" of the two antibiotic action texts, and "2 months up to 5 years" in the no-medicine action of R1's result
       "blocking:NUMBER_IN_TEXT_UNSUPPORTED": 3,
       "info:BOUNDARY_SHOWN": 6,
+      // no second, independent draft was supplied, so the cross-check comparison did not run (and says so)
+      "info:CONTEXT_NOT_PROVIDED": 1,
       // 7 danger signs the extraction found are not modelled but named as left out of this form (Q4)
       "info:DANGER_SIGN_EXCLUDED_NOT_COUGH": 7,
       "info:ENTRY_LIMIT_TEAM_CHOICE": 1,
@@ -65,7 +67,8 @@ describe("v1.json on the real pair (real booklet blocks, real extraction, propos
     const g = r.findings.find((x) => x.code === "GOLDEN_COUNT")!;
     expect(g.params).toMatchObject({ total: 20, agree: 20, different: 0 });
     expect(r.findings.some((x) => x.code === "OUTCOME_WITHOUT_GOLDEN_CASE")).toBe(false);
-    expect(r.findings.some((x) => x.code === "CONTEXT_NOT_PROVIDED")).toBe(false);
+    // everything but the optional second draft was supplied
+    expect(r.findings.find((x) => x.code === "CONTEXT_NOT_PROVIDED")?.params["needs"]).toBe("the second draft");
   });
 
   it("the gates: nobody can sign and nothing can be built", () => {

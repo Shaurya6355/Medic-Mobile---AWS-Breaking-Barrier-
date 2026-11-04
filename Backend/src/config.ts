@@ -25,6 +25,9 @@ export interface Config {
   ingestScript: string;
   extractPrompt: string;
   fillPrompt: string;
+  // Revision loop prompts: step 1 (comments -> instruction) and the addendum appended to the fill prompt (step 2).
+  reviseInstructionPrompt: string;
+  revisePrompt: string;
   // Model for the fill_logic draft; defaults to MODEL_ID (the IAM policy covers MODEL_ID only).
   fillModelId: string;
   prices: PriceTable;
@@ -37,6 +40,8 @@ export interface Config {
   // Officer agent: model (defaults to MODEL_ID) and cost cap in USD per run.
   officerAgentModelId: string;
   officerAgentMaxCostUsd: number;
+  // Optional cap on the recorded cost of one run (RUN_BUDGET_USD); absent means no cap.
+  runBudgetUsd?: number;
 }
 
 const REQUIRED = [
@@ -86,6 +91,14 @@ function leaseMs(env: NodeJS.ProcessEnv, runMode: Config["runMode"]): number {
   return n;
 }
 
+function optionalPositiveNumber(env: NodeJS.ProcessEnv, name: string): number | undefined {
+  const raw = env[name];
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`${name} must be a positive number`);
+  return n;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const rawMode = str(env, "RUN_MODE", "container");
   if (rawMode !== "container" && rawMode !== "agentcore" && rawMode !== "lambda") {
@@ -110,6 +123,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       throw new Error("AGENTCORE_RUNTIME_ARN must be a bedrock-agentcore runtime ARN");
     }
   }
+  const budget = optionalPositiveNumber(env, "RUN_BUDGET_USD");
   const req = (n: (typeof REQUIRED)[number]): string => env[n] as string;
   return {
     region: str(env, "AWS_REGION", "us-west-2"),
@@ -137,6 +151,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     ingestScript: str(env, "INGEST_SCRIPT", path.join(extractionDir, "prepare_input.py")),
     extractPrompt: str(env, "EXTRACT_PROMPT", path.join(extractionDir, "final_prompt.txt")),
     fillPrompt: str(env, "FILL_PROMPT", path.join(extractionDir, "fill_prompt.txt")),
+    reviseInstructionPrompt: str(env, "REVISE_INSTRUCTION_PROMPT", path.join(extractionDir, "revise_instruction_prompt.txt")),
+    revisePrompt: str(env, "REVISE_PROMPT", path.join(extractionDir, "revise_prompt.txt")),
     fillModelId: str(env, "FILL_MODEL_ID", req("MODEL_ID")),
     prices: loadPrices(env),
     chatModelId: str(env, "CHAT_MODEL_ID", req("MODEL_ID")),
@@ -145,5 +161,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     chatMaxTokens: positiveInt(env, "CHAT_MAX_TOKENS", 200000, 100000000),
     officerAgentModelId: str(env, "OFFICER_AGENT_MODEL_ID", req("MODEL_ID")),
     officerAgentMaxCostUsd: positiveNumber(env, "OFFICER_AGENT_MAX_COST_USD", 2),
+    ...(budget !== undefined ? { runBudgetUsd: budget } : {}),
   };
 }

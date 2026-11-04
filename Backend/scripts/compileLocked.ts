@@ -25,6 +25,7 @@ import { S3ArtifactStore } from "../src/artifacts/s3ArtifactStore.js";
 import { compileLockedVersion } from "../src/compiler/compileLocked.js";
 import { ApprovalError } from "../src/compiler/compileSnapshot.js";
 import type { CompileSettings, Manifest } from "../src/compiler/types.js";
+import { recordProcess } from "../src/metrics/record.js";
 import { parseCompileSettings, type CheckInputsProvider } from "../src/signoff/checkInputs.js";
 import { Signoff, SignoffError } from "../src/signoff/signoff.js";
 import { DynamoStore } from "../src/store/dynamoStore.js";
@@ -60,7 +61,16 @@ export interface CompileJobResult {
   projectDir: string;
 }
 
-export async function runCompileJob(opts: CompileJobOptions): Promise<CompileJobResult> {
+// Recorded as the "compile" process of this version, so its latency is in the run totals (DEC-003).
+export function runCompileJob(opts: CompileJobOptions): Promise<CompileJobResult> {
+  return recordProcess(
+    opts.store,
+    { runId: opts.runId, process: "compile", versionId: String(opts.n), now: opts.now ?? Date.now },
+    () => compileJob(opts),
+  );
+}
+
+async function compileJob(opts: CompileJobOptions): Promise<CompileJobResult> {
   const log = opts.log ?? ((m: string) => console.log(m));
   const projectDir = path.join(opts.outDir, "project");
   const logsDir = path.join(opts.outDir, "logs");

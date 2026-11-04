@@ -7,10 +7,16 @@ const pattern = {
   // Sign-off (DEC-019): findings of a version (optionally ?audience=program_officer|clinician), its
   // approval status, and one signature endpoint per role (:role is program_officer or clinician).
   findings: "/runs/:id/versions/:n/findings",
+  // The cross-check flags of a version, stored as flags.json for the front end (DEC-035).
+  flags: "/runs/:id/versions/:n/flags",
   status: "/runs/:id/versions/:n/status",
   sign: "/runs/:id/versions/:n/signatures/:role",
   // The clinician's rejection with a comment (AR-06, RR-02; DEC-020).
   reject: "/runs/:id/versions/:n/reject",
+  // Revision loop: comments on a version -> AI instruction (POST creates, GET lists) -> confirm -> new version.
+  revisions: "/runs/:id/versions/:n/revisions",
+  revision: "/runs/:id/revisions/:rid",
+  revisionConfirm: "/runs/:id/revisions/:rid/confirm",
   resume: "/runs/:id/resume",
   // Clinician features: activity feed, chat, tree (flow + edits), history (diff, change record, restore).
   activity: "/runs/:id/activity",
@@ -21,6 +27,8 @@ const pattern = {
   diff: "/runs/:id/versions/:a/diff/:b",
   change: "/runs/:id/versions/:n/change",
   restore: "/runs/:id/versions/:n/restore",
+  // Timing and cost of a run: per step, per model call, cumulative, with AWS extras estimated.
+  metrics: "/runs/:id/metrics",
   ping: "/ping",
   invocations: "/invocations",
   events: "/events",
@@ -34,9 +42,13 @@ const proxiable = [
   pattern.version,
   pattern.comments,
   pattern.findings,
+  pattern.flags,
   pattern.status,
   pattern.sign,
   pattern.reject,
+  pattern.revisions,
+  pattern.revision,
+  pattern.revisionConfirm,
   pattern.resume,
   pattern.activity,
   pattern.chat,
@@ -46,6 +58,7 @@ const proxiable = [
   pattern.diff,
   pattern.change,
   pattern.restore,
+  pattern.metrics,
 ] as const;
 
 export const routes = {
@@ -55,9 +68,13 @@ export const routes = {
   version: (id: string, n: number) => `/runs/${id}/versions/${n}`,
   comments: (id: string, n: number) => `/runs/${id}/versions/${n}/comments`,
   findings: (id: string, n: number) => `/runs/${id}/versions/${n}/findings`,
+  flags: (id: string, n: number) => `/runs/${id}/versions/${n}/flags`,
   status: (id: string, n: number) => `/runs/${id}/versions/${n}/status`,
   sign: (id: string, n: number, role: string) => `/runs/${id}/versions/${n}/signatures/${role}`,
   reject: (id: string, n: number) => `/runs/${id}/versions/${n}/reject`,
+  revisions: (id: string, n: number) => `/runs/${id}/versions/${n}/revisions`,
+  revision: (id: string, rid: string) => `/runs/${id}/revisions/${rid}`,
+  revisionConfirm: (id: string, rid: string) => `/runs/${id}/revisions/${rid}/confirm`,
   resume: (id: string) => `/runs/${id}/resume`,
   activity: (id: string, after?: number) => `/runs/${id}/activity${after === undefined ? "" : `?after=${after}`}`,
   chat: (id: string) => `/runs/${id}/chat`,
@@ -67,6 +84,7 @@ export const routes = {
   diff: (id: string, a: number, b: number) => `/runs/${id}/versions/${a}/diff/${b}`,
   change: (id: string, n: number) => `/runs/${id}/versions/${n}/change`,
   restore: (id: string, n: number) => `/runs/${id}/versions/${n}/restore`,
+  metrics: (id: string) => `/runs/${id}/metrics`,
   ping: () => "/ping",
   invocations: () => "/invocations",
   events: () => "/events",
