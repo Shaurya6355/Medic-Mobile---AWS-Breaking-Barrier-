@@ -134,6 +134,23 @@ describe("Orchestrator", () => {
     expect((await store.getRun(run.runId))!.docSha256).toBe("abc");
   });
 
+  it("two concurrent onUploaded calls run each step once", async () => {
+    const steps = flow();
+    const { store, orch } = setup(steps);
+    const run = await orch.createRun(undefined, "doc.pdf");
+    await Promise.all([orch.onUploaded(run.runId), orch.onUploaded(run.runId)]);
+    expect(steps.map((s) => s.calls)).toEqual([1, 1, 1]);
+    const recs = await store.listSteps(run.runId);
+    expect(recs.map((r) => [r.step, r.attempt, r.status])).toEqual([
+      ["ingest", 1, "succeeded"],
+      ["extract", 1, "succeeded"],
+      ["fill_logic", 1, "succeeded"],
+    ]);
+    const after = (await store.getRun(run.runId))!;
+    expect(after.state).toBe("in_review");
+    expect(after.lease).toBeUndefined();
+  });
+
   it("a non-transient failure leaves the run failed with currentStep; resume re-runs only that step", async () => {
     const steps = flow({ extract: [failHard, ok] });
     const { store, orch } = setup(steps);

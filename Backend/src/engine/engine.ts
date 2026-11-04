@@ -35,6 +35,10 @@ export class Orchestrator {
   private readonly leaseMs: number;
   private readonly runnerOpts: Omit<RunStepOptions, "firstAttempt">;
   private readonly now: () => number;
+  // Runs this instance is advancing right now. The lease is per owner, so it does
+  // not stop two calls in the same process (for example a duplicate upload event
+  // handled concurrently) from both advancing one run; this set does.
+  private readonly active = new Set<string>();
 
   constructor(opts: OrchestratorOptions) {
     this.store = opts.store;
@@ -69,6 +73,16 @@ export class Orchestrator {
   }
 
   async advance(runId: string): Promise<void> {
+    if (this.active.has(runId)) return;
+    this.active.add(runId);
+    try {
+      await this.advanceHeld(runId);
+    } finally {
+      this.active.delete(runId);
+    }
+  }
+
+  private async advanceHeld(runId: string): Promise<void> {
     if (!(await this.renewLease(runId))) return;
     let threw = false;
     let current: Step | undefined;
