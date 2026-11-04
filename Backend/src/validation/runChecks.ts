@@ -24,6 +24,7 @@ import { sourceCoverage } from "./checks/sourceCoverage.js";
 import { goldenCasesCheck } from "./checks/goldenCases.js";
 import { compileReady } from "./checks/compileReady.js";
 import { contextNotice } from "./checks/contextNotice.js";
+import { crossCheck } from "./checks/crossCheck.js";
 import { gates } from "./gates.js";
 import type { Gates } from "./gates.js";
 import { getAnalysis } from "./analysis.js";
@@ -62,6 +63,7 @@ export const DEFAULT_CHECKS: readonly NamedCheck[] = [
   { name: "sourceCoverage", run: sourceCoverage, needsValidModel: true },
   { name: "goldenCases", run: goldenCasesCheck, needsValidModel: true },
   { name: "compileReady", run: compileReady, needsValidModel: true },
+  { name: "crossCheck", run: crossCheck, needsValidModel: true },
   { name: "contextNotice", run: contextNotice, needsValidModel: true },
 ];
 

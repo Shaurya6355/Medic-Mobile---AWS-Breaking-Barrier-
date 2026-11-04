@@ -20,8 +20,10 @@ import {
   type CheckInputsProvider,
   type FindingsRecord,
   type LoadedVersion,
+  ensureFlags,
   type StoreIo,
 } from "./checks.js";
+import type { FlagsDocument } from "../validation/flags.js";
 import { InvalidUserId, normaliseUserId, sameUser } from "./identity.js";
 import { approvalStatus, validSignatures, verifyLock, type ApprovalStatus } from "./rules.js";
 
@@ -240,6 +242,12 @@ export class Signoff {
   async findingsRecord(runId: string, n: number): Promise<FindingsRecord> {
     await this.mustRun(runId);
     return (await this.ensure(runId, n)).record;
+  }
+
+  /** The flags (cross-check findings) of version n as stored for the front end; computed when missing. */
+  async flagsDocument(runId: string, n: number): Promise<FlagsDocument> {
+    await this.mustRun(runId);
+    return (await this.notFoundAs404(ensureFlags(this.io, runId, n))).doc;
   }
 
   async findingsView(runId: string, n: number, audience?: SignerRole): Promise<FindingsView> {

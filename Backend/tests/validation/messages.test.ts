@@ -30,6 +30,10 @@ const params = {
   ids: "g01, g02", total: 15, agree: 13, different: 2, needs: "the test cases", checks: "the test-case check", route: "clinician", affects: "R1, R2",
   pageQuote: "", value: -2, rule: "R4", actual: "Treat at home", question: "Is a child of exactly 12 months in the 40-breaths group?",
   threshold: 12, unit: " months", below: "11 months", at: "12 months", above: "13 months", o1: "Cough only", o2: "Treat at home", o3: "Treat at home", bandsMeet: true,
+  draft: "second", answerKind: "yes or no", differences: "the answers allowed (first: 0 to 120; second: 0 to 59)", first: "40 or more, 50 or more", second: "40 or more",
+  firstFrom: 2, firstTo: 60, secondFrom: 2, secondTo: 59, severity: 3, firstSeverity: 3, secondSeverity: 2, direction: "more_urgent_in_second",
+  onlyFirst: '"Give vitamin A"', onlySecond: "none", action: "Give first dose of oral antibiotic", compared: 12288, differing: 256, skipped: 0, groups: 2,
+  secondOutcome: "Fast breathing: treat at home", secondRule: "R5", combinations: "250000", extra: "",
 };
 
 const LOGIC_CODES = [
