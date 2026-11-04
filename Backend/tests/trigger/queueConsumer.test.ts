@@ -73,6 +73,17 @@ describe("startQueueConsumer", () => {
     expect(logs.join("\n")).not.toContain("Records");
   });
 
+  it("survives a throwing log function", async () => {
+    serve([msg("1", upload("r1"))]);
+    let called = 0;
+    const { ac, done } = start(async () => { called++; throw new Error("boom"); }, { log: () => { throw new Error("log broke"); } });
+    await waitFor(() => called === 1);
+    await tick();
+    ac.abort();
+    await expect(done).resolves.toBeUndefined();
+    expect(deleted()).toEqual([]);
+  });
+
   it("does not delete a multi-record message when one run fails", async () => {
     const body = JSON.stringify({ Records: ["a", "b"].map((r) => ({ s3: { bucket: { name: "b" }, object: { key: `runs/${r}/input/guideline.pdf` } } })) });
     serve([msg("1", body)]);

@@ -27,7 +27,15 @@ export async function startQueueConsumer(opts: QueueConsumerOptions): Promise<vo
   const concurrency = opts.concurrency ?? 4;
   const visibility = opts.visibilityTimeoutSeconds ?? 900;
   const wait = opts.waitTimeSeconds ?? 20;
-  const log = opts.log ?? (() => {});
+  const userLog = opts.log ?? (() => {});
+  // A throwing caller-supplied logger must never reject an in-flight promise.
+  const log = (msg: string, detail?: object): void => {
+    try {
+      userLog(msg, detail);
+    } catch {
+      // ignore
+    }
+  };
   const sleep = opts.sleep ?? defaultSleep;
   const inFlight = new Set<Promise<void>>();
 
