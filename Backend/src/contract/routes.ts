@@ -7,7 +7,7 @@ const pattern = {
   // Sign-off (DEC-019): findings of a version (optionally ?audience=program_officer|clinician), its
   // approval status, and one signature endpoint per role (:role is program_officer or clinician).
   findings: "/runs/:id/versions/:n/findings",
-  // The cross-check flags of a version, stored as flags.json for the front end (DEC-027).
+  // The cross-check flags of a version, stored as flags.json for the front end (DEC-035).
   flags: "/runs/:id/versions/:n/flags",
   status: "/runs/:id/versions/:n/status",
   sign: "/runs/:id/versions/:n/signatures/:role",

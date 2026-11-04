@@ -62,7 +62,7 @@ Symptom (exact error text if short): ValidationException: `temperature` is depre
 How to reproduce: Call us.anthropic.claude-haiku-5-5 through Bedrock Converse with inferenceConfig temperature 0 or 0.1. Only temperature 1 is accepted; omitting it works.
 Suspected or confirmed cause: Confirmed by direct test calls. Haiku 5.5 does not take a temperature other than the default.
 Owner: unassigned
-Related: DEC-021, INT-015
+Related: DEC-021, INT-026
 Handling: The Python script was fixed by an agent (temperature removed). Backend/src/model/strands.ts is now fixed too: temperatureSetting() sends no temperature to Claude Haiku 5.5 and 0 to every other model (test in tests/model/strands.test.ts). NOT fixed: AgentService/src/agent.ts still sets temperature 0 and will fail the same way if Haiku 5.5 is ever its model (not run).
 
 ### ERR-015 | A real Haiku extraction cannot go through fill_logic: the child age variable has no unit
@@ -73,7 +73,7 @@ Symptom (exact error text if short): fill_logic: the model draft still has 3 pro
 How to reproduce: Run fill_logic on the real Haiku 5.5 extraction of CoughGuideline2.pdf.
 Suspected or confirmed cause: Confirmed. The real extraction records var_child_age with unit null (type "age range"), because the booklet states the unit only inside the age bands. The resolver requires an age variable whose unit is months; the committed sample extraction (made in a session) had unit months written in, so this never showed before.
 Owner: unassigned
-Related: DEC-005, DEC-017, INT-020
+Related: DEC-005, DEC-017, INT-031
 Handling: Not fixed. The sample run used a repaired copy in /tmp (unit set to months). The team decides: let the resolver read the unit from the age bands, or have the extraction prompt set the unit when every band is in months.
 
 ### ERR-016 | A real Llama extraction does not satisfy the extraction schema
@@ -84,7 +84,7 @@ Symptom (exact error text if short): Extraction output does not match the extrac
 How to reproduce: Parse Backend/cross-check output of a real Llama run with Backend/src/steps/extractionSchema.ts.
 Suspected or confirmed cause: Confirmed. Llama omitted goto_target on 4 nodes instead of writing null, wrote null text on 2 nodes and invented the node kind "overview". The Haiku extraction passes the same schema. The Python script does not validate, so the problem only shows when the output is read by the TypeScript code.
 Owner: unassigned
-Related: DEC-024, INT-020
+Related: DEC-032, INT-031
 Handling: Not fixed. The sample run used a repaired copy in /tmp. Options: validate in the cross-check script and normalise a missing goto_target to null; tighten the prompt for Llama.
 
 ### ERR-017 | Llama cannot draft a valid logic model with the current fill prompt
@@ -95,7 +95,7 @@ Symptom (exact error text if short): max tokens above the model limit of 8192 (f
 How to reproduce: Run createFillLogicStep with modelId us.meta.llama4-scout-17b-instruct-v1:0 on a valid extraction.
 Suspected or confirmed cause: Confirmed on one live run. Llama writes null for optional keys, which the strict draft schema forbids, wraps JSON in code fences, which the parser refuses on purpose (tests/model/modelClient.test.ts), and the fill step asks for more output tokens than Llama allows unless maxTokens is set.
 Owner: unassigned
-Related: DEC-024, DEC-027, INT-020
+Related: DEC-032, DEC-035, INT-031
 Handling: Not fixed. No second logic model can be produced by Llama today, so the sample run compared Haiku's real logic model with the hand-written reference v1.json instead. Options: a Llama-specific prompt and normalisation of nulls before validation; use another model for the second draft.
 
 ## Fixed
@@ -258,7 +258,7 @@ Symptom (exact error text if short): ReadTimeoutError on .../converse after 60 s
 How to reproduce: Run run_extraction.py with Haiku 5.5 using default boto3 settings.
 Suspected or confirmed cause: boto3 waits 60 s for a reply by default and retries automatically, but extraction takes about 86 s. Haiku 5.5 also returns a reasoningContent block before the text block, so reading content[0]["text"] failed.
 Owner: Nirubama12
-Related: INT-015
+Related: INT-026
 Fixed: 2026-11-04
 Fixed by: agent (reviewed by Nirubama12 pending)
 Fix: Both scripts set read_timeout 900 and no automatic retries (so a slow call is never billed twice); extraction joins all text blocks and records content_block_types in run_metrics.json.
@@ -272,8 +272,8 @@ Symptom (exact error text if short): "Too many input images: 4, max allowed: 3";
 How to reproduce: Send 4 or more page images, or ask for more than 8192 output tokens, to us.meta.llama4-scout-17b-instruct-v1:0 through Converse.
 Suspected or confirmed cause: Confirmed by test calls: at most 3 images per request and at most 8192 output tokens. The guideline has 12 pages, and Haiku's output JSON was about 44 KB, so one call per document (DEC-005) cannot work for Llama.
 Owner: unassigned
-Related: DEC-005, DEC-021, INT-015
+Related: DEC-005, DEC-021, INT-026
 Fixed: 2026-11-04
 Fixed by: agent (reviewed by Nirubama12 pending), design chosen by human
-Fix: Cross-check now sends the pages in batches of 3 (4 calls, run in parallel, 8192 output tokens each) and merges the results in code (see DEC-024). Known cost: edges and links that cross a batch boundary (pages 3-4, 6-7, 9-10) are not produced as edges; go-to links across batches are resolved to the first top-level node of the target page.
+Fix: Cross-check now sends the pages in batches of 3 (4 calls, run in parallel, 8192 output tokens each) and merges the results in code (see DEC-032). Known cost: edges and links that cross a batch boundary (pages 3-4, 6-7, 9-10) are not produced as edges; go-to links across batches are resolved to the first top-level node of the target page.
 How to prevent a repeat: Check a model's image and output limits with tiny calls before designing a prompt around it.
