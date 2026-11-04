@@ -1,0 +1,1523 @@
+{
+  "nodes": [
+    {
+      "id": "n_ask_cough",
+      "kind": "ask",
+      "text": "Cough? If yes, for how long? ____days",
+      "parent_id": null,
+      "order": 1,
+      "clinical": false,
+      "pdf_page": 5,
+      "printed_page": 5,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p5.b4",
+          "pdf_page": 5,
+          "quote": "Cough? If yes, for how long? ____days"
+        }
+      ]
+    },
+    {
+      "id": "n_look_chest_indrawing",
+      "kind": "look",
+      "text": "Chest indrawing?",
+      "parent_id": null,
+      "order": 2,
+      "clinical": false,
+      "pdf_page": 5,
+      "printed_page": 5,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p5.b5",
+          "pdf_page": 5,
+          "quote": "Chest indrawing?"
+        }
+      ]
+    },
+    {
+      "id": "n_count_breaths",
+      "kind": "count",
+      "text": "If cough, count breaths in 1 minute: ___ breaths per minute (bpm).",
+      "parent_id": null,
+      "order": 3,
+      "clinical": false,
+      "pdf_page": 5,
+      "printed_page": 5,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p5.b7",
+          "pdf_page": 5,
+          "quote": "If cough, count breaths in 1 minute: ___ breaths per\nminute (bpm)."
+        }
+      ]
+    },
+    {
+      "id": "n_look_sleepy",
+      "kind": "look",
+      "text": "Unusually sleepy or unconscious?",
+      "parent_id": null,
+      "order": 4,
+      "clinical": false,
+      "pdf_page": 5,
+      "printed_page": 5,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p5.b9",
+          "pdf_page": 5,
+          "quote": "Unusually sleepy or unconscious?"
+        }
+      ]
+    },
+    {
+      "id": "n_ask_convulsions",
+      "kind": "ask",
+      "text": "Convulsions?",
+      "parent_id": null,
+      "order": 5,
+      "clinical": false,
+      "pdf_page": 5,
+      "printed_page": 5,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p5.b12",
+          "pdf_page": 5,
+          "quote": "Convulsions?"
+        }
+      ]
+    },
+    {
+      "id": "n_ask_drink_feed",
+      "kind": "ask",
+      "text": "Difficulty drinking or feeding? If yes, not able to drink or feed anything?",
+      "parent_id": null,
+      "order": 6,
+      "clinical": false,
+      "pdf_page": 5,
+      "printed_page": 5,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p5.b14",
+          "pdf_page": 5,
+          "quote": "Difficulty drinking or feeding? If yes, not able to drink\nor feed anything?"
+        }
+      ]
+    },
+    {
+      "id": "n_ask_vomit",
+      "kind": "ask",
+      "text": "Vomiting? If yes, vomits everything?",
+      "parent_id": null,
+      "order": 7,
+      "clinical": false,
+      "pdf_page": 5,
+      "printed_page": 5,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p5.b15",
+          "pdf_page": 5,
+          "quote": "Vomiting? If yes, vomits everything?"
+        }
+      ]
+    },
+    {
+      "id": "n_dec_danger",
+      "kind": "decision",
+      "text": "Any DANGER SIGN?",
+      "parent_id": null,
+      "order": 1,
+      "clinical": false,
+      "pdf_page": 6,
+      "printed_page": 6,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p6.b3",
+          "pdf_page": 6,
+          "quote": "Any\nDANGER SIGN?"
+        }
+      ]
+    },
+    {
+      "id": "n_out_refer",
+      "kind": "outcome",
+      "text": "REFER URGENTLY TO HEALTH FACILITY. Begin treatment and Assist referral",
+      "parent_id": "n_dec_danger",
+      "order": 1,
+      "clinical": false,
+      "pdf_page": 6,
+      "printed_page": 6,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p6.b16",
+          "pdf_page": 6,
+          "quote": "REFER URGENTLY\nTO HEALTH\nFACILITY"
+        },
+        {
+          "block_id": "p6.b17",
+          "pdf_page": 6,
+          "quote": "Begin treatment\nand\nAssist referral"
+        }
+      ]
+    },
+    {
+      "id": "n_goto_referral",
+      "kind": "goto",
+      "text": "To begin treatment and assist referral - Go to next page",
+      "parent_id": "n_dec_danger",
+      "order": 2,
+      "clinical": false,
+      "pdf_page": 6,
+      "printed_page": 6,
+      "out_of_scope": false,
+      "goto_target": "n_assist_referral",
+      "src": [
+        {
+          "block_id": "p6.b24",
+          "pdf_page": 6,
+          "quote": "To begin\ntreatment and\nassist referral"
+        },
+        {
+          "block_id": "p6.b25",
+          "pdf_page": 6,
+          "quote": "Go to next page"
+        }
+      ]
+    },
+    {
+      "id": "n_goto_p8",
+      "kind": "goto",
+      "text": "If NO Danger Sign - Go to page 8",
+      "parent_id": "n_dec_danger",
+      "order": 3,
+      "clinical": false,
+      "pdf_page": 6,
+      "printed_page": 6,
+      "out_of_scope": false,
+      "goto_target": "n_dec_sick_no_danger",
+      "src": [
+        {
+          "block_id": "p6.b21",
+          "pdf_page": 6,
+          "quote": "If NO Danger Sign"
+        },
+        {
+          "block_id": "p6.b22",
+          "pdf_page": 6,
+          "quote": "Go to page 8"
+        }
+      ]
+    },
+    {
+      "id": "n_assist_referral",
+      "kind": "action",
+      "text": "Assist referral to health facility:",
+      "parent_id": null,
+      "order": 1,
+      "clinical": false,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p7.b3",
+          "pdf_page": 7,
+          "quote": "Assist referral to health facility:"
+        }
+      ]
+    },
+    {
+      "id": "n_explain",
+      "kind": "advice",
+      "text": "Explain why child needs to go to the health facility.",
+      "parent_id": "n_assist_referral",
+      "order": 1,
+      "clinical": true,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p7.b4",
+          "pdf_page": 7,
+          "quote": "Explain why child needs to go to the health facility."
+        }
+      ]
+    },
+    {
+      "id": "n_first_dose",
+      "kind": "action",
+      "text": "GIVE FIRST DOSE OF TREATMENT:",
+      "parent_id": "n_assist_referral",
+      "order": 2,
+      "clinical": false,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p7.b5",
+          "pdf_page": 7,
+          "quote": "GIVE FIRST DOSE OF TREATMENT:"
+        }
+      ]
+    },
+    {
+      "id": "n_ref_amox",
+      "kind": "action",
+      "text": "If fast breathing or chest indrawing, give first dose of oral antibiotic (amoxycillin tablet—250 mg):",
+      "parent_id": "n_first_dose",
+      "order": 1,
+      "clinical": true,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p7.b9",
+          "pdf_page": 7,
+          "quote": "If fast breathing or chest indrawing, give first\ndose of oral antibiotic (amoxycillin tablet—250 mg):"
+        },
+        {
+          "block_id": "p7.b9",
+          "pdf_page": 7,
+          "quote": "Age 2 months up to 12 months—1 tablet\nAge 12 months up to 5 years—2 tablets"
+        }
+      ]
+    },
+    {
+      "id": "n_ref_fluids",
+      "kind": "advice",
+      "text": "For any sick child who can drink, advise to give fluids and continue feeding.",
+      "parent_id": "n_assist_referral",
+      "order": 3,
+      "clinical": true,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p7.b11",
+          "pdf_page": 7,
+          "quote": "For any sick child who can drink, advise\nto give fluids and continue feeding."
+        }
+      ]
+    },
+    {
+      "id": "n_ref_warm",
+      "kind": "advice",
+      "text": "Advise to keep child warm, if child is NOT hot with fever.",
+      "parent_id": "n_assist_referral",
+      "order": 4,
+      "clinical": true,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p7.b12",
+          "pdf_page": 7,
+          "quote": "Advise to keep child warm, if child is\nNOT hot with fever."
+        }
+      ]
+    },
+    {
+      "id": "n_ref_note",
+      "kind": "action",
+      "text": "Write a referral note.",
+      "parent_id": "n_assist_referral",
+      "order": 5,
+      "clinical": false,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p7.b13",
+          "pdf_page": 7,
+          "quote": "Write a referral note."
+        }
+      ]
+    },
+    {
+      "id": "n_ref_transport",
+      "kind": "action",
+      "text": "Arrange transportation, and help solve other difficulties in referral.",
+      "parent_id": "n_assist_referral",
+      "order": 6,
+      "clinical": false,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p7.b14",
+          "pdf_page": 7,
+          "quote": "Arrange transportation, and help solve\nother difficulties in referral."
+        }
+      ]
+    },
+    {
+      "id": "n_fu_weekly",
+      "kind": "followup",
+      "text": "FOLLOW UP child on return at least once a week until child is well.",
+      "parent_id": "n_assist_referral",
+      "order": 7,
+      "clinical": true,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p7.b15",
+          "pdf_page": 7,
+          "quote": "FOLLOW UP child on return at least once\na week until child is well."
+        }
+      ]
+    },
+    {
+      "id": "n_goto_oral_med_p7",
+      "kind": "goto",
+      "text": "To give first dose oral medication, see page 10",
+      "parent_id": "n_assist_referral",
+      "order": 8,
+      "clinical": false,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": false,
+      "goto_target": "n_teach_oral_meds",
+      "src": [
+        {
+          "block_id": "p7.b17",
+          "pdf_page": 7,
+          "quote": "To give first dose oral medication, see\npage 10"
+        }
+      ]
+    },
+    {
+      "id": "n_goto_ors_p7",
+      "kind": "goto",
+      "text": "To give ORS solution, see page 9.",
+      "parent_id": "n_assist_referral",
+      "order": 9,
+      "clinical": false,
+      "pdf_page": 7,
+      "printed_page": 7,
+      "out_of_scope": true,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p7.b16",
+          "pdf_page": 7,
+          "quote": "To give ORS solution, see page 9."
+        }
+      ]
+    },
+    {
+      "id": "n_dec_sick_no_danger",
+      "kind": "decision",
+      "text": "SICK BUT NO DANGER SIGN?",
+      "parent_id": null,
+      "order": 2,
+      "clinical": false,
+      "pdf_page": 8,
+      "printed_page": 8,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p8.b2",
+          "pdf_page": 8,
+          "quote": "SICK BUT NO D ANGER S IGN ?"
+        }
+      ]
+    },
+    {
+      "id": "n_crit_cough_lt14",
+      "kind": "ask",
+      "text": "Cough (less than 14 days)",
+      "parent_id": "n_dec_sick_no_danger",
+      "order": 1,
+      "clinical": false,
+      "pdf_page": 8,
+      "printed_page": 8,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p8.b3",
+          "pdf_page": 8,
+          "quote": "Cough (less than 14 days)"
+        }
+      ]
+    },
+    {
+      "id": "n_crit_fast_breathing",
+      "kind": "decision",
+      "text": "Fast breathing:",
+      "parent_id": "n_dec_sick_no_danger",
+      "order": 2,
+      "clinical": false,
+      "pdf_page": 8,
+      "printed_page": 8,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p8.b11",
+          "pdf_page": 8,
+          "quote": "Fast breathing:"
+        },
+        {
+          "block_id": "p8.b12",
+          "pdf_page": 8,
+          "quote": "In a child age 2 months up to 12 months,\n50 breaths or more per minute"
+        },
+        {
+          "block_id": "p8.b13",
+          "pdf_page": 8,
+          "quote": "In a child age 12 months up to 5 years,\n40 breaths or more per minute"
+        }
+      ]
+    },
+    {
+      "id": "n_out_treat_home",
+      "kind": "outcome",
+      "text": "TREAT at home and ADVISE caregiver",
+      "parent_id": "n_dec_sick_no_danger",
+      "order": 3,
+      "clinical": false,
+      "pdf_page": 8,
+      "printed_page": 8,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p8.b16",
+          "pdf_page": 8,
+          "quote": "TREAT at home\nand\nADVISE\ncaregiver"
+        }
+      ]
+    },
+    {
+      "id": "n_goto_p9",
+      "kind": "goto",
+      "text": "Go to next page",
+      "parent_id": "n_dec_sick_no_danger",
+      "order": 4,
+      "clinical": false,
+      "pdf_page": 8,
+      "printed_page": 8,
+      "out_of_scope": false,
+      "goto_target": "n_dec_fast_breathing_row",
+      "src": [
+        {
+          "block_id": "p8.b17",
+          "pdf_page": 8,
+          "quote": "Go to next page"
+        }
+      ]
+    },
+    {
+      "id": "n_dec_fast_breathing_row",
+      "kind": "decision",
+      "text": "If Fast Breathing (pneumonia)",
+      "parent_id": null,
+      "order": 1,
+      "clinical": false,
+      "pdf_page": 9,
+      "printed_page": 9,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p9.b15",
+          "pdf_page": 9,
+          "quote": "If\nFast Breathing"
+        },
+        {
+          "block_id": "p9.b16",
+          "pdf_page": 9,
+          "quote": "(pneumonia)"
+        }
+      ]
+    },
+    {
+      "id": "n_home_amox",
+      "kind": "action",
+      "text": "Give oral antibiotic (amoxycillin tablet—250 mg ).",
+      "parent_id": "n_dec_fast_breathing_row",
+      "order": 1,
+      "clinical": true,
+      "pdf_page": 9,
+      "printed_page": 9,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p9.b18",
+          "pdf_page": 9,
+          "quote": "Give oral antibiotic (amoxycillin tablet—250 mg )."
+        }
+      ]
+    },
+    {
+      "id": "n_home_amox_dose",
+      "kind": "action",
+      "text": "Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10 tabs); Age 12 months up to 5 years—2 tablets (total 20 tabs)",
+      "parent_id": "n_dec_fast_breathing_row",
+      "order": 2,
+      "clinical": true,
+      "pdf_page": 9,
+      "printed_page": 9,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p9.b19",
+          "pdf_page": 9,
+          "quote": "Give twice daily for 5 days:\nAge 2 months up to 12 months—1 tablet (total 10 tabs)\nAge 12 months up to 5 years—2 tablets (total 20 tabs)"
+        }
+      ]
+    },
+    {
+      "id": "n_home_first_dose",
+      "kind": "advice",
+      "text": "Help caregiver give first dose now. (Go to page 10.)",
+      "parent_id": "n_dec_fast_breathing_row",
+      "order": 3,
+      "clinical": true,
+      "pdf_page": 9,
+      "printed_page": 9,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p9.b20",
+          "pdf_page": 9,
+          "quote": "Help caregiver give first dose now. (Go to page 10.)"
+        }
+      ]
+    },
+    {
+      "id": "n_goto_oral_med_p9",
+      "kind": "goto",
+      "text": "(Go to page 10.)",
+      "parent_id": "n_dec_fast_breathing_row",
+      "order": 4,
+      "clinical": false,
+      "pdf_page": 9,
+      "printed_page": 9,
+      "out_of_scope": false,
+      "goto_target": "n_teach_oral_meds",
+      "src": [
+        {
+          "block_id": "p9.b20",
+          "pdf_page": 9,
+          "quote": "(Go to page 10.)"
+        }
+      ]
+    },
+    {
+      "id": "n_home_fluids",
+      "kind": "advice",
+      "text": "Advise the caregiver to give more fluids and continue feeding.",
+      "parent_id": null,
+      "order": 2,
+      "clinical": true,
+      "pdf_page": 9,
+      "printed_page": 9,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p9.b17",
+          "pdf_page": 9,
+          "quote": "Advise the caregiver to\ngive more fluids and\ncontinue feeding."
+        },
+        {
+          "block_id": "p9.b31",
+          "pdf_page": 9,
+          "quote": "For ALL\nchildren\ntreated\nat\nhome,\nadvise\non home\ncare"
+        }
+      ]
+    },
+    {
+      "id": "n_home_return",
+      "kind": "advice",
+      "text": "Advise on when to return. Go to nearest health facility or, if not possible, return immediately if child: Cannot drink or feed; Becomes sicker; Has blood in stool",
+      "parent_id": null,
+      "order": 3,
+      "clinical": true,
+      "pdf_page": 9,
+      "printed_page": 9,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p9.b32",
+          "pdf_page": 9,
+          "quote": "Advise on when to return.\nGo to nearest health facility\nor, if not possible, return\nimmediately if child"
+        },
+        {
+          "block_id": "p9.b32",
+          "pdf_page": 9,
+          "quote": " Cannot drink or feed\n Becomes sicker\n Has blood in stool"
+        }
+      ]
+    },
+    {
+      "id": "n_fu_3days",
+      "kind": "followup",
+      "text": "Follow up child in 3 days.",
+      "parent_id": null,
+      "order": 4,
+      "clinical": true,
+      "pdf_page": 9,
+      "printed_page": 9,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p9.b33",
+          "pdf_page": 9,
+          "quote": "Follow up child in 3 days."
+        }
+      ]
+    },
+    {
+      "id": "n_out_refer_worse",
+      "kind": "outcome",
+      "text": "If child becomes sicker or does not improve REFER CHILD URGENTLY TO HEALTH FACILITY",
+      "parent_id": null,
+      "order": 5,
+      "clinical": true,
+      "pdf_page": 9,
+      "printed_page": 9,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p9.b34",
+          "pdf_page": 9,
+          "quote": "If child becomes sicker\nor does not improve\nREFER CHILD\nURGENTLY TO HEALTH\nFACILITY"
+        }
+      ]
+    },
+    {
+      "id": "n_teach_oral_meds",
+      "kind": "advice",
+      "text": "Teach the caregiver how to give the oral medicines at home",
+      "parent_id": null,
+      "order": 1,
+      "clinical": false,
+      "pdf_page": 11,
+      "printed_page": 11,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p11.b1",
+          "pdf_page": 11,
+          "quote": "Teach the caregiver how to give the oral medicines at home"
+        }
+      ]
+    },
+    {
+      "id": "n_teach_amox",
+      "kind": "action",
+      "text": "Amoxicillin: Give one dose now, then twice daily for 5 days",
+      "parent_id": "n_teach_oral_meds",
+      "order": 1,
+      "clinical": true,
+      "pdf_page": 11,
+      "printed_page": 11,
+      "out_of_scope": false,
+      "goto_target": null,
+      "src": [
+        {
+          "block_id": "p11.b18",
+          "pdf_page": 11,
+          "quote": "Amoxicillin: Give one dose now, then twice daily for 5 days"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "n_ask_cough",
+      "to": "n_dec_danger",
+      "branch_label": null,
+      "condition_text": null,
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p6.b4",
+          "pdf_page": 6,
+          "quote": "Cough for 14 days or more"
+        }
+      ]
+    },
+    {
+      "from": "n_dec_danger",
+      "to": "n_out_refer",
+      "branch_label": "If ANY danger sign",
+      "condition_text": "If ANY\ndanger sign",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p6.b15",
+          "pdf_page": 6,
+          "quote": "If ANY\ndanger sign"
+        }
+      ]
+    },
+    {
+      "from": "n_out_refer",
+      "to": "n_goto_referral",
+      "branch_label": null,
+      "condition_text": null,
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p6.b24",
+          "pdf_page": 6,
+          "quote": "To begin\ntreatment and\nassist referral"
+        }
+      ]
+    },
+    {
+      "from": "n_goto_referral",
+      "to": "n_assist_referral",
+      "branch_label": null,
+      "condition_text": "Go to next page",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p6.b25",
+          "pdf_page": 6,
+          "quote": "Go to next page"
+        }
+      ]
+    },
+    {
+      "from": "n_dec_danger",
+      "to": "n_goto_p8",
+      "branch_label": "If NO Danger Sign",
+      "condition_text": "If NO Danger Sign",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p6.b21",
+          "pdf_page": 6,
+          "quote": "If NO Danger Sign"
+        }
+      ]
+    },
+    {
+      "from": "n_goto_p8",
+      "to": "n_dec_sick_no_danger",
+      "branch_label": null,
+      "condition_text": "Go to page 8",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p6.b22",
+          "pdf_page": 6,
+          "quote": "Go to page 8"
+        }
+      ]
+    },
+    {
+      "from": "n_dec_sick_no_danger",
+      "to": "n_out_treat_home",
+      "branch_label": "If SICK but NO danger sign",
+      "condition_text": "If SICK but\nNO danger\nsign",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p8.b7",
+          "pdf_page": 8,
+          "quote": "If SICK but\nNO danger\nsign"
+        }
+      ]
+    },
+    {
+      "from": "n_out_treat_home",
+      "to": "n_goto_p9",
+      "branch_label": null,
+      "condition_text": "Go to next page",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p8.b17",
+          "pdf_page": 8,
+          "quote": "Go to next page"
+        }
+      ]
+    },
+    {
+      "from": "n_goto_p9",
+      "to": "n_dec_fast_breathing_row",
+      "branch_label": null,
+      "condition_text": null,
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p9.b15",
+          "pdf_page": 9,
+          "quote": "If\nFast Breathing"
+        }
+      ]
+    },
+    {
+      "from": "n_dec_fast_breathing_row",
+      "to": "n_home_amox",
+      "branch_label": "If Fast Breathing (pneumonia)",
+      "condition_text": "If\nFast Breathing",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p9.b15",
+          "pdf_page": 9,
+          "quote": "If\nFast Breathing"
+        }
+      ]
+    },
+    {
+      "from": "n_home_first_dose",
+      "to": "n_teach_oral_meds",
+      "branch_label": null,
+      "condition_text": "(Go to page 10.)",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p9.b20",
+          "pdf_page": 9,
+          "quote": "(Go to page 10.)"
+        }
+      ]
+    },
+    {
+      "from": "n_dec_fast_breathing_row",
+      "to": "n_home_fluids",
+      "branch_label": "For ALL children treated at home, advise on home care",
+      "condition_text": "For ALL\nchildren\ntreated\nat\nhome,\nadvise\non home\ncare",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p9.b31",
+          "pdf_page": 9,
+          "quote": "For ALL\nchildren\ntreated\nat\nhome,\nadvise\non home\ncare"
+        }
+      ]
+    },
+    {
+      "from": "n_fu_3days",
+      "to": "n_out_refer_worse",
+      "branch_label": "If child becomes sicker or does not improve",
+      "condition_text": "If child becomes sicker\nor does not improve",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p9.b34",
+          "pdf_page": 9,
+          "quote": "If child becomes sicker\nor does not improve"
+        }
+      ]
+    },
+    {
+      "from": "n_ref_amox",
+      "to": "n_goto_oral_med_p7",
+      "branch_label": null,
+      "condition_text": "To give first dose oral medication, see\npage 10",
+      "draft_condition": null,
+      "src": [
+        {
+          "block_id": "p7.b17",
+          "pdf_page": 7,
+          "quote": "To give first dose oral medication, see\npage 10"
+        }
+      ]
+    }
+  ],
+  "variables": [
+    {
+      "id": "age_months",
+      "label": "Child age",
+      "type_hint": "integer",
+      "unit": "months",
+      "range_hint": "2 months up to 5 years",
+      "used_by": [
+        "n_crit_fast_breathing",
+        "n_ref_amox",
+        "n_home_amox_dose"
+      ],
+      "src": [
+        {
+          "block_id": "p3.b3",
+          "pdf_page": 3,
+          "quote": "(child age 2 months up to 5 years)"
+        }
+      ]
+    },
+    {
+      "id": "has_cough",
+      "label": "Cough present",
+      "type_hint": "boolean",
+      "unit": null,
+      "range_hint": null,
+      "used_by": [
+        "n_ask_cough"
+      ],
+      "src": [
+        {
+          "block_id": "p5.b4",
+          "pdf_page": 5,
+          "quote": "Cough? If yes"
+        }
+      ]
+    },
+    {
+      "id": "cough_duration_days",
+      "label": "Cough duration",
+      "type_hint": "integer",
+      "unit": "days",
+      "range_hint": null,
+      "used_by": [
+        "n_ask_cough",
+        "n_crit_cough_lt14"
+      ],
+      "src": [
+        {
+          "block_id": "p5.b4",
+          "pdf_page": 5,
+          "quote": "for how long? ____days"
+        }
+      ]
+    },
+    {
+      "id": "resp_rate",
+      "label": "Breaths counted in 1 minute",
+      "type_hint": "integer",
+      "unit": "breaths per minute",
+      "range_hint": null,
+      "used_by": [
+        "n_count_breaths",
+        "n_crit_fast_breathing"
+      ],
+      "src": [
+        {
+          "block_id": "p5.b7",
+          "pdf_page": 5,
+          "quote": "count breaths in 1 minute: ___ breaths per\nminute (bpm)"
+        }
+      ]
+    },
+    {
+      "id": "chest_indrawing",
+      "label": "Chest indrawing",
+      "type_hint": "boolean",
+      "unit": null,
+      "range_hint": null,
+      "used_by": [
+        "n_look_chest_indrawing"
+      ],
+      "src": [
+        {
+          "block_id": "p5.b5",
+          "pdf_page": 5,
+          "quote": "Chest indrawing?"
+        }
+      ]
+    },
+    {
+      "id": "unusually_sleepy_or_unconscious",
+      "label": "Unusually sleepy or unconscious",
+      "type_hint": "boolean",
+      "unit": null,
+      "range_hint": null,
+      "used_by": [
+        "n_look_sleepy"
+      ],
+      "src": [
+        {
+          "block_id": "p5.b9",
+          "pdf_page": 5,
+          "quote": "Unusually sleepy or unconscious?"
+        }
+      ]
+    },
+    {
+      "id": "convulsions",
+      "label": "Convulsions",
+      "type_hint": "boolean",
+      "unit": null,
+      "range_hint": null,
+      "used_by": [
+        "n_ask_convulsions"
+      ],
+      "src": [
+        {
+          "block_id": "p5.b12",
+          "pdf_page": 5,
+          "quote": "Convulsions?"
+        }
+      ]
+    },
+    {
+      "id": "not_able_to_drink_or_feed",
+      "label": "Not able to drink or feed anything",
+      "type_hint": "boolean",
+      "unit": null,
+      "range_hint": null,
+      "used_by": [
+        "n_ask_drink_feed"
+      ],
+      "src": [
+        {
+          "block_id": "p5.b14",
+          "pdf_page": 5,
+          "quote": "If yes, not able to drink\nor feed anything?"
+        }
+      ]
+    },
+    {
+      "id": "vomits_everything",
+      "label": "Vomits everything",
+      "type_hint": "boolean",
+      "unit": null,
+      "range_hint": null,
+      "used_by": [
+        "n_ask_vomit"
+      ],
+      "src": [
+        {
+          "block_id": "p5.b15",
+          "pdf_page": 5,
+          "quote": "If yes, vomits everything?"
+        }
+      ]
+    }
+  ],
+  "danger_signs": [
+    {
+      "id": "ds_cough_14d",
+      "text": "Cough for 14 days or more",
+      "condition_text": "Cough for 14 days or more",
+      "cough_relevant": true,
+      "src": [
+        {
+          "block_id": "p6.b4",
+          "pdf_page": 6,
+          "quote": "Cough for 14 days or more"
+        }
+      ]
+    },
+    {
+      "id": "ds_chest_indrawing",
+      "text": "Chest indrawing",
+      "condition_text": null,
+      "cough_relevant": true,
+      "src": [
+        {
+          "block_id": "p6.b5",
+          "pdf_page": 6,
+          "quote": "Chest indrawing"
+        }
+      ]
+    },
+    {
+      "id": "ds_diarrhoea_14d",
+      "text": "Diarrhoea for 14 days or more",
+      "condition_text": "Diarrhoea for 14 days or more",
+      "cough_relevant": false,
+      "src": [
+        {
+          "block_id": "p6.b6",
+          "pdf_page": 6,
+          "quote": "Diarrhoea for 14 days or more"
+        }
+      ]
+    },
+    {
+      "id": "ds_blood_stool",
+      "text": "Blood in stool",
+      "condition_text": null,
+      "cough_relevant": false,
+      "src": [
+        {
+          "block_id": "p6.b7",
+          "pdf_page": 6,
+          "quote": "Blood in stool"
+        }
+      ]
+    },
+    {
+      "id": "ds_fever_7d",
+      "text": "Fever for last 7 days or more",
+      "condition_text": "Fever for last 7 days or more",
+      "cough_relevant": false,
+      "src": [
+        {
+          "block_id": "p6.b8",
+          "pdf_page": 6,
+          "quote": "Fever for last 7 days or more"
+        }
+      ]
+    },
+    {
+      "id": "ds_convulsions",
+      "text": "Convulsions",
+      "condition_text": null,
+      "cough_relevant": true,
+      "src": [
+        {
+          "block_id": "p6.b9",
+          "pdf_page": 6,
+          "quote": "Convulsions"
+        }
+      ]
+    },
+    {
+      "id": "ds_sleepy",
+      "text": "Unusually sleepy or unconscious",
+      "condition_text": null,
+      "cough_relevant": true,
+      "src": [
+        {
+          "block_id": "p6.b10",
+          "pdf_page": 6,
+          "quote": "Unusually sleepy\nor unconscious"
+        }
+      ]
+    },
+    {
+      "id": "ds_muac_red",
+      "text": "Red on MUAC strap",
+      "condition_text": "For child age 6 months up to 5 years",
+      "cough_relevant": false,
+      "src": [
+        {
+          "block_id": "p6.b18",
+          "pdf_page": 6,
+          "quote": "Red on MUAC strap,\nor"
+        },
+        {
+          "block_id": "p6.b11",
+          "pdf_page": 6,
+          "quote": "For child age 6 months\nup to 5 years,"
+        }
+      ]
+    },
+    {
+      "id": "ds_muac_yellow_hiv",
+      "text": "Yellow on MUAC strap and has HIV",
+      "condition_text": "For child age 6 months up to 5 years",
+      "cough_relevant": false,
+      "src": [
+        {
+          "block_id": "p6.b19",
+          "pdf_page": 6,
+          "quote": "Yellow on MUAC\nstrap and has\nHIV"
+        },
+        {
+          "block_id": "p6.b11",
+          "pdf_page": 6,
+          "quote": "For child age 6 months\nup to 5 years,"
+        }
+      ]
+    },
+    {
+      "id": "ds_cannot_drink_feed",
+      "text": "Not able to drink or feed anything",
+      "condition_text": null,
+      "cough_relevant": true,
+      "src": [
+        {
+          "block_id": "p6.b12",
+          "pdf_page": 6,
+          "quote": "Not able to drink or feed any-\nthing"
+        }
+      ]
+    },
+    {
+      "id": "ds_vomits_everything",
+      "text": "Vomits everything",
+      "condition_text": null,
+      "cough_relevant": true,
+      "src": [
+        {
+          "block_id": "p6.b13",
+          "pdf_page": 6,
+          "quote": "Vomits everything"
+        }
+      ]
+    },
+    {
+      "id": "ds_hiv_other_illness",
+      "text": "Has HIV and any other illness",
+      "condition_text": null,
+      "cough_relevant": false,
+      "src": [
+        {
+          "block_id": "p6.b14",
+          "pdf_page": 6,
+          "quote": "Has HIV and any other illness"
+        }
+      ]
+    },
+    {
+      "id": "ds_swelling_feet",
+      "text": "Swelling of both feet",
+      "condition_text": null,
+      "cough_relevant": false,
+      "src": [
+        {
+          "block_id": "p6.b20",
+          "pdf_page": 6,
+          "quote": "Swelling of both\nfeet"
+        }
+      ]
+    }
+  ],
+  "thresholds": [
+    {
+      "variable": "cough_duration_days",
+      "op": ">=",
+      "value": 14,
+      "unit": "days",
+      "age_band": null,
+      "src": [
+        {
+          "block_id": "p6.b4",
+          "pdf_page": 6,
+          "quote": "Cough for 14 days or more"
+        }
+      ]
+    },
+    {
+      "variable": "cough_duration_days",
+      "op": "<",
+      "value": 14,
+      "unit": "days",
+      "age_band": null,
+      "src": [
+        {
+          "block_id": "p8.b3",
+          "pdf_page": 8,
+          "quote": "Cough (less than 14 days)"
+        }
+      ]
+    },
+    {
+      "variable": "resp_rate",
+      "op": ">=",
+      "value": 50,
+      "unit": "breaths per minute",
+      "age_band": "age 2 months up to 12 months",
+      "src": [
+        {
+          "block_id": "p8.b12",
+          "pdf_page": 8,
+          "quote": "In a child age 2 months up to 12 months,\n50 breaths or more per minute"
+        }
+      ]
+    },
+    {
+      "variable": "resp_rate",
+      "op": ">=",
+      "value": 40,
+      "unit": "breaths per minute",
+      "age_band": "age 12 months up to 5 years",
+      "src": [
+        {
+          "block_id": "p8.b13",
+          "pdf_page": 8,
+          "quote": "In a child age 12 months up to 5 years,\n40 breaths or more per minute"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "act_amox_referral",
+      "type": "drug",
+      "drug": "oral antibiotic (amoxycillin tablet—250 mg)",
+      "dose_text": "Age 2 months up to 12 months—1 tablet; Age 12 months up to 5 years—2 tablets",
+      "age_band": null,
+      "frequency": null,
+      "duration": null,
+      "trigger_node_id": "n_ref_amox",
+      "clinical": true,
+      "src": [
+        {
+          "block_id": "p7.b9",
+          "pdf_page": 7,
+          "quote": "If fast breathing or chest indrawing, give first\ndose of oral antibiotic (amoxycillin tablet—250 mg):"
+        },
+        {
+          "block_id": "p7.b9",
+          "pdf_page": 7,
+          "quote": "Age 2 months up to 12 months—1 tablet\nAge 12 months up to 5 years—2 tablets"
+        }
+      ]
+    },
+    {
+      "id": "act_amox_home",
+      "type": "drug",
+      "drug": "oral antibiotic (amoxycillin tablet—250 mg)",
+      "dose_text": "Age 2 months up to 12 months—1 tablet (total 10 tabs); Age 12 months up to 5 years—2 tablets (total 20 tabs)",
+      "age_band": null,
+      "frequency": "twice daily",
+      "duration": "5 days",
+      "trigger_node_id": "n_dec_fast_breathing_row",
+      "clinical": true,
+      "src": [
+        {
+          "block_id": "p9.b19",
+          "pdf_page": 9,
+          "quote": "Give twice daily for 5 days:\nAge 2 months up to 12 months—1 tablet (total 10 tabs)\nAge 12 months up to 5 years—2 tablets (total 20 tabs)"
+        }
+      ]
+    },
+    {
+      "id": "act_amox_teach",
+      "type": "drug",
+      "drug": "Amoxicillin",
+      "dose_text": "Give one dose now, then twice daily for 5 days",
+      "age_band": null,
+      "frequency": "twice daily",
+      "duration": "5 days",
+      "trigger_node_id": "n_teach_oral_meds",
+      "clinical": true,
+      "src": [
+        {
+          "block_id": "p11.b18",
+          "pdf_page": 11,
+          "quote": "Amoxicillin: Give one dose now, then twice daily for 5 days"
+        }
+      ]
+    },
+    {
+      "id": "act_refer_urgent",
+      "type": "refer",
+      "drug": null,
+      "dose_text": null,
+      "age_band": null,
+      "frequency": null,
+      "duration": null,
+      "trigger_node_id": "n_dec_danger",
+      "clinical": true,
+      "src": [
+        {
+          "block_id": "p6.b16",
+          "pdf_page": 6,
+          "quote": "REFER URGENTLY\nTO HEALTH\nFACILITY"
+        }
+      ]
+    },
+    {
+      "id": "act_referral_note",
+      "type": "referral_step",
+      "drug": null,
+      "dose_text": null,
+      "age_band": null,
+      "frequency": null,
+      "duration": null,
+      "trigger_node_id": "n_assist_referral",
+      "clinical": true,
+      "src": [
+        {
+          "block_id": "p7.b13",
+          "pdf_page": 7,
+          "quote": "Write a referral note."
+        }
+      ]
+    }
+  ],
+  "followups": [
+    {
+      "id": "fu_weekly_after_referral",
+      "text": "FOLLOW UP child on return at least once a week until child is well.",
+      "due_text": "at least once a week until child is well",
+      "trigger_node_id": "n_assist_referral",
+      "src": [
+        {
+          "block_id": "p7.b15",
+          "pdf_page": 7,
+          "quote": "FOLLOW UP child on return at least once\na week until child is well."
+        }
+      ]
+    },
+    {
+      "id": "fu_3days_home",
+      "text": "Follow up child in 3 days.",
+      "due_text": "in 3 days",
+      "trigger_node_id": "n_dec_fast_breathing_row",
+      "src": [
+        {
+          "block_id": "p9.b33",
+          "pdf_page": 9,
+          "quote": "Follow up child in 3 days."
+        }
+      ]
+    },
+    {
+      "id": "fu_refer_if_worse",
+      "text": "If child becomes sicker or does not improve REFER CHILD URGENTLY TO HEALTH FACILITY",
+      "due_text": null,
+      "trigger_node_id": "n_fu_3days",
+      "src": [
+        {
+          "block_id": "p9.b34",
+          "pdf_page": 9,
+          "quote": "If child becomes sicker\nor does not improve\nREFER CHILD\nURGENTLY TO HEALTH\nFACILITY"
+        }
+      ]
+    }
+  ],
+  "unclear_items": [
+    {
+      "id": "u1",
+      "block_id": "p7.b17",
+      "quote": "To give first dose oral medication, see\npage 10",
+      "what_is_unclear": "This and 'Go to page 10.' (p9.b20) point to page 10 for giving the first dose of oral medicine, but page 10 in this document is the ORS page; the oral medicine instructions are on page 11.",
+      "related_ids": [
+        "n_goto_oral_med_p7",
+        "n_goto_oral_med_p9",
+        "n_teach_oral_meds"
+      ]
+    }
+  ],
+  "_run": {
+    "run_id": "test-in-session-1",
+    "test_type": "throwaway test performed in the Claude Code session, NOT a Bedrock run; tokens, cost and latency not measured",
+    "quote_check_failures": []
+  }
+}

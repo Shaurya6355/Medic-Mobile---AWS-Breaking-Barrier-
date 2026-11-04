@@ -5,6 +5,7 @@ build_viz.py
 /Backend/extraction/flow.html
 system_prompt.txt
 Backend/extraction/pages
+Backend/cross-check/pages
 Docs/superpowers
 .superpowers
 .env
