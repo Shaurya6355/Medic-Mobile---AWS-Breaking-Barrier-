@@ -36,13 +36,23 @@ How to prevent a repeat:
 
 | Pending | Fixed (human) | Fixed (agent) |
 |---------|---------------|---------------|
-| 0 | 0 | 0 |
+| 1 | 0 | 0 |
 
 Update these counts when you move an entry.
 
 ## Pending
 
-No pending errors.
+### ERR-001 | Source PDF page references off by one
+Found: 2026-11-03 by utg1209 (Claude session), via review
+System: Guideline intake and extraction (Cough_Guideline.pdf)
+Severity: low
+Symptom (exact error text if short): p7 "To give first dose oral medication, see page 10" and p9 "Help caregiver give first dose now. (Go to page 10.)"; page 10 is the ORS page, oral medicine instructions are on page 11. Similar for "To give ORS solution, see page 9" (ORS is on page 10).
+How to reproduce: Open Guideline_Docs/Cough_Guideline.pdf, follow the page links on pages 7 and 9.
+Suspected or confirmed cause: The booklet's printed page links do not match its page numbers in this PDF (probably an editing or pagination difference in the source).
+Owner: unassigned
+Related: DEC-005, INT-002
+Handling: extraction records it as unclear item u1 and resolves the goto to the page 11 node; a reviewer confirms in the UI.
+
 
 ## Fixed
 

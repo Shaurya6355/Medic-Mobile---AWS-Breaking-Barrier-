@@ -83,6 +83,7 @@ Open question: Reference path (build on cht-ui-builder) or Open path (own tools)
 - Infrastructure as code: Terraform or CDK in TypeScript, one configuration, no hard-coded ARNs or account IDs.
 - Validate every model output against a schema (Zod or Ajv) before it drives the next step.
 - Edit existing XLSForm workbooks by cell (ExcelJS or openpyxl). Never regenerate a workbook wholesale.
+- Monitor every pipeline process (extraction, drafting, validation, compile, build-and-test): record token usage (input and output), running cost, and latency per process and per run, tied to the run and snapshot ID. Store the records (CloudWatch and/or DynamoDB) and report cost per pathway run in the README. Tracked as DEC-003.
 - Never set `NODE_TLS_REJECT_UNAUTHORIZED=0`.
 - Tag every AWS resource with the project tag.
 

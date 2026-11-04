@@ -60,3 +60,10 @@ Files or resources touched: claude_team/*
 What others must do or know: Pull, then read claude.md first. Follow its session start and session end steps.
 Open items: Assign owners in section 1. Decide DEC-001 (path) and DEC-002 (reference documents in repo).
 Related: DEC-001, DEC-002
+
+### INT-002 | 2026-11-03 | utg1209 (Claude session) | Guideline intake and extraction
+What changed: Designed and first-tested the extraction stage for Guideline_Docs/Cough_Guideline.pdf (cough and fast breathing scope only). Added deterministic pre-processing (page images, numbered blocks with bounding boxes), the extraction system prompt with schema, and a Bedrock runner that logs tokens, cost and latency (DEC-003) and checks every quote against its block. Ran the prompt once as a throwaway in-session test (not Bedrock): 38 nodes, 14 edges, 9 variables, 13 danger signs, 4 thresholds, 5 actions, 3 follow-ups, 1 unclear item, 0 quote failures.
+Files or resources touched: Backend/extraction_test/ (prepare_input.py, system_prompt.txt, run_extraction.py, input_blocks.json, pages/, extraction_output.json); claude_team/decisions.md (DEC-003 to DEC-005); claude_team/errors.md (ERR-001).
+What others must do or know: extraction_output.json is the preliminary record the logic-model stage will read. It was produced in-session, not by a Bedrock model, so tokens, cost and latency are unmeasured. To run on Bedrock: set AWS credentials, pip install boto3, set MODEL_ID to a us. inference profile (and optionally PRICE_IN_PER_MTOK, PRICE_OUT_PER_MTOK), then python3 Backend/extraction_test/run_extraction.py. Logic model is not built yet.
+Open items: Bedrock model ID and credentials; Amazon Transcribe scope question (DEC-004); UI for showing unclear items; assign an owner in section 1.
+Related: DEC-003, DEC-004, DEC-005, ERR-001
