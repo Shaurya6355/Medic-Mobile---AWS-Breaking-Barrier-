@@ -8,6 +8,7 @@ import { buildServer } from "./api/server.js";
 import { S3ArtifactStore } from "./artifacts/s3ArtifactStore.js";
 import { loadConfig } from "./config.js";
 import { Orchestrator } from "./engine/engine.js";
+import { startResumeSweep } from "./engine/sweep.js";
 import { createStrandsModelClient } from "./model/strands.js";
 import { createExtractStep } from "./steps/extract.js";
 import { createFillLogicStep } from "./steps/fillLogic.js";
@@ -17,6 +18,8 @@ import { DynamoStore } from "./store/dynamoStore.js";
 import { startQueueConsumer } from "./trigger/queueConsumer.js";
 
 const PRESIGN_EXPIRES_SECONDS = 900;
+
+const resumeSweepIntervalMs = (leaseMs: number): number => Math.max(1, Math.min(60000, Math.floor(leaseMs / 2)));
 
 // Never log env values, request bodies or message bodies.
 const log = (msg: string, detail?: object): void => {
@@ -78,12 +81,14 @@ async function main(): Promise<void> {
     log,
   });
 
+  let stopSweep: (() => void) | undefined;
   let stopping = false;
   const shutdown = (signal: string): void => {
     if (stopping) return;
     stopping = true;
     log("shutting down", { signal });
     abort.abort();
+    stopSweep?.();
     void Promise.all([consumer, app.close()])
       .then(() => process.exit(0))
       .catch((e: unknown) => {
@@ -101,6 +106,16 @@ async function main(): Promise<void> {
     await orchestrator.resumeAll();
   } catch (e) {
     log("resumeAll failed", { error: e instanceof Error ? e.message : String(e) });
+  }
+
+  // Runs left by a killed process keep that process's lease until it expires;
+  // the sweep picks them up after that.
+  if (!stopping) {
+    stopSweep = startResumeSweep({
+      resumeAll: () => orchestrator.resumeAll(),
+      intervalMs: resumeSweepIntervalMs(cfg.leaseMs),
+      log,
+    });
   }
 }
 

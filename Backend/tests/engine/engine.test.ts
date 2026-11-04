@@ -239,6 +239,40 @@ describe("Orchestrator", () => {
     ]);
   });
 
+  it("resumeAll leaves a run with a live foreign lease alone, then resumes it once the lease expires", async () => {
+    // A process was killed mid-extract; its lease is still live when the new process sweeps.
+    const store = new MemoryStore();
+    const runId = "r1";
+    await store.createRun({ runId, state: "extracting", createdAt: 0, lease: { owner: "dead", expiresAt: 50_000 } });
+    const base = { runId, inputTokens: 0, outputTokens: 0, startedAt: 10 };
+    await store.appendStep({ ...base, step: "ingest", attempt: 1, status: "succeeded", artifactRefs: { blocks: "b" } });
+    await store.appendStep({ ...base, step: "extract", attempt: 1, status: "running", artifactRefs: {} });
+
+    const steps = flow();
+    const clock = { t: 1000 };
+    const { orch } = setup(steps, { store, owner: "B", clock });
+
+    await orch.resumeAll();
+    let after = (await store.getRun(runId))!;
+    expect(after.state).toBe("extracting");
+    expect(after.lease).toEqual({ owner: "dead", expiresAt: 50_000 });
+    expect(steps.map((s) => s.calls)).toEqual([0, 0, 0]);
+
+    clock.t = 50_001;
+    await orch.resumeAll();
+    after = (await store.getRun(runId))!;
+    expect(after.state).toBe("in_review");
+    expect(after.lease).toBeUndefined();
+    expect(steps.map((s) => s.calls)).toEqual([0, 1, 1]);
+    const recs = await store.listSteps(runId);
+    expect(recs.map((r) => [r.step, r.attempt, r.status, r.error])).toEqual([
+      ["ingest", 1, "succeeded", undefined],
+      ["extract", 1, "failed", "abandoned"],
+      ["extract", 2, "succeeded", undefined],
+      ["fill_logic", 1, "succeeded", undefined],
+    ]);
+  });
+
   it("skips a step that already succeeded even if the run state still names it", async () => {
     // Crash between the step succeeding and the state moving on.
     const store = new MemoryStore();
