@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { OFFICER_AGENT_ID } from "../../src/signoff/identity.js";
 import { mkdtempSync, readFileSync, existsSync, readdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -163,7 +164,7 @@ describe("compileSnapshot refusals", () => {
   // shape below used to be the only thing standing between a caller and a release build.
   const lockFor = (s: string, over: { status?: "draft" | "locked"; sigs?: Signature[] } = {}) => {
     const sigs: Signature[] = over.sigs ?? [
-      { runId: "r1", n: 1, modelSha: s, role: "program_officer", userId: "officer-1", signedAt: 1 },
+      { runId: "r1", n: 1, modelSha: s, role: "program_officer", userId: OFFICER_AGENT_ID, signedAt: 1 },
       { runId: "r1", n: 1, modelSha: s, role: "clinician", userId: "clinician-1", signedAt: 2 },
     ];
     return { snapshotSha: s, version: { runId: "r1", n: 1, status: over.status ?? ("locked" as const), signatures: sigs } };
@@ -200,7 +201,7 @@ describe("compileSnapshot refusals", () => {
     const m = fullyResolved();
     const sha = shaOf(m);
     const s = await seed("awaiting_officer", [m]);
-    await s.signoff.sign("r1", 1, "program_officer", { role: "program_officer", userId: "o", modelSha: sha });
+    await s.signoff.signAsAgent("r1", 1, sha);
     await s.signoff.sign("r1", 1, "clinician", { role: "clinician", userId: "c", modelSha: sha });
     const src = { store: s.store, artifacts: s.artifacts, runId: "r1", n: 1, inputs: async () => testInputs() };
     await expect(compileSnapshot(v1(), { projectDir: fresh(), buildKind: "release", settings: demoSettings(), release: src })).rejects.toThrow(/is not the locked version/);

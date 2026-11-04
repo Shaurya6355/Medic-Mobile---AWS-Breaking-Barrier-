@@ -1,3 +1,6 @@
+import { OFFICER_AGENT_ID } from "../../src/signoff/identity.js";
+import { SignoffError } from "../../src/signoff/signoff.js";
+import { saveVersion } from "../../src/versions/saveVersion.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -106,12 +109,33 @@ async function setup() {
   const body = async (n: number): Promise<Model> => (await api.inject({ method: "GET", url: routes.version(RUN, n) })).json().body;
   const status = async (n: number) => (await api.inject({ method: "GET", url: routes.status(RUN, n) })).json();
   const save = async (parent: number, author: string, authorRole: string, m: Model) => {
+    if (authorRole === "program_officer") {
+      // A program officer version is written by the officer agent, never over HTTP (403 agent_only).
+      const saved = await saveVersion(
+        { store, artifacts, validator: parseModelValidator, onVersionSaved, now },
+        { runId: RUN, parentVersion: parent, body: m, author: OFFICER_AGENT_ID, authorRole: "program_officer", origin: "officer_agent" },
+      );
+      expect(saved.ok).toBe(true);
+      return (saved as { n: number }).n;
+    }
     const r = await api.inject({ method: "POST", url: routes.versions(RUN), payload: { parentVersion: parent, author, authorRole, body: m } });
     expect(r.statusCode).toBe(201);
     return r.json().n as number;
   };
-  const sign = (n: number, role: string, userId: string, modelSha: string) =>
-    api.inject({ method: "POST", url: routes.sign(RUN, n, role), payload: { role, userId, modelSha } });
+  // The program officer slot is filled by the officer agent, never over HTTP (403 agent_only), so the
+  // officer's signature goes through signAsAgent; the clinician still signs through the route.
+  const sign = async (n: number, role: string, userId: string, modelSha: string) => {
+    if (role === "program_officer") {
+      try {
+        const signed = await signoff.signAsAgent(RUN, n, modelSha);
+        return { statusCode: 201, json: () => signed as any };
+      } catch (e) {
+        if (e instanceof SignoffError) return { statusCode: e.status, json: () => ({ error: e.code }) as any }; // what the route would answer
+        throw e;
+      }
+    }
+    return api.inject({ method: "POST", url: routes.sign(RUN, n, role), payload: { role, userId, modelSha } });
+  };
   const comment = (n: number, itemRef: string, text: string) =>
     api.inject({ method: "POST", url: routes.comments(RUN, n), payload: { itemRef, text, author: "alice" } });
   const create = (n: number, payload: object = { role: "program_officer", userId: "alice" }) =>

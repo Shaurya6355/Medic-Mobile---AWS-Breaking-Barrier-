@@ -82,6 +82,9 @@ Before emitting, `compileSnapshot` runs `verifyFlow` on every point of the exact
 | CROSS_CHECK_MODEL_PATH | not set (DEC-035) | A second, independent logic model for the cross-check comparison, used when the run has no `runs/<id>/inputs/cross_check_model.json`. `none` switches it off; a set path that is missing is an error. Without a second draft the comparison does not run and the findings say so. Its differences are warnings decided by the clinician and never block signing |
 | PRICES_JSON | none | JSON map of model ID to `{inPerMTok, outPerMTok}` for cost metrics. A configured model with no entry is logged at startup and named in `unpricedModels` |
 | RUN_BUDGET_USD | none | Optional cap on the recorded cost of one run (step records plus revision calls). When reached, the next attempt is refused with `Run budget exceeded` and the run fails; raise the cap and resume. Counts step records plus revision model calls. Infra context key `runBudgetUsd` sets it |
+| CHAT_MAX_TOKENS | 200000 | Per-run chat token cap, used when PRICES_JSON has no price for the chat model |
+| OFFICER_AGENT_MODEL_ID | MODEL_ID | Model of the officer agent |
+| OFFICER_AGENT_MAX_COST_USD | 2 | Max model cost per run for the officer agent |
 
 Startup fails with a list of the names of any missing required variables.
 
@@ -147,6 +150,21 @@ On SIGTERM or SIGINT the process stops polling SQS and the resume sweep, waits u
 ## HTTP API
 
 Route names and request/response shapes are defined only in `src/contract/` (`routes.ts`, `schemas.ts`). The API covers creating a run (returning a presigned upload URL), reading a run, saving versions, comments, resuming a run, and sign-off: `GET .../versions/:n/findings[?audience=program_officer|clinician]`, `GET .../versions/:n/status`, `POST .../versions/:n/signatures/:role` with body `{role, userId, modelSha}` (201, or 400/403/404/409/422 as listed under "Sign-off"). See that folder for the exact paths.
+
+## For the frontend
+
+Exact shapes live in `src/contract/` (`routes.ts`, `schemas.ts`). Until Cognito is added (DEC-015, DEC-038) `userId` and `role` are sent in the body. All clinician routes use `role: "clinician"`; unknown run 404, unknown version 404, bad body 400.
+
+- `GET /runs/:id/activity[?after=<cursor>]` returns `{items:[{seq, at, actor, kind, text}], cursor, runState}`. Poll with the last `cursor`. Actors: pipeline, officer_agent, clinician, it.
+- `POST /runs/:id/chat` with `{userId, role, messages:[{from:"user"|"assistant", text}]}` (1 to 20 messages) returns `{reply, citations:[{kind, ref, quote?}]}`. Answers only, never changes anything. Errors: 429 `rate_limited` or `chat_budget_exceeded`, 503 `chat_unavailable`.
+- `GET /runs/:id/versions/:n/flow` returns `{flow, nodes:[{nodeId, kind, questionId?, ruleId?, label, editable:[...]}], modelSha}`. Send `modelSha` back when saving edits.
+- `POST /runs/:id/versions/:n/edits/preview` with `{userId, role, edits:[...]}` returns `{flow, nodes, paths, behaviourChanges, findings}`. `findings` is what the edited model would get as the next version (`{status, blocking, gates, checksNotRun, clinician:[groups], program_officer:[groups]}`); nothing is saved. Edit ops: `setQuestionLabel {questionId,text}`, `setThreshold {questionId,ruleId,from,to}`, `setOutcomeText {ruleId,field:"title"|"action",actionIndex?,text}`, `setFollowUpDays {ruleId,days}`. Any other op: 422 `unsupported_edit`.
+- `POST /runs/:id/versions/:n/edits` with `{userId, role, edits, modelSha}` (optional `Idempotency-Key` header) saves a new version (origin `tree_edit`) and returns 201 `{n, checks_status, behaviourChanges}`. Only the latest version can be edited: a stale `n` or `modelSha` gives 409 `conflict`. The new version goes to the officer agent, which fixes and signs it, then to the clinician.
+- `GET /runs/:id/versions/:a/diff/:b` returns `{a, b, structural:{changes, total, truncated}, behaviourChanges}`.
+- `GET /runs/:id/versions/:n/change` returns the stored change record of a version (who, what, behaviour changes, agent details).
+- `POST /runs/:id/versions/:n/restore` with `{userId, role}` copies version n into a new latest version (origin `restore`) and returns 201 `{n, checks_status, restoredFrom}`.
+- Unchanged: `GET .../findings`, `GET .../status`, `POST .../signatures/clinician` `{role, userId, modelSha}`, and `POST .../reject` `{role:"clinician", userId, modelSha, comment (15+ chars), itemRef?, urgent?}`.
+- Officer sign is now agent-only: `POST .../signatures/program_officer` and saving a version with `authorRole: "program_officer"` answer 403 `agent_only`. The officer agent runs by itself after the pipeline, after every saved version and after a reject; watch `activity` for `agent_fix`, `agent_signed` and `agent_escalated`. An escalation comment (itemRef `agent:escalation`) lists what a person must still do.
 
 The cross-check flags (the differences between the draft and a second, independent logic model, DEC-035) are stored with every version's checks as `flags.json` in the run's artifacts (`runs/<id>/flags/<checks version>/<modelSha>-<inputs>.json`, a derived document that is recomputed when missing) and served by `GET /runs/:id/versions/:n/flags`. The document holds `comparison` (`ran`, `not_run` when no second draft was supplied, or `second_draft_invalid`), a `summary`, a `notice` and the `flags`: each is a Finding with its message worded for the clinician and for the program officer and a status; all are warnings decided by the clinician and none blocks signing. `python3 validation/compare_outputs.py --first ... --second ...` produces the same flags for two logic model files.
 

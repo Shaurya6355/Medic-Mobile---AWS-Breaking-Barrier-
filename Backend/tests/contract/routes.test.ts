@@ -12,6 +12,20 @@ describe("routes", () => {
     expect(routes.resume("r1")).toBe("/runs/r1/resume");
   });
 
+  it("builds and proxies the clinician paths", () => {
+    expect(routes.activity("r1")).toBe("/runs/r1/activity");
+    expect(routes.activity("r1", 4)).toBe("/runs/r1/activity?after=4");
+    expect(routes.chat("r1")).toBe("/runs/r1/chat");
+    expect(routes.flow("r1", 2)).toBe("/runs/r1/versions/2/flow");
+    expect(routes.editsPreview("r1", 2)).toBe("/runs/r1/versions/2/edits/preview");
+    expect(routes.edits("r1", 2)).toBe("/runs/r1/versions/2/edits");
+    expect(routes.diff("r1", 1, 2)).toBe("/runs/r1/versions/1/diff/2");
+    expect(routes.change("r1", 2)).toBe("/runs/r1/versions/2/change");
+    expect(routes.restore("r1", 2)).toBe("/runs/r1/versions/2/restore");
+    const p = routes.pattern;
+    expect(routes.proxiable).toEqual(expect.arrayContaining([p.activity, p.chat, p.flow, p.editsPreview, p.edits, p.diff, p.change, p.restore]));
+  });
+
   it("exposes Fastify patterns", () => {
     expect(routes.pattern.runs).toBe("/runs");
     expect(routes.pattern.run).toBe("/runs/:id");

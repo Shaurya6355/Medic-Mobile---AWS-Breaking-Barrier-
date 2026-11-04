@@ -814,7 +814,7 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
         `The guideline reading contains text that looks like an instruction to the computer rather than guideline content, in ${[...new Set(planted.map((x) => x.id))].join(", ")}: "${collapse(planted[0]!.text).slice(0, 160)}". It was treated as data and not followed. Check the guideline reading before going on.`,
       ),
       affects: [],
-      route_to: "program_officer",
+      route_to: "clinician",
     });
   }
   const teamOnly = [...new Set(teamItems)];
@@ -822,7 +822,7 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
     oqs.push({
       question: clipText(`These items have no supporting quote from the guideline and are the team's wording or choice: ${teamOnly.join(", ")}. Please confirm or correct them.`),
       affects: teamOnly,
-      route_to: "program_officer",
+      route_to: "clinician",
     });
   }
   let fileSha = opts.guideline.fileSha256;

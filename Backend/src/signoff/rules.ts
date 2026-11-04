@@ -1,5 +1,5 @@
 import type { Signature, VersionStatus } from "../domain/types.js";
-import { sameUser } from "./identity.js";
+import { OFFICER_AGENT_ID, sameUser } from "./identity.js";
 
 /**
  * Pure sign-off rules (BRD AR-02, AR-03, AR-05, AR-07, AR-08; DEC-019, DEC-020). No I/O: the store enforces
@@ -30,7 +30,7 @@ export function validSignatures(signatures: readonly Signature[] | undefined, sh
   const sigs = signatures ?? [];
   const binds = (s: Signature): boolean => s.modelSha === sha && s.runId === ref.runId && s.n === ref.n;
   const officer = sigs[0];
-  if (officer === undefined || officer.role !== "program_officer" || !binds(officer)) return [];
+  if (officer === undefined || officer.role !== "program_officer" || officer.userId !== OFFICER_AGENT_ID || !binds(officer)) return [];
   const clinician = sigs[1];
   if (
     clinician === undefined ||
@@ -56,9 +56,10 @@ export function verifyLock(sha: string, v: LockEvidence, opts: { settingsSha?: s
   const sigs = v.signatures ?? [];
   if (sigs.length !== 2) return no(`needs exactly two signatures, has ${sigs.length}`);
   const [a, b] = sigs as [Signature, Signature];
-  if (a.role !== "program_officer" || b.role !== "clinician") return no("must be signed by the program officer first, then the clinician");
-  if (sameUser(a.userId, b.userId)) return no("the same person signed as program officer and as clinician");
-  if (b.signedAt < a.signedAt) return no("the clinician signature is dated before the program officer signature");
+  if (a.role !== "program_officer" || b.role !== "clinician") return no("must be signed by the officer agent first, then the clinician");
+  if (a.userId !== OFFICER_AGENT_ID) return no("the first signature is not the officer agent's (DEC-038)");
+  if (sameUser(a.userId, b.userId)) return no("the clinician signed with the officer agent's identity");
+  if (b.signedAt < a.signedAt) return no("the clinician signature is dated before the officer agent signature");
   for (const s of sigs) {
     if (s.runId !== v.runId || s.n !== v.n) return no(`the ${s.role} signature belongs to another version`);
     if (s.modelSha !== sha) return no(`the ${s.role} signature was given for different content (signed ${s.modelSha.slice(0, 12)}, now ${sha.slice(0, 12)})`);

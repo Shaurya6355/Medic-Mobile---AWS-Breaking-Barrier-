@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { OFFICER_AGENT_ID } from "../../src/signoff/identity.js";
 import { mockClient } from "aws-sdk-client-mock";
 import { randomUUID } from "node:crypto";
 import { DynamoDBClient, CreateTableCommand, ConditionalCheckFailedException, TransactionCanceledException } from "@aws-sdk/client-dynamodb";
@@ -75,7 +76,7 @@ describe("DynamoStore command shapes", () => {
   });
 
   it("addSignature checks the latest pointer and conditions the version update (officer, then clinician)", async () => {
-    const sig = { runId: "r1", n: 2, modelSha: "a".repeat(64), role: "program_officer" as const, userId: "o1", signedAt: 10 };
+    const sig = { runId: "r1", n: 2, modelSha: "a".repeat(64), role: "program_officer" as const, userId: OFFICER_AGENT_ID, signedAt: 10 };
     mock.on(TransactWriteCommand).resolves({});
     mock.on(GetCommand).resolves({ Item: { runId: "r1", n: 2, parent: 1, author: "u", createdAt: 1, artifactKey: "k", signatures: [sig] } });
     const v = await make().addSignature(sig);

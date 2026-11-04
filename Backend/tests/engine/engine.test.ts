@@ -636,3 +636,34 @@ function wrap(inner: MemoryStore, overrides: Partial<Store>): Store {
     },
   }) as Store;
 }
+
+describe("Orchestrator onFinalState hook", () => {
+  it("fires once after the last step with the lease released; hook errors are dropped; resumeAll re-fires for awaiting_officer", async () => {
+    const seen: string[] = [];
+    const store = new MemoryStore();
+    let leaseFreeInHook = false;
+    const orch = new Orchestrator({
+      store,
+      artifacts: new MemoryArtifactStore(),
+      model: {} as ModelClient,
+      steps: [...flow(), fakeStep("checks", "checking")],
+      owner: "A",
+      leaseMs: LEASE_MS,
+      runnerOpts: { maxAttempts: 1, backoffMs: () => 0, sleep: async () => {}, prices: {} },
+      finalState: "awaiting_officer",
+      onFinalState: async (id) => {
+        seen.push(id);
+        leaseFreeInHook = (await store.acquireLease(id, "other", LEASE_MS, 5_000_000)) === true;
+        throw new Error("hook boom");
+      },
+    });
+    const run = await orch.createRun(undefined, "f.pdf");
+    await orch.onUploaded(run.runId);
+    expect(seen).toEqual([run.runId]);
+    expect(leaseFreeInHook).toBe(true);
+    expect((await store.getRun(run.runId))!.state).toBe("awaiting_officer");
+    expect((await store.listAudit(run.runId)).some((e) => e.type === "final_state_hook_error")).toBe(true);
+    await orch.resumeAll();
+    expect(seen).toEqual([run.runId, run.runId]);
+  });
+});
