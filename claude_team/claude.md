@@ -100,3 +100,5 @@ Open question: Reference path (build on cht-ui-builder) or Open path (own tools)
 - Technical Environment Document: No-Code CHT Configuration (currently at `~/Documents/Medic Mobile/technical-environment-document-no-code-cht-configuration.md`, outside this repository).
 - Vision Document: No-Code CHT Configuration (companion to the above).
 - Team decision needed: copy these into the repository so every laptop has them. Tracked as DEC-002 in decisions.md.
+- [brd.md](brd.md): the Business Requirements Document (BR, AR, RR, GR, OQ ids). When building or testing against a requirement, cite its id (for example "implements BR-05", "tests AR-08"). Its approval, release and guardrail rules are non-negotiable. Tracked as DEC-012.
+- [system-design.md](system-design.md): the end-to-end system design (logic model schema in section 4, stages S1 to S13, checks, state machine). Where it conflicts with the BRD on approvals, the BRD wins; where it conflicts with decisions.md on hosting, decisions.md wins. Tracked as DEC-012 to DEC-014.

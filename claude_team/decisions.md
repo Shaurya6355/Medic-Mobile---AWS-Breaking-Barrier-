@@ -182,3 +182,79 @@ Other options considered (and why not):
 - Whole orchestrator on AgentCore Runtime: sessions are invoked and stopped when idle, which does not fit a queue consumer and sweep.
 Revisit if: organisers refuse API Gateway/EventBridge, or a single step must exceed 15 minutes.
 Related: DEC-006, DEC-008, DEC-009, DEC-010
+
+### DEC-012 | BRD and system design adopted as the requirements source
+Status: decided
+Date: 2026-11-03
+Decided by: human (utg1209)
+Feature or area: requirements
+Decision: claude_team/brd.md (BRD v1.3) and claude_team/system-design.md are the requirements and design source for the build. Work cites BRD ids. Precedence on conflicts: BRD over the system design for approvals and sign-off order; decisions.md (DEC-010, DEC-011, DEC-014) over the system design for hosting and tooling; claude.md hard rules over both.
+Assumptions: Both documents were pasted by the human as the team's agreed versions; the BRD live copy is newer if they differ.
+Why: Most of what is being built (logic model, checks, approvals, compile, test, release) is defined there.
+Other options considered (and why not): Keep working from the earlier plan (superseded by the design itself, D-012 in the design numbering).
+Revisit if: the BRD change log gains a new version, or the design review changes the open decisions in section 19.
+Related: DEC-013, DEC-014
+
+### DEC-013 | Logic model schema is system design section 4 (decision tables); the example tree JSON is illustrative
+Status: decided
+Date: 2026-11-03
+Decided by: human (utg1209)
+Feature or area: logic model
+Decision: The logic model is variables, relevance, decision tables with hit_policy FIRST or UNIQUE and rules using the JSON condition DSL, outcomes, followups and clinical_text (system design section 4). cough-pathway-logic-tree-v0.9.json (tree, derived, flags) only illustrates how a finished model can look and is not the schema. Checks in system design section 4 S4 plus extraction validators V1 to V7 live in a validation folder and run on every snapshot, AI-drafted or hand-edited. Assumption for V1 and V2 (not defined in the repo): V1 = the document parses and satisfies the strict schema; V2 = every reference resolves and types, operators, options and ids agree.
+Assumptions: V1 and V2 meaning chosen by Claude on the human's instruction to use judgment; OQ-02 (how the table holds question order, relevance, field types and limits) is still open.
+Why: The BRD and design describe tables and grid-based checks, which a tree does not support directly.
+Other options considered (and why not): Tree as the stored shape (checks would have to be rewritten per path); tree compiled to a table (extra step with no benefit for one pathway).
+Revisit if: OQ-02 is answered differently, or the team defines V1 and V2 differently.
+Related: DEC-005, DEC-012
+
+### DEC-014 | Hosting reconciled: hybrid (Lambda for API and orchestrator, EC2 only for build and test); approvals follow the BRD
+Status: decided
+Date: 2026-11-03
+Decided by: human (utg1209)
+Feature or area: hosting and approvals
+Decision: (1) Keep Lambda plus CDK (DEC-009, DEC-010, DEC-011) for the API and orchestrator. Add one EC2 container host only for compile, build and synthetic-patient stages (cht-app-ide needs the SYS_ADMIN capability and Chromium, which Lambda cannot give). The system design's all-EC2, Docker Compose and Terraform plan is not followed. (2) Approvals: BRD order governs (program officer signs, then clinician, version locks, IT releases); the design supplies the mechanism (approval bound to the snapshot hash, roles enforced by the API, separation of duties). (3) Numbered versions stay; each gains snapshot_sha, signatures and status per AR-01 to AR-10. (4) The orchestrator state machine is extended with the design's approval, compile, build, test and deploy states.
+Assumptions: The EC2 build host can be added to Infra/ later; API Gateway and EventBridge approval from organisers still outstanding (DEC-011).
+Why: Keeps the hosting already built and reviewed while meeting the build container's needs.
+Other options considered (and why not): Follow the design fully (discards built Lambda and CDK work); Lambda only with CodeBuild (unapproved service, riskier).
+Revisit if: organisers refuse API Gateway or EventBridge, or the EC2 host cannot be added in time.
+Related: DEC-009, DEC-010, DEC-011, DEC-012
+
+### DEC-015 | Real sign-in with Cognito (three groups) so separation of duties can hold
+Status: decided (implementation not started)
+Date: 2026-11-03
+Decided by: human (utg1209), after a critique that found the API has no identity (author is client-supplied)
+Feature or area: identity and roles
+Decision: Add Amazon Cognito (user pool, groups program_officer, clinician, it) and a JWT authorizer on the HTTP API. Roles and the acting user are derived server-side from the token, never from the request body. Enforces BRD section 4 and AR-03/AR-08. Added to Infra/ per DEC-009 when built. Sign and release actions will be conditional DynamoDB transactions with Signature, Decision, edit-lock and latest-signed records.
+Assumptions: Cognito is an approved or approvable AWS service (the system design already uses it); not yet confirmed with organisers.
+Why: Without identity, no BRD approval rule can be demonstrated.
+Other options considered (and why not): Build identity later (the signature flow depends on it); API keys (no per-user identity).
+Revisit if: organisers refuse Cognito.
+Related: DEC-012, DEC-014
+
+### DEC-016 | Logic model v2 proposal (open, under team discussion)
+Status: open
+Date: 2026-11-03
+Decided by: pending (human is discussing with a teammate)
+Feature or area: logic model schema and checks
+Decision: Not yet made. Three independent critiques (clinical safety, formal soundness, AI governance) recommend: outcome severity tiers owned by the clinician with a blocking check that a lower-severity rule can never override a higher one; mandatory required on questions that rules read and an explicit could-not-measure choice; drop != and UNIQUE tables for the MVP; named table outputs (age_band, fast_breathing, any_danger_sign, dose) and a collect-all treatment table; structured doses and clinical text with sources; separate entry limits; needs_value holes allowed in drafts only; exact region-search checks (NOT PROVEN blocks approval) instead of pairwise sampling; code-generated gap findings (12-month overlap, scope edges, danger-sign coverage); fill_logic outputs references to extraction ids with code expanding numbers, operators, catch-all and clinical text; rebuild the fixture as a port of the v0.9 tree on real block ids, verified by Medic.
+Assumptions: Critique files are in the session scratchpad; clinician answers needed for OQ-03, exact 12 months, the drinking condition for first-dose amoxicillin, and breaths-not-counted.
+Why: The critiques found that the current schema and fixture could let a lower-priority rule hide an urgent referral and treat unmeasured children as normal.
+Other options considered (and why not): minimal patch (add only severity, required and danger-sign checks), which leaves derived values and doses outside the model.
+Revisit if: the clinician or team rejects tiers or named outputs.
+Related: DEC-013
+
+Update 2026-11-03 (DEC-016): human (utg1209) answered the proposal. Decided: (1) outcome severity ranks, clinician-owned; (2) a catch-all outcome receives anything unclassified or unmeasured (to be a declared, clinician-chosen fallback, with its region shown to reviewers); (4) the generation step is extraction record -> logic model, and clinical text is copied by code from the extraction (it already holds verbatim text, block ids and quotes); (5) a derived-values section is required (age band, fast breathing, any danger sign, doses); (6) numbers, operators and the catch-all are written by code, not AI; (7) access control (DEC-015). Quote check (V3) and number check (V4) are the first validators to build. Point 3 (drop != and unique-match tables) was not answered: Claude's call is to drop both for the MVP and add a collect-all table mode, reversible.
+
+Update 2026-11-03 (DEC-013): the implemented logic model is schema_version 2 (Backend/src/logicModel/schema.ts), which supersedes system-design.md section 4 (schema_version 1) where they differ: no != operator, hit policies FIRST and COLLECT only (no UNIQUE), range renamed entry_limits, outcomes are objects with a severity rank, a required derived section, structured actions with sources, clinical_text with sources, a mandatory catch-all as the last FIRST rule, followups name their table. Cross-references and uniqueness (declared variables, outcome ids, table ids) are enforced by the validators (Backend/src/validation/checks/schemaReferences), not by the schema parse; no model may reach evaluate or enumerateGrid without passing them.
+
+### DEC-017 | v1.json is the logic model contract (supersedes the section-4 style schema)
+Status: decided
+Date: 2026-11-03
+Decided by: human (utg1209)
+Feature or area: logic model contract
+Decision: The team's hand-written v1.json (repo root; schema_version "1.0": meta, scope, questions, derived, outcomes with actions/dose_by_age/follow_up/severity, hit_policy first_match_by_priority, rules with priority and an "otherwise" catch-all, open_questions with route_to) is the logic model the pipeline generates and validates. Backend/src/logicModel (built to system-design section 4, DEC-013 v2) is to be rewritten around it; the canonical hash and the validation framework carry over. v1.json becomes the fixture and golden reference. Conditions use only is_yes, at_least, less_than, all, any (plus the "otherwise" rule); sources are {page, quote} and are checked against the page text. Items to settle in the merge: severity convention (v1.json: lower number is more urgent), several sources per item (a derived value or rule cites more than one quote), meta.file_sha256 must equal the sha256 of the PDF actually used (v1.json says a489..., repo PDF is 0d74...), block ids on sources if the extraction supplies them.
+Assumptions: The cht-conf compile contract (project directory with forms/app/<id>.xlsx, properties.json, tasks.js, targets.js, translations, .eslintrc, base_settings.json, contact-summary.js) is met by a compileSnapshot step that writes a base-project template plus files generated from the model.
+Why: v1.json matches the BRD (rule table, order, shown_when, entry constraints, open questions, provenance) and uses a closed operator set that compiles safely to XLSForm.
+Other options considered (and why not): keep the section-4 schema and convert v1.json into it (two shapes to maintain).
+Revisit if: the compiler needs fields v1.json lacks (form id and title, contact types, task window after due).
+Related: DEC-012, DEC-013, DEC-016

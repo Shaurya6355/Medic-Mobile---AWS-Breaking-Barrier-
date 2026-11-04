@@ -95,3 +95,17 @@ Files or resources touched: Infra/DEPLOY_CHECKLIST.md (new), claude_team/integra
 What others must do or know: Status of the infra steps: code complete and reviewed; not deployed; not verified on real AWS. The logic model placeholder is Backend/src/steps/fillLogic.ts and Backend/src/steps/logicModelValidator.ts; both get replaced when the logic model design is agreed.
 Open items: logic model design (fill step, validator, unclear section, version 1); deploy and smoke test; API authentication; organiser approvals (DEC-008, DEC-011).
 Related: INT-004, INT-005, DEC-011
+
+### INT-007 | 2026-11-03 | utg1209 (Claude session) | BRD and system design added; logic model work starts
+What changed: Added claude_team/brd.md (BRD v1.3) and claude_team/system-design.md exactly as supplied by the human, linked from claude.md (Reference documents). Recorded DEC-012 (requirements source and precedence), DEC-013 (logic model schema is system design section 4; the example tree JSON is illustrative) and DEC-014 (hybrid hosting, BRD approval order). Next build, by subagents with reviewers: a logic package (schema, DSL, interpreter, input grid) and a validation folder with the S4 checks and V1 to V7 validators, then the real fill_logic step.
+Files or resources touched: claude_team/brd.md (new), claude_team/system-design.md (new), claude_team/claude.md, claude_team/decisions.md, claude_team/integration.md.
+What others must do or know: Read brd.md and system-design.md. Gaps against the BRD in the existing Backend: no signatures, roles or locking on versions (AR-01 to AR-10), no single-editor lock (BR-10), rejection reasons are not fed to later drafts (GR-11), no issue register, no compiler, no build or synthetic-patient stage, no audit hash chain, no review UI. Open BRD questions still open: OQ-01 to OQ-07 (OQ-02 table layout and OQ-03 out-of-pathway children block parts of the logic model).
+Open items: build the logic package and validation folder; issue register and approvals API; compiler spike; EC2 build host in Infra/ (DEC-009).
+Related: DEC-012, DEC-013, DEC-014
+
+### INT-008 | 2026-11-03 | utg1209 (Claude session) | Logic model foundations and critique
+What changed: Built in Backend/src/logicModel/ (uncommitted): strict Zod schema per design section 4, canonical JSON plus SHA-256 snapshot hash, single interpreter (evaluate, trace, relevance), input grid with pairwise fallback, synthetic cough fixture, 526 tests passing in Backend (16 skipped need DynamoDB Local). Three independent critiques (clinical, formal, AI governance) found issues recorded as DEC-016 (open). The fixture is NOT a clinical reference: it misorders cough of 14 days or more, has only 4 of 13 danger signs and invented quotes. Do not use it for evals or golden cases.
+Files or resources touched: Backend/src/logicModel/*, Backend/tests/logicModel/*, Backend/tests/fixtures/logicModel/*, claude_team/decisions.md (DEC-015, DEC-016).
+What others must do or know: Validation folder (S4 checks) not yet built; waiting on the DEC-016 decision. Cognito added as decision DEC-015, not yet in Infra/. Ask the clinician (Medic) for: out-of-pathway ages (OQ-03), the exactly-12-months band, the drinking condition for first-dose amoxicillin, what happens when breaths are not counted.
+Open items: DEC-016; validation folder; fill_logic on the new schema; Cognito and signatures (AR-01 to AR-10); fixture rebuild and 12 golden cases for Medic to confirm.
+Related: DEC-013, DEC-015, DEC-016
