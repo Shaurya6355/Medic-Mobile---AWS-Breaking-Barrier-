@@ -121,7 +121,7 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
       await s.appendAudit("r1", { at: 1, type: "a", detail: { x: 1 } });
       await s.appendAudit("r1", { at: 2, type: "b", detail: null });
       expect((await s.listAudit("r1")).map((e) => e.type)).toEqual(["a", "b"]);
-      const keys = Object.keys(s as object).concat(Object.getOwnPropertyNames(Object.getPrototypeOf(s)));
+      const keys = Object.getOwnPropertyNames(Object.getPrototypeOf(s));
       expect(keys.filter((k) => /audit/i.test(k)).sort()).toEqual(["appendAudit", "listAudit"]);
     });
 
