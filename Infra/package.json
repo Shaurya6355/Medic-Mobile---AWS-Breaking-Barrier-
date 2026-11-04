@@ -1,0 +1,25 @@
+{
+  "name": "orchestrator-infra",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWS CDK v2 data layer for the CHT config orchestrator",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "synth": "cdk synth"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.275.0",
+    "constructs": "10.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "aws-cdk": "2.1147.0",
+    "ts-node": "10.9.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}
