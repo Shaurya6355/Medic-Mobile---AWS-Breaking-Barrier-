@@ -9,7 +9,8 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import type { RunState } from "../contract/schemas.js";
-import type { Comment, Run, StepRecord, Version } from "../domain/types.js";
+import type { Comment, Rejection, Run, Signature, StepRecord, Version } from "../domain/types.js";
+import { InvalidUserId, normaliseUserId } from "../signoff/identity.js";
 import { AlreadyExists, Conflict } from "./store.js";
 import type { AuditEvent, Store } from "./store.js";
 
@@ -19,7 +20,11 @@ import type { AuditEvent, Store } from "./store.js";
  *   runs      HASH runId (S).            One item per run; the Run fields are top-level
  *                                        attributes, lease is a map {owner, expiresAt}.
  *   steps     HASH runId, RANGE sk (S).  sk = "<step>#<attempt padded to 6>".
- *   versions  HASH runId, RANGE n (N).   n >= 1: the immutable version items.
+ *   versions  HASH runId, RANGE n (N).   n >= 1: the version items. Their body pointer (artifactKey) is
+ *                                        never rewritten; the only updates are addSignature, which appends
+ *                                        to `signatures` and sets `status`/`lockedAt` under a condition,
+ *                                        and rejectVersion, which sets `status` "rejected" and
+ *                                        `rejection` under a condition (AR-06).
  *                                        n = 0: the per-run "latest pointer" item
  *                                        {runId, n: 0, latest: <number>}. addVersion writes
  *                                        the version and moves the pointer in one transaction,
@@ -269,6 +274,131 @@ export class DynamoStore implements Store {
       new GetCommand({ TableName: this.tables.versions, Key: { runId, n }, ConsistentRead: true }),
     );
     return res.Item ? (res.Item as Version) : undefined;
+  }
+
+  // One transaction: a ConditionCheck that the latest pointer still equals n (a newer version
+  // invalidates the sign-off of this one), plus a conditional Update of the version item. Needs
+  // dynamodb:ConditionCheckItem in the app policy (Infra/lib/data-stack.ts).
+  async addSignature(input: Signature): Promise<Version> {
+    // userIds are stored and compared normalised (signoff/identity.ts), so "Alice" and "alice" are one person.
+    let sig: Signature;
+    try {
+      sig = { ...input, userId: normaliseUserId(input.userId) };
+    } catch (e) {
+      if (e instanceof InvalidUserId) throw new Conflict(`Signature refused for ${input.runId} v${input.n} (${input.role}): invalid userId`);
+      throw e;
+    }
+    const names: Record<string, string> = { "#sigs": "signatures", "#status": "status" };
+    const values: Record<string, unknown> = { ":one": [clean(sig)], ":locked": "locked", ":rejected": "rejected" };
+    let condition = "attribute_exists(runId) AND (attribute_not_exists(#status) OR (#status <> :locked AND #status <> :rejected))";
+    let update: string;
+    if (sig.role === "program_officer") {
+      condition += " AND (attribute_not_exists(#sigs) OR size(#sigs) = :zero)";
+      values[":zero"] = 0;
+      update = "SET #sigs = :one";
+    } else {
+      names["#role"] = "role";
+      names["#sha"] = "modelSha";
+      names["#user"] = "userId";
+      names["#set"] = "settingsSha";
+      Object.assign(values, { ":count": 1, ":officer": "program_officer", ":sha": sig.modelSha, ":user": sig.userId, ":at": sig.signedAt });
+      condition +=
+        " AND size(#sigs) = :count AND #sigs[0].#role = :officer AND #sigs[0].#sha = :sha AND #sigs[0].#user <> :user";
+      if (sig.settingsSha === undefined) condition += " AND attribute_not_exists(#sigs[0].#set)";
+      else {
+        values[":set"] = sig.settingsSha;
+        condition += " AND #sigs[0].#set = :set";
+      }
+      names["#lockedAt"] = "lockedAt";
+      update = "SET #sigs = list_append(#sigs, :one), #status = :locked, #lockedAt = :at";
+    }
+    try {
+      await this.doc.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              ConditionCheck: {
+                TableName: this.tables.versions,
+                Key: { runId: sig.runId, n: 0 },
+                ConditionExpression: "#latest = :n",
+                ExpressionAttributeNames: { "#latest": "latest" },
+                ExpressionAttributeValues: { ":n": sig.n },
+              },
+            },
+            {
+              Update: {
+                TableName: this.tables.versions,
+                Key: { runId: sig.runId, n: sig.n },
+                UpdateExpression: update,
+                ConditionExpression: condition,
+                ExpressionAttributeNames: names,
+                ExpressionAttributeValues: values,
+              },
+            },
+          ],
+        }),
+      );
+    } catch (e) {
+      if (isChainConflict(e)) throw new Conflict(`Signature refused for ${sig.runId} v${sig.n} (${sig.role})`);
+      throw e;
+    }
+    const v = await this.getVersion(sig.runId, sig.n);
+    if (!v) throw new Error(`Version not found after signing: ${sig.runId} v${sig.n}`);
+    return v;
+  }
+
+  // Same shape as addSignature: a ConditionCheck on the latest pointer plus a conditional Update.
+  async rejectVersion(runId: string, n: number, input: Rejection): Promise<Version> {
+    let rejection: Rejection;
+    try {
+      rejection = { ...input, userId: normaliseUserId(input.userId) };
+    } catch (e) {
+      if (e instanceof InvalidUserId) throw new Conflict(`Rejection refused for ${runId} v${n}: invalid userId`);
+      throw e;
+    }
+    try {
+      await this.doc.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              ConditionCheck: {
+                TableName: this.tables.versions,
+                Key: { runId, n: 0 },
+                ConditionExpression: "#latest = :n",
+                ExpressionAttributeNames: { "#latest": "latest" },
+                ExpressionAttributeValues: { ":n": n },
+              },
+            },
+            {
+              Update: {
+                TableName: this.tables.versions,
+                Key: { runId, n },
+                UpdateExpression: "SET #status = :rejected, #rej = :rej",
+                ConditionExpression:
+                  "attribute_exists(runId) AND (attribute_not_exists(#status) OR (#status <> :locked AND #status <> :rejected))" +
+                  " AND size(#sigs) = :count AND #sigs[0].#role = :officer AND #sigs[0].#sha = :sha AND #sigs[0].#user <> :user",
+                ExpressionAttributeNames: { "#status": "status", "#rej": "rejection", "#sigs": "signatures", "#role": "role", "#sha": "modelSha", "#user": "userId" },
+                ExpressionAttributeValues: {
+                  ":rejected": "rejected",
+                  ":locked": "locked",
+                  ":rej": clean(rejection),
+                  ":count": 1,
+                  ":officer": "program_officer",
+                  ":sha": rejection.modelSha,
+                  ":user": rejection.userId,
+                },
+              },
+            },
+          ],
+        }),
+      );
+    } catch (e) {
+      if (isChainConflict(e)) throw new Conflict(`Rejection refused for ${runId} v${n}`);
+      throw e;
+    }
+    const v = await this.getVersion(runId, n);
+    if (!v) throw new Error(`Version not found after rejecting: ${runId} v${n}`);
+    return v;
   }
 
   async addComment(c: Comment): Promise<void> {

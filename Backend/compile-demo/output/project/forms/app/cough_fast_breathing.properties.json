@@ -1,0 +1,13 @@
+{
+  "title": [
+    {
+      "locale": "en",
+      "content": "Cough and fast breathing (demo preview)"
+    }
+  ],
+  "icon": "icon-healthcare",
+  "context": {
+    "person": true,
+    "place": false
+  }
+}

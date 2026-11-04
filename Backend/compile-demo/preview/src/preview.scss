@@ -1,0 +1,166 @@
+// enketo-core's own formhub theme (the CHT webapp builds its enketo styles from the same partials).
+@import "enketo-core/src/sass/formhub/formhub";
+
+// ---- preview shell (not CHT) ----
+body {
+  margin: 0;
+  background: #e9edf0;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+#preview-banner {
+  background: #b71c1c;
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  padding: 8px 12px;
+  letter-spacing: 0.02em;
+}
+.layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 20px;
+  flex-wrap: wrap;
+}
+.phone {
+  width: 400px;
+  max-width: 100%;
+  background: #fff;
+  border: 10px solid #222;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+.phone-header {
+  background: #3f6c87; // close to the CHT webapp header colour
+  color: #fff;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  #page-indicator {
+    font-weight: 400;
+    font-size: 0.85em;
+    opacity: 0.9;
+  }
+}
+.phone-subject {
+  background: #f3f6f8;
+  padding: 6px 14px;
+  font-size: 0.85em;
+  color: #333;
+  border-bottom: 1px solid #dde3e7;
+}
+#form-wrap {
+  .container {
+    min-height: 420px;
+  }
+  form.or {
+    padding: 0 14px 10px;
+    margin: 0;
+    box-shadow: none;
+    border: none;
+    max-width: none;
+    width: auto;
+  }
+  #form-title {
+    display: none; // CHT shows the title in its header bar
+  }
+  .form-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px 14px;
+    border-top: 1px solid #dde3e7;
+    margin: 0;
+    .btn {
+      flex: 1;
+      padding: 10px;
+      font-size: 1em;
+      border-radius: 4px;
+      border: 1px solid #3f6c87;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: #3f6c87;
+      color: #fff;
+    }
+    .btn-default {
+      background: #fff;
+      color: #3f6c87;
+    }
+    .btn.disabled {
+      display: none;
+    }
+    .btn.submit {
+      display: none;
+    }
+    &.end .btn.submit {
+      display: block;
+    }
+  }
+  #submit-result {
+    padding: 0 14px 14px;
+    pre {
+      font-size: 11px;
+      max-height: 220px;
+      overflow: auto;
+      background: #f6f8fa;
+      padding: 8px;
+    }
+  }
+}
+.submit-ok {
+  color: #1b5e20;
+  font-weight: 600;
+}
+.submit-error {
+  color: #b71c1c;
+  font-weight: 600;
+}
+.tooling {
+  width: 460px;
+  max-width: 100%;
+  background: #fffbe6;
+  border: 2px dashed #b08900;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  h2 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    color: #7a5c00;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .tooling-note {
+    color: #5c5c5c;
+    font-size: 12px;
+  }
+  table.calcs {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+    th,
+    td {
+      border: 1px solid #e0d9b5;
+      padding: 5px 8px;
+      text-align: left;
+      font-family: ui-monospace, Menlo, monospace;
+    }
+    th {
+      width: 40%;
+      background: #fff3c4;
+    }
+  }
+  pre#model-xml {
+    font-size: 11px;
+    max-height: 520px;
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #e0d9b5;
+    padding: 8px;
+  }
+}

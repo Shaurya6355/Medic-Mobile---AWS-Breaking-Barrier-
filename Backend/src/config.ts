@@ -24,6 +24,9 @@ export interface Config {
   pythonBin: string;
   ingestScript: string;
   extractPrompt: string;
+  fillPrompt: string;
+  // Model for the fill_logic draft; defaults to MODEL_ID (the IAM policy covers MODEL_ID only).
+  fillModelId: string;
   prices: PriceTable;
 }
 
@@ -116,6 +119,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     pythonBin: str(env, "PYTHON_BIN", "python3"),
     ingestScript: str(env, "INGEST_SCRIPT", path.join(extractionDir, "prepare_input.py")),
     extractPrompt: str(env, "EXTRACT_PROMPT", path.join(extractionDir, "final_prompt.txt")),
+    fillPrompt: str(env, "FILL_PROMPT", path.join(extractionDir, "fill_prompt.txt")),
+    fillModelId: str(env, "FILL_MODEL_ID", req("MODEL_ID")),
     prices: loadPrices(env),
   };
 }

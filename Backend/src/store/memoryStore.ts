@@ -1,5 +1,6 @@
 import type { RunState } from "../contract/schemas.js";
-import type { Comment, Run, StepRecord, Version } from "../domain/types.js";
+import type { Comment, Rejection, Run, Signature, StepRecord, Version } from "../domain/types.js";
+import { normaliseUserId, sameUser } from "../signoff/identity.js";
 import { AlreadyExists, Conflict } from "./store.js";
 import type { AuditEvent, Store } from "./store.js";
 
@@ -77,6 +78,66 @@ export class MemoryStore implements Store {
   async getVersion(runId: string, n: number): Promise<Version | undefined> {
     const v = (this.versions.get(runId) ?? []).find((x) => x.n === n);
     return v ? structuredClone(v) : undefined;
+  }
+
+  async addSignature(sig: Signature): Promise<Version> {
+    const list = this.versions.get(sig.runId) ?? [];
+    const v = list.find((x) => x.n === sig.n);
+    const refuse = (why: string): never => {
+      throw new Conflict(`Signature refused for ${sig.runId} v${sig.n} (${sig.role}): ${why}`);
+    };
+    if (!v) return refuse("version not found");
+    if (list[list.length - 1]!.n !== sig.n) refuse("not the latest version");
+    if (v.status === "locked") refuse("version is locked");
+    if (v.status === "rejected") refuse("version is rejected");
+    let userId: string;
+    try {
+      userId = normaliseUserId(sig.userId);
+    } catch {
+      return refuse("invalid userId");
+    }
+    const sigs = v.signatures ?? [];
+    if (sig.role === "program_officer") {
+      if (sigs.length > 0) refuse("already signed");
+    } else {
+      const officer = sigs[0];
+      if (sigs.length !== 1 || officer?.role !== "program_officer") refuse("needs exactly the program officer signature first");
+      if (officer!.modelSha !== sig.modelSha) refuse("officer signed different content");
+      if ((officer!.settingsSha ?? "none") !== (sig.settingsSha ?? "none")) refuse("officer signed with other compile settings");
+      if (sameUser(officer!.userId, userId)) refuse("same person as the officer");
+    }
+    v.signatures = [...sigs, structuredClone({ ...sig, userId })];
+    if (sig.role === "clinician") {
+      v.status = "locked";
+      v.lockedAt = sig.signedAt;
+    }
+    return structuredClone(v);
+  }
+
+  async rejectVersion(runId: string, n: number, rejection: Rejection): Promise<Version> {
+    const list = this.versions.get(runId) ?? [];
+    const v = list.find((x) => x.n === n);
+    const refuse = (why: string): never => {
+      throw new Conflict(`Rejection refused for ${runId} v${n}: ${why}`);
+    };
+    if (!v) return refuse("version not found");
+    if (list[list.length - 1]!.n !== n) refuse("not the latest version");
+    if (v.status === "locked") refuse("version is locked");
+    if (v.status === "rejected") refuse("version is already rejected");
+    let userId: string;
+    try {
+      userId = normaliseUserId(rejection.userId);
+    } catch {
+      return refuse("invalid userId");
+    }
+    const sigs = v.signatures ?? [];
+    const officer = sigs[0];
+    if (sigs.length !== 1 || officer?.role !== "program_officer") refuse("needs exactly the program officer signature");
+    if (officer!.modelSha !== rejection.modelSha) refuse("officer signed different content");
+    if (sameUser(officer!.userId, userId)) refuse("same person as the officer");
+    v.status = "rejected";
+    v.rejection = structuredClone({ ...rejection, userId });
+    return structuredClone(v);
   }
 
   async addComment(c: Comment): Promise<void> {

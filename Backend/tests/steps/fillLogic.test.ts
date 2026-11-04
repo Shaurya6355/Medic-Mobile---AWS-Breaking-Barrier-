@@ -1,30 +1,55 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Version } from "../../src/domain/types.js";
 import { Conflict, type Store } from "../../src/store/store.js";
 import { MemoryArtifactStore, artifactKey } from "../../src/artifacts/artifactStore.js";
-import type { StepContext } from "../../src/engine/step.js";
+import { TransientError, UsageError, type StepContext } from "../../src/engine/step.js";
 import { createFillLogicStep } from "../../src/steps/fillLogic.js";
-import { acceptAnyObjectValidator } from "../../src/steps/logicModelValidator.js";
+import { acceptAnyObjectValidator, parseModelValidator } from "../../src/steps/logicModelValidator.js";
 import { MemoryStore } from "../../src/store/memoryStore.js";
-import { FakeModelClient } from "../../src/model/modelClient.js";
+import { FakeModelClient, type FakeResponse } from "../../src/model/modelClient.js";
+import { DraftSchema } from "../../src/logic/fill/draftSchema.js";
+import { parseModel } from "../../src/logic/schema.js";
+import { rawV1 } from "../logic/helpers.js";
 
-const extraction = { nodes: [], unclear_items: [{ id: "u1", note: "dose?" }] };
+const backend = path.resolve(import.meta.dirname, "..", "..");
+const extractionText = readFileSync(path.join(backend, "extraction", "extraction_output.json"), "utf8");
+const draftText = readFileSync(path.join(backend, "tests", "fixtures", "fill", "draft-cough.json"), "utf8");
+const promptPath = path.join(backend, "extraction", "fill_prompt.txt");
+const SHA = "0d74150dc2e1d377522706560444e3ea86b6877600cefc375f18809239513793";
+
 const outKey = artifactKey("r1", "extract", "extraction_output.json");
 const v1Key = artifactKey("r1", "versions", "v1.json");
-const step = createFillLogicStep({ validator: acceptAnyObjectValidator });
+const draftKey = artifactKey("r1", "fill_logic", "draft.json");
+const rawKey = artifactKey("r1", "fill_logic", "raw_response.txt");
+const repairKey = artifactKey("r1", "fill_logic", "raw_repair.txt");
+const usage = (i: number, o: number) => ({ inputTokens: i, outputTokens: o, modelId: "us.test.model-v1:0" });
+const good: FakeResponse = { raw: draftText, usage: usage(1000, 400) };
+const badDraft = (): string => {
+  const d = JSON.parse(draftText);
+  d.rules[0].when = { ref: "no_such_item" };
+  d.outcomes[0].action_ids.push("act_ghost");
+  return JSON.stringify(d);
+};
 
-async function setup(withExtraction = true) {
+const mkStep = (validator = parseModelValidator) =>
+  createFillLogicStep({ validator, modelId: "us.test.model-v1:0", promptPath, pathwayId: "cough_fast_breathing" });
+const step = mkStep();
+
+async function setup(responses: (FakeResponse | Error)[] = [good], withExtraction = true) {
   const artifacts = new MemoryArtifactStore();
-  if (withExtraction) await artifacts.put(outKey, JSON.stringify(extraction));
+  if (withExtraction) await artifacts.put(outKey, extractionText);
   const store = new MemoryStore();
+  const model = new FakeModelClient(responses);
   const ctx: StepContext = {
-    run: { runId: "r1", state: "filling_logic", createdAt: 0 },
+    run: { runId: "r1", state: "filling_logic", createdAt: 0, docSha256: SHA },
     store,
     artifacts,
-    model: new FakeModelClient([]),
-    now: () => 5,
+    model,
+    now: () => Date.UTC(2026, 10, 4, 12),
   };
-  return { ctx, store, artifacts };
+  return { ctx, store, artifacts, model };
 }
 const text = (a: MemoryArtifactStore, k: string) => a.get(k).then((b) => new TextDecoder().decode(b));
 
@@ -34,30 +59,52 @@ describe("fill_logic step", () => {
     expect(step.runState).toBe("filling_logic");
   });
 
-  it("creates exactly one version 1 with the placeholder body", async () => {
-    const { ctx, store, artifacts } = await setup();
+  it("drafts with the model, resolves and stores exactly one version 1 that parses", async () => {
+    const { ctx, store, artifacts, model } = await setup();
     const res = await step.run(ctx);
     const versions = await store.listVersions("r1");
     expect(versions).toHaveLength(1);
-    expect(versions[0]).toMatchObject({ n: 1, parent: null, author: "ai", createdAt: 5, artifactKey: v1Key });
-    expect(res.artifactRefs).toEqual({ version: v1Key });
-    expect(res.usage).toBeUndefined();
+    expect(versions[0]).toMatchObject({ n: 1, parent: null, author: "ai", artifactKey: v1Key });
+    expect(res.artifactRefs).toEqual({ version: v1Key, draft: draftKey });
+    expect(res.usage).toEqual(usage(1000, 400));
+
     const body = JSON.parse(await text(artifacts, v1Key));
-    expect(body.placeholder).toBe(true);
-    expect(body.extraction).toEqual(extraction);
-    expect(body.unclear).toEqual(extraction.unclear_items);
+    const parsed = parseModel(body);
+    expect(parsed.ok).toBe(true);
+    expect(body.meta).toMatchObject({
+      pathway_id: "cough_fast_breathing",
+      version: 1,
+      parent_version: null,
+      created_by: "ai_draft",
+      created_at: "2026-11-04T12:00:00.000Z",
+      guideline: { file_sha256: SHA },
+    });
+    expect(JSON.parse(await text(artifacts, draftKey))).toEqual(JSON.parse(draftText));
+    expect(await text(artifacts, rawKey)).toBe(draftText);
+
+    // One model call, through the ModelClient, with the prompt file and the draft schema.
+    expect(model.calls).toHaveLength(1);
+    const call = model.calls[0]!;
+    expect(call.modelId).toBe("us.test.model-v1:0");
+    expect(call.system).toBe(readFileSync(promptPath, "utf8"));
+    expect(call.schema).toBe(DraftSchema);
+    const sent = call.content.map((c) => (c.type === "text" ? c.text : "")).join("\n");
+    expect(sent).toContain('"index":2');
+    expect(sent).toContain("n_dec_danger");
   });
 
-  it("is idempotent when run twice", async () => {
-    const { ctx, store } = await setup();
+  it("is idempotent: a second run makes no model call and adds no version", async () => {
+    const { ctx, store, model } = await setup([good]);
     await step.run(ctx);
     const res = await step.run(ctx);
     expect(await store.listVersions("r1")).toHaveLength(1);
     expect(res.artifactRefs).toEqual({ version: v1Key });
+    expect(res.usage).toBeUndefined();
+    expect(model.calls).toHaveLength(1);
   });
 
-  it("succeeds without touching a pre-existing version 1", async () => {
-    const { ctx, store, artifacts } = await setup();
+  it("succeeds without touching a pre-existing version 1 and without a model call", async () => {
+    const { ctx, store, artifacts, model } = await setup([]);
     await artifacts.put(v1Key, "user edited");
     await store.addVersion({ runId: "r1", n: 1, parent: null, author: "ai", createdAt: 1, artifactKey: v1Key });
     await store.addVersion({ runId: "r1", n: 2, parent: 1, author: "user", createdAt: 2, artifactKey: "k2" });
@@ -65,33 +112,102 @@ describe("fill_logic step", () => {
     expect(await store.listVersions("r1")).toHaveLength(2);
     expect(await text(artifacts, v1Key)).toBe("user edited");
     expect(res.artifactRefs).toEqual({ version: v1Key });
+    expect(model.calls).toHaveLength(0);
   });
 
   it("two concurrent executions end with one version and both succeed", async () => {
-    const { ctx, store } = await setup();
+    const { ctx, store } = await setup([good, good]);
     const [a, b] = await Promise.all([step.run(ctx), step.run(ctx)]);
     expect(await store.listVersions("r1")).toHaveLength(1);
-    expect(a.artifactRefs).toEqual({ version: v1Key });
-    expect(b.artifactRefs).toEqual({ version: v1Key });
+    expect(a.artifactRefs.version).toBe(v1Key);
+    expect(b.artifactRefs.version).toBe(v1Key);
   });
 
-  it("fails when the validator rejects, writing nothing", async () => {
-    const { ctx, store, artifacts } = await setup();
-    const bad = createFillLogicStep({ validator: { validate: () => ({ ok: false, issues: ["a", "b"] }) } });
-    await expect(bad.run(ctx)).rejects.toThrow(/a; b/);
+  it("repairs a draft with problems once, sending the problems back, and sums the usage", async () => {
+    const { ctx, store, artifacts, model } = await setup([{ raw: badDraft(), usage: usage(1000, 400) }, { raw: draftText, usage: usage(1500, 420) }]);
+    const res = await step.run(ctx);
+    expect(model.calls).toHaveLength(2);
+    expect(res.usage).toEqual(usage(2500, 820));
+    expect(await store.listVersions("r1")).toHaveLength(1);
+    const repairText = model.calls[1]!.content.map((c) => (c.type === "text" ? c.text : "")).join("\n");
+    expect(repairText).toContain('"no_such_item" is not a question or derived item');
+    expect(repairText).toContain('action "act_ghost" is not in extraction');
+    expect(repairText).toContain("Your previous answer was:");
+    expect(await text(artifacts, rawKey)).toBe(badDraft());
+    expect(await text(artifacts, repairKey)).toBe(draftText);
+  });
+
+  it("repairs an answer that is not valid JSON or does not fit the draft schema", async () => {
+    for (const raw of ["not json at all", JSON.stringify({ questions: [] })]) {
+      const { ctx, model } = await setup([{ raw, usage: usage(10, 5) }, good]);
+      const res = await step.run(ctx);
+      expect(model.calls).toHaveLength(2);
+      expect(res.usage).toEqual(usage(1010, 405));
+    }
+  });
+
+  it("fails clearly after one failed repair, records the usage of both calls and writes no version", async () => {
+    const { ctx, store, artifacts, model } = await setup([{ raw: badDraft(), usage: usage(1000, 400) }, { raw: badDraft(), usage: usage(1100, 410) }, good]);
+    const err = await step.run(ctx).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(UsageError);
+    expect((err as Error).message).toMatch(/still has 2 problem\(s\) after one repair/);
+    expect((err as UsageError).usage).toEqual(usage(2100, 810));
+    expect(model.calls).toHaveLength(2);
     expect(await store.listVersions("r1")).toHaveLength(0);
     expect(await artifacts.exists(v1Key)).toBe(false);
   });
 
+  it("does not repair a transient model error: it is rethrown for the runner to retry", async () => {
+    const { ctx, model } = await setup([new TransientError("throttled")]);
+    await expect(step.run(ctx)).rejects.toBeInstanceOf(TransientError);
+    expect(model.calls).toHaveLength(1);
+  });
+
+  it("fails when the validator rejects, writing no version and keeping the usage", async () => {
+    const { ctx, store, artifacts } = await setup();
+    const bad = mkStep({ validate: () => ({ ok: false, issues: ["a", "b"] }) });
+    const err = await bad.run(ctx).catch((e: unknown) => e);
+    expect((err as Error).message).toMatch(/a; b/);
+    expect((err as UsageError).usage).toEqual(usage(1000, 400));
+    expect(await store.listVersions("r1")).toHaveLength(0);
+    expect(await artifacts.exists(v1Key)).toBe(false);
+  });
+
+  it("takes the file hash from the ingest record when the run has none, and flags it when neither has it", async () => {
+    const { ctx, artifacts } = await setup();
+    await artifacts.put(artifactKey("r1", "ingest", "input_blocks.json"), JSON.stringify({ source_id: "Cough_Guideline", doc_name: "Cough_Guideline.pdf", doc_sha256: "b".repeat(64), pages: [] }));
+    const run = { ...ctx.run };
+    delete run.docSha256;
+    await createFillLogicStep({ validator: parseModelValidator, modelId: "m", promptPath }).run({ ...ctx, run });
+    const body = JSON.parse(await text(artifacts, v1Key));
+    expect(body.meta.guideline).toMatchObject({ title: "Cough_Guideline.pdf", file_sha256: "b".repeat(64) });
+    expect(body.meta.pathway_id).toBe("cough_guideline");
+
+    const s2 = await setup();
+    const run2 = { ...s2.ctx.run };
+    delete run2.docSha256;
+    await step.run({ ...s2.ctx, run: run2 });
+    const body2 = JSON.parse(await text(s2.artifacts, v1Key));
+    expect(body2.meta.guideline.file_sha256).toBe("0".repeat(64));
+    expect(body2.open_questions.some((q: { question: string }) => /fingerprint/.test(q.question))).toBe(true);
+  });
+
   it("fails clearly when the extraction artifact is missing", async () => {
-    const { ctx } = await setup(false);
+    const { ctx } = await setup([], false);
     await expect(step.run(ctx)).rejects.toThrow(/Extraction output not found/);
   });
 
   it("fails clearly when the extraction artifact is not JSON", async () => {
-    const { ctx, artifacts } = await setup(false);
+    const { ctx, artifacts } = await setup([], false);
     await artifacts.put(outKey, "not json");
     await expect(step.run(ctx)).rejects.toThrow(/not valid JSON/);
+  });
+
+  it("fails clearly when the extraction does not match its schema, before any model call", async () => {
+    const { ctx, artifacts, model } = await setup([good], false);
+    await artifacts.put(outKey, JSON.stringify({ nodes: [] }));
+    await expect(step.run(ctx)).rejects.toThrow(/does not match the extraction schema/);
+    expect(model.calls).toHaveLength(0);
   });
 });
 
@@ -137,14 +253,7 @@ describe("fill_logic races and edge cases", () => {
     await expect(step.run({ ...ctx, store: wrapped })).rejects.toThrow(/version 1 is missing/);
   });
 
-  it("uses an empty unclear list when unclear_items is absent", async () => {
-    const { ctx, artifacts } = await setup(false);
-    await artifacts.put(outKey, JSON.stringify({ nodes: [] }));
-    await step.run(ctx);
-    expect(JSON.parse(await text(artifacts, v1Key)).unclear).toEqual([]);
-  });
-
-  it("re-checks before the artifact put and skips it when version 1 appeared", async () => {
+  it("re-checks before the version artifact put and skips it when version 1 appeared", async () => {
     const { ctx, store, artifacts } = await setup();
     const winnerKey = "winner/v1.json";
     const winner: Version = { runId: "r1", n: 1, parent: null, author: "ai", createdAt: 1, artifactKey: winnerKey };
@@ -158,13 +267,23 @@ describe("fill_logic races and edge cases", () => {
       size: (k: string) => artifacts.size(k),
     };
     const res = await step.run({ ...ctx, store: wrapped, artifacts: spy });
-    expect(puts).toEqual([]);
+    // Only the raw model answer is kept; no version object and no draft are written.
+    expect(puts).toEqual([rawKey]);
     expect(res.artifactRefs).toEqual({ version: winnerKey });
+    expect(res.usage).toEqual(usage(1000, 400));
   });
 });
 
-describe("acceptAnyObjectValidator", () => {
-  it("accepts plain objects and rejects others", () => {
+describe("logic model validators", () => {
+  it("parseModelValidator accepts the reference model and rejects anything else with issues", () => {
+    expect(parseModelValidator.validate(rawV1())).toEqual({ ok: true });
+    for (const v of [{}, null, [], "s", { placeholder: true }]) {
+      const r = parseModelValidator.validate(v);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.issues.length).toBeGreaterThan(0);
+    }
+  });
+  it("acceptAnyObjectValidator accepts plain objects and rejects others", () => {
     expect(acceptAnyObjectValidator.validate({})).toEqual({ ok: true });
     for (const v of [null, [], "s", 3, undefined]) {
       const r = acceptAnyObjectValidator.validate(v);

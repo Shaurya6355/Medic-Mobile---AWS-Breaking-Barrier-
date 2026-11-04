@@ -2,7 +2,7 @@
 /claude
 *.pdf
 build_viz.py 
-flow.html
+/Backend/extraction/flow.html
 system_prompt.txt
 Backend/extraction/pages
 Backend/cross-check/pages
@@ -18,3 +18,6 @@ Docs/superpowers
 **/.env
 **/.env.*
 !**/.env.example
+/v1.json
+/cough-pathway-logic-tree-v0.9.json
+/logic-model

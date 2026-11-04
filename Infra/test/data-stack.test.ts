@@ -84,6 +84,34 @@ describe("bucket", () => {
     expect(p.CorsConfiguration.CorsRules[0].AllowedOrigins).toEqual(["https://a.example", "https://b.example"]);
     expect(bucket().Properties.CorsConfiguration.CorsRules[0].AllowedOrigins).not.toContain("*");
   });
+  // The CDK CLI passes every `-c key=value` as a string, so uiOrigins must parse from strings too.
+  describe("uiOrigins given as the CLI passes it (a string)", () => {
+    const origins = (ctx: unknown): unknown =>
+      (Object.values(build({ uiOrigins: ctx }).findResources("AWS::S3::Bucket"))[0] as any).Properties.CorsConfiguration.CorsRules[0].AllowedOrigins;
+    it("accepts a JSON array string", () => {
+      expect(origins('["https://a.example","https://b.example"]')).toEqual(["https://a.example", "https://b.example"]);
+    });
+    it("accepts one bare origin", () => {
+      expect(origins("https://a.example")).toEqual(["https://a.example"]);
+    });
+    it("accepts a comma separated list and trims spaces", () => {
+      expect(origins("https://a.example, https://b.example")).toEqual(["https://a.example", "https://b.example"]);
+    });
+    it("rejects a wildcard inside a string", () => {
+      expect(() => build({ uiOrigins: '["*"]' })).toThrow(/wildcard/);
+      expect(() => build({ uiOrigins: "*" })).toThrow(/wildcard/);
+    });
+    it("rejects values that are not http(s) origins instead of falling back to localhost", () => {
+      expect(() => build({ uiOrigins: "app.example.org" })).toThrow(/uiOrigins/);
+      expect(() => build({ uiOrigins: "[1,2]" })).toThrow(/uiOrigins/);
+      expect(() => build({ uiOrigins: 5 })).toThrow(/uiOrigins/);
+    });
+    it("falls back to localhost only when unset or empty", () => {
+      expect(origins(undefined)).toEqual(["http://localhost:5173"]);
+      expect(origins("")).toEqual(["http://localhost:5173"]);
+      expect(origins([])).toEqual(["http://localhost:5173"]);
+    });
+  });
   it("notifies the queue on input pdf creation only", () => {
     const custom = Object.values(t.findResources("Custom::S3BucketNotifications")) as any[];
     expect(custom).toHaveLength(1);
@@ -170,7 +198,7 @@ describe("app policy", () => {
   it("grants only the dynamodb actions the code uses, on exactly the five tables", () => {
     const s = stmts().find((x) => actions(x).some((a) => a.startsWith("dynamodb:")));
     expect(actions(s).sort()).toEqual(
-      ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:UpdateItem"].sort(),
+      ["dynamodb:ConditionCheckItem", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:UpdateItem"].sort(),
     );
     const got = resources(s).map((r: any) => r["Fn::GetAtt"][0]).sort();
     const want = ["RunsTable", "StepsTable", "VersionsTable", "CommentsTable", "AuditTable"]

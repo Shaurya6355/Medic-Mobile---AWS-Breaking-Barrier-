@@ -1,0 +1,16 @@
+{
+  "mode": "full",
+  "ok": true,
+  "modelSha": "3dcbacce7f6065dd4394c6cea1b1e4b268c607e8fc487d40ad4a67d804b22955",
+  "formSha256": "e480a4d3c02370606fdb831f2368cec8e7e0219769492ab607f86fd84d48dd67",
+  "avgQuestions": 8.92,
+  "goldenAvgScreens": 8.2,
+  "golden": "15/15",
+  "edits": "4/4",
+  "gridPoints": 6400,
+  "gridMismatches": 0,
+  "shownMismatches": 0,
+  "partialMismatches": 0,
+  "mutation": "not run",
+  "seconds": 2987.4
+}

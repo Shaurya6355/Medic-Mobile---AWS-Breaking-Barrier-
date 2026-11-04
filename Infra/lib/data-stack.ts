@@ -16,6 +16,37 @@ export const DEFAULT_UI_ORIGINS = ["http://localhost:5173"];
 // longer wait before SQS redelivers is acceptable.
 const VISIBILITY_TIMEOUT = Duration.seconds(5400);
 
+// Reads the uiOrigins context. cdk.json can hold a real array, but `-c uiOrigins=...` always arrives as a
+// string, so a string may be a JSON array ('["https://a","https://b"]'), one origin or a comma separated
+// list. Unset or empty gives the localhost default; anything malformed throws rather than silently
+// falling back to localhost, which would block the real UI with CORS errors after deploy.
+export function resolveUiOrigins(raw: unknown): string[] {
+  if (raw === undefined || raw === null || raw === "") return DEFAULT_UI_ORIGINS;
+  let list: unknown = raw;
+  if (typeof raw === "string") {
+    const text = raw.trim();
+    if (text.startsWith("[")) {
+      try {
+        list = JSON.parse(text);
+      } catch {
+        throw new Error("context uiOrigins looks like a JSON array but does not parse");
+      }
+    } else {
+      list = text.split(",").map((o) => o.trim()).filter((o) => o !== "");
+    }
+  }
+  if (!Array.isArray(list)) throw new Error("context uiOrigins must be an array, a JSON array string or a comma separated string");
+  if (list.length === 0) return DEFAULT_UI_ORIGINS;
+  const origins = list.map((o) => (typeof o === "string" ? o.trim() : o));
+  if (origins.includes("*")) throw new Error("context uiOrigins must list explicit origins; a wildcard is not allowed");
+  for (const o of origins) {
+    if (typeof o !== "string" || !/^https?:\/\/[^/\s]+$/.test(o)) {
+      throw new Error(`context uiOrigins entry ${JSON.stringify(o)} must be an origin such as https://app.example.org (scheme and host, no path)`);
+    }
+  }
+  return origins as string[];
+}
+
 // "us.anthropic.claude-..." -> "anthropic.claude-..." (strip the cross-region profile prefix).
 export function baseModelId(modelId: string): string {
   return modelId.replace(/^(us|eu|apac|global|us-gov)\./, "");
@@ -48,12 +79,7 @@ export class OrchestratorDataStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    const ctxOrigins = this.node.tryGetContext("uiOrigins") as unknown;
-    const uiOrigins =
-      Array.isArray(ctxOrigins) && ctxOrigins.length > 0 ? (ctxOrigins as string[]) : DEFAULT_UI_ORIGINS;
-    if (uiOrigins.includes("*")) {
-      throw new Error("context uiOrigins must list explicit origins; a wildcard is not allowed");
-    }
+    const uiOrigins = resolveUiOrigins(this.node.tryGetContext("uiOrigins"));
     const ctxModel = this.node.tryGetContext("modelId") as unknown;
     const modelId = typeof ctxModel === "string" && ctxModel !== "" ? ctxModel : DEFAULT_MODEL_ID;
     if (!this.node.tryGetContext("uiOrigins")) {
@@ -110,7 +136,8 @@ export class OrchestratorDataStack extends Stack {
 
     // Application policy, scoped to the resources above. Actions mirror the SDK commands the
     // Backend issues: Get/Put/Update/Query/Scan/TransactWrite on DynamoDB (TransactWriteItems is
-    // authorised through the per-item Put/Update actions), Get/Put/Head on S3 (HeadObject needs
+    // authorised through the per-item Put/Update/ConditionCheck actions; ConditionCheckItem is for the
+    // sign-off write, which checks the versions table's latest pointer, DEC-019), Get/Put/Head on S3 (HeadObject needs
     // s3:GetObject; s3:ListBucket is added so a missing key returns 404 instead of 403), Receive/Delete
     // on SQS (Bedrock Converse, authorised by bedrock:InvokeModel, is in the separate bedrockPolicy).
     this.appPolicy = new iam.ManagedPolicy(this, "OrchestratorAppPolicy", {
@@ -122,6 +149,7 @@ export class OrchestratorDataStack extends Stack {
             "dynamodb:GetItem",
             "dynamodb:PutItem",
             "dynamodb:UpdateItem",
+            "dynamodb:ConditionCheckItem",
             "dynamodb:Query",
             "dynamodb:Scan",
           ],

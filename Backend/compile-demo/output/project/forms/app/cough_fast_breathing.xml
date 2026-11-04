@@ -1,0 +1,359 @@
+<?xml version="1.0"?>
+<h:html xmlns="http://www.w3.org/2002/xforms" xmlns:h="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" xmlns:odk="http://www.opendatakit.org/xforms">
+  <h:head>
+    <h:title>Cough and fast breathing (demo preview)</h:title>
+    <model odk:xforms-version="1.0.0">
+      <itext>
+        <translation lang="en">
+          <text id="yes_no-0">
+            <value>Yes</value>
+          </text>
+          <text id="yes_no-1">
+            <value>No</value>
+          </text>
+          <text id="/data/inputs/source:label">
+            <value>Source</value>
+          </text>
+          <text id="/data/inputs/source_id:label">
+            <value>Source ID</value>
+          </text>
+          <text id="/data/inputs/contact:label">
+            <value>Contact</value>
+          </text>
+          <text id="/data/inputs/contact/_id:label">
+            <value>Who is this assessment for?</value>
+          </text>
+          <text id="/data/inputs/contact/name:label">
+            <value>Name</value>
+          </text>
+          <text id="/data/inputs/contact/patient_id:label">
+            <value>Patient ID</value>
+          </text>
+          <text id="/data/q_age_months/age_months:jr:constraintMsg">
+            <value>Enter age in whole months.</value>
+          </text>
+          <text id="/data/q_age_months/age_months:label">
+            <value>Child's age in months</value>
+          </text>
+          <text id="/data/q_cough/cough:label">
+            <value>Does the child have a cough?</value>
+          </text>
+          <text id="/data/q_cough_days/cough_days:jr:constraintMsg">
+            <value>Enter a number of days.</value>
+          </text>
+          <text id="/data/q_cough_days/cough_days:label">
+            <value>For how many days has the child had the cough?</value>
+          </text>
+          <text id="/data/q_convulsions/convulsions:label">
+            <value>Has the child had convulsions?</value>
+          </text>
+          <text id="/data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed:label">
+            <value>Is the child not able to drink or feed anything?</value>
+          </text>
+          <text id="/data/q_vomits_everything/vomits_everything:label">
+            <value>Does the child vomit everything?</value>
+          </text>
+          <text id="/data/q_chest_indrawing/chest_indrawing:label">
+            <value>Look: does the child have chest indrawing?</value>
+          </text>
+          <text id="/data/q_breaths_per_minute/breaths_per_minute:jr:constraintMsg">
+            <value>Recount. Enter breaths in one full minute.</value>
+          </text>
+          <text id="/data/q_breaths_per_minute/breaths_per_minute:label">
+            <value>Count the child's breaths in 1 minute</value>
+          </text>
+          <text id="/data/q_unusually_sleepy/unusually_sleepy:label">
+            <value>Look: is the child unusually sleepy or unconscious?</value>
+          </text>
+          <text id="/data/results:label">
+            <value>Result</value>
+          </text>
+          <text id="/data/results/outcome_refer_urgent_outside_age_range:label">
+            <value>Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.
+Explain why the child needs to go to the health facility. Write a referral note and help arrange transport.
+Do not give medicine from this form. The guideline gives no doses outside 2 months up to 5 years.</value>
+          </text>
+          <text id="/data/results/outcome_refer_outside_age_range:label">
+            <value>Outside this form's age range, no danger sign: refer to health facility
+Refer child to health facility, write a referral note, and follow up child on return.</value>
+          </text>
+          <text id="/data/results/outcome_refer_urgent_with_antibiotic:label">
+            <value>Danger sign: refer urgently and give first dose of antibiotic
+Give first dose of oral antibiotic (amoxicillin tablet, 250 mg).
+Explain why the child needs to go to the health facility. Write a referral note and help arrange transport.</value>
+          </text>
+          <text id="/data/results/outcome_refer_urgent_with_antibiotic_dose_1_1:label">
+            <value>Age 2 to under 12 months: 1 tablet</value>
+          </text>
+          <text id="/data/results/outcome_refer_urgent_with_antibiotic_dose_1_2:label">
+            <value>Age 12 to under 60 months: 2 tablets</value>
+          </text>
+          <text id="/data/results/outcome_refer_urgent:label">
+            <value>Danger sign: refer urgently
+Explain why the child needs to go to the health facility. Write a referral note and help arrange transport.</value>
+          </text>
+          <text id="/data/results/outcome_treat_fast_breathing_at_home:label">
+            <value>Fast breathing (pneumonia): treat at home and follow up in 3 days
+Give oral antibiotic (amoxicillin tablet, 250 mg) twice daily for 5 days. Help the caregiver give the first dose now.
+Advise to return immediately if the child cannot drink or feed, becomes sicker, or has blood in stool.</value>
+          </text>
+          <text id="/data/results/outcome_treat_fast_breathing_at_home_dose_1_1:label">
+            <value>Age 2 to under 12 months: 1 tablet (total 10 tablets)</value>
+          </text>
+          <text id="/data/results/outcome_treat_fast_breathing_at_home_dose_1_2:label">
+            <value>Age 12 to under 60 months: 2 tablets (total 20 tablets)</value>
+          </text>
+          <text id="/data/results/outcome_cough_no_fast_breathing:label">
+            <value>Cough without fast breathing or danger signs
+Advise the caregiver to give more fluids and continue feeding. Advise when to return.</value>
+          </text>
+          <text id="/data/results/outcome_no_cough:label">
+            <value>No cough: this form does not apply. Assess other problems.
+Continue with the other parts of the sick child assessment.</value>
+          </text>
+        </translation>
+      </itext>
+      <instance>
+        <data id="cough_fast_breathing" version="preview-ade81969" prefix="J1!cough_fast_breathing!" delimiter="#">
+          <inputs>
+            <meta>
+              <location>
+                <lat/>
+                <long/>
+                <error/>
+                <message/>
+              </location>
+            </meta>
+            <source>user</source>
+            <source_id/>
+            <contact>
+              <_id/>
+              <name/>
+              <patient_id/>
+            </contact>
+          </inputs>
+          <patient_uuid/>
+          <patient_id/>
+          <patient_name/>
+          <q_age_months>
+            <age_months/>
+          </q_age_months>
+          <q_cough>
+            <cough/>
+          </q_cough>
+          <q_cough_days>
+            <cough_days/>
+          </q_cough_days>
+          <q_convulsions>
+            <convulsions/>
+          </q_convulsions>
+          <q_not_able_to_drink_or_feed>
+            <not_able_to_drink_or_feed/>
+          </q_not_able_to_drink_or_feed>
+          <q_vomits_everything>
+            <vomits_everything/>
+          </q_vomits_everything>
+          <q_chest_indrawing>
+            <chest_indrawing/>
+          </q_chest_indrawing>
+          <q_breaths_per_minute>
+            <breaths_per_minute/>
+          </q_breaths_per_minute>
+          <q_unusually_sleepy>
+            <unusually_sleepy/>
+          </q_unusually_sleepy>
+          <outside_age_range/>
+          <fast_breathing/>
+          <danger_sign/>
+          <outcome/>
+          <results>
+            <outcome_refer_urgent_outside_age_range/>
+            <outcome_refer_outside_age_range/>
+            <outcome_refer_urgent_with_antibiotic/>
+            <outcome_refer_urgent_with_antibiotic_dose_1_1/>
+            <outcome_refer_urgent_with_antibiotic_dose_1_2/>
+            <outcome_refer_urgent/>
+            <outcome_treat_fast_breathing_at_home/>
+            <outcome_treat_fast_breathing_at_home_dose_1_1/>
+            <outcome_treat_fast_breathing_at_home_dose_1_2/>
+            <outcome_cough_no_fast_breathing/>
+            <outcome_no_cough/>
+          </results>
+          <meta tag="hidden">
+            <instanceID/>
+          </meta>
+        </data>
+      </instance>
+      <instance id="contact-summary"/>
+      <instance id="user-contact-summary"/>
+      <instance id="yes_no">
+        <root>
+          <item>
+            <itextId>yes_no-0</itextId>
+            <name>yes</name>
+          </item>
+          <item>
+            <itextId>yes_no-1</itextId>
+            <name>no</name>
+          </item>
+        </root>
+      </instance>
+      <bind nodeset="/data/inputs" relevant="./source = 'user'"/>
+      <bind nodeset="/data/inputs/source" type="string"/>
+      <bind nodeset="/data/inputs/source_id" type="string"/>
+      <bind nodeset="/data/inputs/contact/_id" type="string"/>
+      <bind nodeset="/data/inputs/contact/name" type="string"/>
+      <bind nodeset="/data/inputs/contact/patient_id" type="string"/>
+      <bind nodeset="/data/patient_uuid" type="string" calculate="../inputs/contact/_id"/>
+      <bind nodeset="/data/patient_id" type="string" calculate="../inputs/contact/patient_id"/>
+      <bind nodeset="/data/patient_name" type="string" calculate="../inputs/contact/name"/>
+      <bind nodeset="/data/q_age_months/age_months" type="int" required="true()" constraint=". &gt;= 0 and . &lt;= 120" jr:constraintMsg="jr:itext('/data/q_age_months/age_months:jr:constraintMsg')"/>
+      <bind nodeset="/data/q_cough/cough" type="string" required="true()"/>
+      <bind nodeset="/data/q_cough_days" relevant=" /data/q_cough/cough  = 'yes'"/>
+      <bind nodeset="/data/q_cough_days/cough_days" type="int" required="true()" relevant=" /data/q_cough/cough  = 'yes'" constraint=". &gt;= 0 and . &lt;= 365" jr:constraintMsg="jr:itext('/data/q_cough_days/cough_days:jr:constraintMsg')"/>
+      <bind nodeset="/data/q_convulsions" relevant="( /data/q_cough/cough  = 'no' or ( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14)))"/>
+      <bind nodeset="/data/q_convulsions/convulsions" type="string" required="true()" relevant="( /data/q_cough/cough  = 'no' or ( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14)))"/>
+      <bind nodeset="/data/q_not_able_to_drink_or_feed" relevant="( /data/q_convulsions/convulsions  = 'no' and ( /data/q_cough/cough  = 'no' or ( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14))))"/>
+      <bind nodeset="/data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed" type="string" required="true()" relevant="( /data/q_convulsions/convulsions  = 'no' and ( /data/q_cough/cough  = 'no' or ( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14))))"/>
+      <bind nodeset="/data/q_vomits_everything" relevant="( /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and ( /data/q_cough/cough  = 'no' or ( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14))))"/>
+      <bind nodeset="/data/q_vomits_everything/vomits_everything" type="string" required="true()" relevant="( /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and ( /data/q_cough/cough  = 'no' or ( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14))))"/>
+      <bind nodeset="/data/q_chest_indrawing" relevant="((( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'no' and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and  /data/q_vomits_everything/vomits_everything  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'no' and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'no' and  /data/q_convulsions/convulsions  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14) and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and  /data/q_vomits_everything/vomits_everything  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14) and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14) and  /data/q_convulsions/convulsions  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &gt;= 14)) or ( /data/q_cough/cough  = 'no' and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and  /data/q_vomits_everything/vomits_everything  = 'no') or ( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14) and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and  /data/q_vomits_everything/vomits_everything  = 'no'))"/>
+      <bind nodeset="/data/q_chest_indrawing/chest_indrawing" type="string" required="true()" relevant="((( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'no' and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and  /data/q_vomits_everything/vomits_everything  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'no' and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'no' and  /data/q_convulsions/convulsions  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14) and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and  /data/q_vomits_everything/vomits_everything  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14) and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14) and  /data/q_convulsions/convulsions  = 'yes') or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &gt;= 14)) or ( /data/q_cough/cough  = 'no' and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and  /data/q_vomits_everything/vomits_everything  = 'no') or ( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14) and  /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and  /data/q_vomits_everything/vomits_everything  = 'no'))"/>
+      <bind nodeset="/data/q_breaths_per_minute" relevant="(( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'yes' and  /data/q_chest_indrawing/chest_indrawing  = 'no')"/>
+      <bind nodeset="/data/q_breaths_per_minute/breaths_per_minute" type="int" required="true()" relevant="(( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and  /data/q_cough/cough  = 'yes' and  /data/q_chest_indrawing/chest_indrawing  = 'no')" constraint=". &gt;= 10 and . &lt;= 120" jr:constraintMsg="jr:itext('/data/q_breaths_per_minute/breaths_per_minute:jr:constraintMsg')"/>
+      <bind nodeset="/data/q_unusually_sleepy" relevant="( /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and  /data/q_vomits_everything/vomits_everything  = 'no' and  /data/q_chest_indrawing/chest_indrawing  = 'no' and ( /data/q_cough/cough  = 'no' or ( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14))))"/>
+      <bind nodeset="/data/q_unusually_sleepy/unusually_sleepy" type="string" required="true()" relevant="( /data/q_convulsions/convulsions  = 'no' and  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'no' and  /data/q_vomits_everything/vomits_everything  = 'no' and  /data/q_chest_indrawing/chest_indrawing  = 'no' and ( /data/q_cough/cough  = 'no' or ( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &lt; 14))))"/>
+      <bind nodeset="/data/outside_age_range" type="string" calculate="if((( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 2) or ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 60)), 'yes', 'no')"/>
+      <bind nodeset="/data/fast_breathing" type="string" calculate="if(( /data/q_cough/cough  = 'yes' and ((( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 12) and ( /data/q_breaths_per_minute/breaths_per_minute  != '' and  /data/q_breaths_per_minute/breaths_per_minute  &gt;= 50)) or (( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 12) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and ( /data/q_breaths_per_minute/breaths_per_minute  != '' and  /data/q_breaths_per_minute/breaths_per_minute  &gt;= 40)))), 'yes', 'no')"/>
+      <bind nodeset="/data/danger_sign" type="string" calculate="if((( /data/q_cough/cough  = 'yes' and ( /data/q_cough_days/cough_days  != '' and  /data/q_cough_days/cough_days  &gt;= 14)) or  /data/q_convulsions/convulsions  = 'yes' or  /data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed  = 'yes' or  /data/q_vomits_everything/vomits_everything  = 'yes' or  /data/q_chest_indrawing/chest_indrawing  = 'yes' or  /data/q_unusually_sleepy/unusually_sleepy  = 'yes'), 'yes', 'no')"/>
+      <bind nodeset="/data/outcome" type="string" calculate="if(( /data/outside_age_range  = 'yes' and  /data/danger_sign  = 'yes'), 'refer_urgent_outside_age_range', if( /data/outside_age_range  = 'yes', 'refer_outside_age_range', if(( /data/danger_sign  = 'yes' and ( /data/fast_breathing  = 'yes' or  /data/q_chest_indrawing/chest_indrawing  = 'yes')), 'refer_urgent_with_antibiotic', if( /data/danger_sign  = 'yes', 'refer_urgent', if( /data/fast_breathing  = 'yes', 'treat_fast_breathing_at_home', if( /data/q_cough/cough  = 'yes', 'cough_no_fast_breathing', 'no_cough'))))))"/>
+      <bind nodeset="/data/results/outcome_refer_urgent_outside_age_range" readonly="true()" type="string" relevant=" /data/outcome  = 'refer_urgent_outside_age_range'"/>
+      <bind nodeset="/data/results/outcome_refer_outside_age_range" readonly="true()" type="string" relevant=" /data/outcome  = 'refer_outside_age_range'"/>
+      <bind nodeset="/data/results/outcome_refer_urgent_with_antibiotic" readonly="true()" type="string" relevant=" /data/outcome  = 'refer_urgent_with_antibiotic'"/>
+      <bind nodeset="/data/results/outcome_refer_urgent_with_antibiotic_dose_1_1" readonly="true()" type="string" relevant=" /data/outcome  = 'refer_urgent_with_antibiotic' and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 12)"/>
+      <bind nodeset="/data/results/outcome_refer_urgent_with_antibiotic_dose_1_2" readonly="true()" type="string" relevant=" /data/outcome  = 'refer_urgent_with_antibiotic' and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 12) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60)"/>
+      <bind nodeset="/data/results/outcome_refer_urgent" readonly="true()" type="string" relevant=" /data/outcome  = 'refer_urgent'"/>
+      <bind nodeset="/data/results/outcome_treat_fast_breathing_at_home" readonly="true()" type="string" relevant=" /data/outcome  = 'treat_fast_breathing_at_home'"/>
+      <bind nodeset="/data/results/outcome_treat_fast_breathing_at_home_dose_1_1" readonly="true()" type="string" relevant=" /data/outcome  = 'treat_fast_breathing_at_home' and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 2) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 12)"/>
+      <bind nodeset="/data/results/outcome_treat_fast_breathing_at_home_dose_1_2" readonly="true()" type="string" relevant=" /data/outcome  = 'treat_fast_breathing_at_home' and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &gt;= 12) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60)"/>
+      <bind nodeset="/data/results/outcome_cough_no_fast_breathing" readonly="true()" type="string" relevant=" /data/outcome  = 'cough_no_fast_breathing'"/>
+      <bind nodeset="/data/results/outcome_no_cough" readonly="true()" type="string" relevant=" /data/outcome  = 'no_cough'"/>
+      <bind nodeset="/data/meta/instanceID" type="string" readonly="true()" jr:preload="uid"/>
+    </model>
+  </h:head>
+  <h:body class="pages">
+    <group appearance="field-list" ref="/data/inputs">
+      <group ref="/data/inputs/contact">
+        <label ref="jr:itext('/data/inputs/contact:label')"/>
+        <input ref="/data/inputs/contact/_id" appearance="select-contact type-person">
+          <label ref="jr:itext('/data/inputs/contact/_id:label')"/>
+        </input>
+      </group>
+    </group>
+    <group appearance="field-list" ref="/data/q_age_months">
+      <input ref="/data/q_age_months/age_months">
+        <label ref="jr:itext('/data/q_age_months/age_months:label')"/>
+      </input>
+    </group>
+    <group appearance="field-list" ref="/data/q_cough">
+      <select1 ref="/data/q_cough/cough">
+        <label ref="jr:itext('/data/q_cough/cough:label')"/>
+        <itemset nodeset="instance('yes_no')/root/item">
+          <value ref="name"/>
+          <label ref="jr:itext(itextId)"/>
+        </itemset>
+      </select1>
+    </group>
+    <group appearance="field-list" ref="/data/q_cough_days">
+      <input ref="/data/q_cough_days/cough_days">
+        <label ref="jr:itext('/data/q_cough_days/cough_days:label')"/>
+      </input>
+    </group>
+    <group appearance="field-list" ref="/data/q_convulsions">
+      <select1 ref="/data/q_convulsions/convulsions">
+        <label ref="jr:itext('/data/q_convulsions/convulsions:label')"/>
+        <itemset nodeset="instance('yes_no')/root/item">
+          <value ref="name"/>
+          <label ref="jr:itext(itextId)"/>
+        </itemset>
+      </select1>
+    </group>
+    <group appearance="field-list" ref="/data/q_not_able_to_drink_or_feed">
+      <select1 ref="/data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed">
+        <label ref="jr:itext('/data/q_not_able_to_drink_or_feed/not_able_to_drink_or_feed:label')"/>
+        <itemset nodeset="instance('yes_no')/root/item">
+          <value ref="name"/>
+          <label ref="jr:itext(itextId)"/>
+        </itemset>
+      </select1>
+    </group>
+    <group appearance="field-list" ref="/data/q_vomits_everything">
+      <select1 ref="/data/q_vomits_everything/vomits_everything">
+        <label ref="jr:itext('/data/q_vomits_everything/vomits_everything:label')"/>
+        <itemset nodeset="instance('yes_no')/root/item">
+          <value ref="name"/>
+          <label ref="jr:itext(itextId)"/>
+        </itemset>
+      </select1>
+    </group>
+    <group appearance="field-list" ref="/data/q_chest_indrawing">
+      <select1 ref="/data/q_chest_indrawing/chest_indrawing">
+        <label ref="jr:itext('/data/q_chest_indrawing/chest_indrawing:label')"/>
+        <itemset nodeset="instance('yes_no')/root/item">
+          <value ref="name"/>
+          <label ref="jr:itext(itextId)"/>
+        </itemset>
+      </select1>
+    </group>
+    <group appearance="field-list" ref="/data/q_breaths_per_minute">
+      <input ref="/data/q_breaths_per_minute/breaths_per_minute">
+        <label ref="jr:itext('/data/q_breaths_per_minute/breaths_per_minute:label')"/>
+      </input>
+    </group>
+    <group appearance="field-list" ref="/data/q_unusually_sleepy">
+      <select1 ref="/data/q_unusually_sleepy/unusually_sleepy">
+        <label ref="jr:itext('/data/q_unusually_sleepy/unusually_sleepy:label')"/>
+        <itemset nodeset="instance('yes_no')/root/item">
+          <value ref="name"/>
+          <label ref="jr:itext(itextId)"/>
+        </itemset>
+      </select1>
+    </group>
+    <group appearance="field-list" ref="/data/results">
+      <label ref="jr:itext('/data/results:label')"/>
+      <input ref="/data/results/outcome_refer_urgent_outside_age_range">
+        <label ref="jr:itext('/data/results/outcome_refer_urgent_outside_age_range:label')"/>
+      </input>
+      <input ref="/data/results/outcome_refer_outside_age_range">
+        <label ref="jr:itext('/data/results/outcome_refer_outside_age_range:label')"/>
+      </input>
+      <input ref="/data/results/outcome_refer_urgent_with_antibiotic">
+        <label ref="jr:itext('/data/results/outcome_refer_urgent_with_antibiotic:label')"/>
+      </input>
+      <input ref="/data/results/outcome_refer_urgent_with_antibiotic_dose_1_1">
+        <label ref="jr:itext('/data/results/outcome_refer_urgent_with_antibiotic_dose_1_1:label')"/>
+      </input>
+      <input ref="/data/results/outcome_refer_urgent_with_antibiotic_dose_1_2">
+        <label ref="jr:itext('/data/results/outcome_refer_urgent_with_antibiotic_dose_1_2:label')"/>
+      </input>
+      <input ref="/data/results/outcome_refer_urgent">
+        <label ref="jr:itext('/data/results/outcome_refer_urgent:label')"/>
+      </input>
+      <input ref="/data/results/outcome_treat_fast_breathing_at_home">
+        <label ref="jr:itext('/data/results/outcome_treat_fast_breathing_at_home:label')"/>
+      </input>
+      <input ref="/data/results/outcome_treat_fast_breathing_at_home_dose_1_1">
+        <label ref="jr:itext('/data/results/outcome_treat_fast_breathing_at_home_dose_1_1:label')"/>
+      </input>
+      <input ref="/data/results/outcome_treat_fast_breathing_at_home_dose_1_2">
+        <label ref="jr:itext('/data/results/outcome_treat_fast_breathing_at_home_dose_1_2:label')"/>
+      </input>
+      <input ref="/data/results/outcome_cough_no_fast_breathing">
+        <label ref="jr:itext('/data/results/outcome_cough_no_fast_breathing:label')"/>
+      </input>
+      <input ref="/data/results/outcome_no_cough">
+        <label ref="jr:itext('/data/results/outcome_no_cough:label')"/>
+      </input>
+    </group>
+  </h:body>
+</h:html>

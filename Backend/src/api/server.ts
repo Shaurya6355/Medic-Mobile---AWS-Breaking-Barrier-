@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { ZodType } from "zod";
@@ -12,15 +12,19 @@ import type { RunMode } from "./background.js";
 import {
   CreateCommentRequest,
   CreateRunRequest,
+  FindingsQuery,
   INVOCATION_MAX_BODY_BYTES,
   InvocationRequest,
   LambdaScheduledEvent,
   LambdaSqsEnvelope,
   LambdaSqsRecord,
+  RejectRequest,
   SaveVersionRequest,
+  SignRequest,
 } from "../contract/schemas.js";
 import type { CreateRunResponse, InvocationResponse, LambdaEventResponse, PingResponse } from "../contract/schemas.js";
 import type { Run } from "../domain/types.js";
+import { Signoff, SignoffError } from "../signoff/signoff.js";
 import type { LogicModelValidator } from "../steps/logicModelValidator.js";
 import { Conflict } from "../store/store.js";
 import type { Store } from "../store/store.js";
@@ -43,6 +47,8 @@ export interface ServerDeps {
   validator: LogicModelValidator;
   presign: (key: string) => Promise<string>;
   onVersionSaved: (runId: string, n: number) => Promise<void>;
+  // Sign-off service (findings, status, signatures). Default: one over the same store and artifacts.
+  signoff?: Signoff;
   maxPages: number;
   now?: () => number;
   maxInvocationResponseBytes?: number;
@@ -104,8 +110,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const background = (work: Promise<unknown>, onError: (e: unknown) => void, onDeadline?: () => void): Promise<void> =>
     runBackground(runMode, work, onError, bgDeadline, onDeadline);
   const app = Fastify({ logger: deps.logger ?? false, bodyLimit: BODY_LIMIT });
+  const signoff = deps.signoff ?? new Signoff({ store, artifacts, now });
 
   app.setErrorHandler((err: Error, req, reply) => {
+    if (err instanceof SignoffError) {
+      const detail = typeof err.detail === "object" && err.detail !== null ? err.detail : {};
+      return reply.code(err.status).send({ ...detail, error: err.code, message: err.message });
+    }
     if (err instanceof Conflict) {
       req.log.debug({ detail: err.message }, "conflict");
       return reply.code(409).send({ error: "conflict" });
@@ -186,22 +197,43 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (!result.ok) return reply.code(422).send({ error: "invalid_logic_model", issues: result.issues });
 
     const n = latest.n + 1;
+    // The body must say where it sits in the chain: the store assigns n and the parent (AR-01), and a body
+    // claiming another lineage would carry a misleading version into the README and the signatures (DEC-020).
+    const meta = (req_.body as { meta?: { version?: unknown; parent_version?: unknown } }).meta ?? {};
+    if (meta.version !== n || meta.parent_version !== latest.n) {
+      return reply.code(422).send({
+        error: "version_mismatch",
+        issues: [`meta.version must be ${n} and meta.parent_version must be ${latest.n} (got ${String(meta.version)} and ${String(meta.parent_version)})`],
+        expected: { version: n, parent_version: latest.n },
+      });
+    }
     const key = artifactKey(runId, "versions", `v${n}-${randomUUID()}.json`);
-    await artifacts.put(key, JSON.stringify(req_.body, null, 2), "application/json");
+    const text = JSON.stringify(req_.body, null, 2);
+    await artifacts.put(key, text, "application/json");
     await store.addVersion({
       runId,
       n,
       parent: latest.n,
       author: req_.author,
+      ...(req_.authorRole !== undefined ? { authorRole: req_.authorRole } : {}),
       createdAt: now(),
       artifactKey: key,
+      // The exact bytes stored, so a release can refuse a body rewritten later (DEC-020).
+      bodySha256: createHash("sha256").update(text, "utf8").digest("hex"),
     });
     try {
       await onVersionSaved(runId, n);
     } catch (err) {
       req.log.error({ runId, n, errName: err instanceof Error ? err.name : "unknown" }, "onVersionSaved failed");
+      // Saved, but the checks did not finish: never report plain success. The run is either failed at the
+      // checks step (POST /resume runs them again) or keeps its state; findings are recomputed on the next read.
+      return reply.code(201).send({
+        n,
+        checks_status: "failed",
+        message: "The version was saved but its checks did not finish. They run again when the version is opened; if the run shows failed, resume it.",
+      });
     }
-    return reply.code(201).send({ n });
+    return reply.code(201).send({ n, checks_status: "ok" });
   });
 
   app.post<{ Params: { id: string; n: string } }>(routes.pattern.comments, async (req, reply) => {
@@ -227,6 +259,45 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (n === undefined) return reply;
     if (!(await store.getVersion(req.params.id, n))) return reply.code(404).send({ error: "not_found" });
     return store.listComments(req.params.id, n);
+  });
+
+  // ---------- sign-off (BRD AR-01 to AR-10, DEC-019) ----------
+
+  app.get<{ Params: { id: string; n: string }; Querystring: Record<string, string> }>(routes.pattern.findings, async (req, reply) => {
+    const n = parseVersionNumber(req.params.n, reply);
+    if (n === undefined) return reply;
+    const q = parseBody(FindingsQuery, req.query ?? {}, reply);
+    if (!q) return reply;
+    return signoff.findingsView(req.params.id, n, q.audience);
+  });
+
+  app.get<{ Params: { id: string; n: string } }>(routes.pattern.status, async (req, reply) => {
+    const n = parseVersionNumber(req.params.n, reply);
+    if (n === undefined) return reply;
+    return signoff.status(req.params.id, n);
+  });
+
+  app.post<{ Params: { id: string; n: string; role: string } }>(routes.pattern.sign, async (req, reply) => {
+    const n = parseVersionNumber(req.params.n, reply);
+    if (n === undefined) return reply;
+    // AUTH SEAM (DEC-015, not built): role and userId are taken from the body. With Cognito they come from
+    // the verified JWT (group -> role, sub -> userId) and the body carries only modelSha. The role check
+    // against the endpoint and every sign-off rule stay server-side in Signoff.sign either way.
+    const body = parseBody(SignRequest, req.body, reply);
+    if (!body) return reply;
+    const res = await signoff.sign(req.params.id, n, req.params.role, body);
+    return reply.code(201).send(res);
+  });
+
+  // AR-06, RR-02 (DEC-020): the clinician rejects the officer-signed version with a comment on the rule.
+  app.post<{ Params: { id: string; n: string } }>(routes.pattern.reject, async (req, reply) => {
+    const n = parseVersionNumber(req.params.n, reply);
+    if (n === undefined) return reply;
+    // AUTH SEAM (DEC-015): role and userId from the body until Cognito, as for signatures.
+    const body = parseBody(RejectRequest, req.body, reply);
+    if (!body) return reply;
+    const res = await signoff.reject(req.params.id, n, body);
+    return reply.code(201).send(res);
   });
 
   app.post<{ Params: { id: string } }>(routes.pattern.resume, async (req, reply) => {

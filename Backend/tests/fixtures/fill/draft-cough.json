@@ -1,0 +1,99 @@
+{
+  "questions": [
+    { "id": "age_months", "label": "Child's age in months", "answer_type": "integer", "variable_id": "age_months" },
+    { "id": "cough", "label": "Does the child have a cough?", "answer_type": "yes_no", "variable_id": "has_cough", "node_id": "n_ask_cough" },
+    { "id": "cough_days", "label": "For how many days has the child had the cough?", "answer_type": "integer", "variable_id": "cough_duration_days", "shown_when": { "ref": "cough" } },
+    { "id": "convulsions", "label": "Has the child had convulsions?", "answer_type": "yes_no", "variable_id": "convulsions", "danger_sign_id": "ds_convulsions" },
+    { "id": "not_able_to_drink_or_feed", "label": "Is the child not able to drink or feed anything?", "answer_type": "yes_no", "variable_id": "not_able_to_drink_or_feed", "danger_sign_id": "ds_cannot_drink_feed" },
+    { "id": "vomits_everything", "label": "Does the child vomit everything?", "answer_type": "yes_no", "variable_id": "vomits_everything", "danger_sign_id": "ds_vomits_everything" },
+    { "id": "chest_indrawing", "label": "Look: does the child have chest indrawing?", "answer_type": "yes_no", "variable_id": "chest_indrawing", "danger_sign_id": "ds_chest_indrawing" },
+    { "id": "breaths_per_minute", "label": "Count the child's breaths in 1 minute", "answer_type": "integer", "variable_id": "resp_rate", "node_id": "n_count_breaths", "shown_when": { "ref": "cough" } },
+    { "id": "unusually_sleepy", "label": "Look: is the child unusually sleepy or unconscious?", "answer_type": "yes_no", "variable_id": "unusually_sleepy_or_unconscious", "danger_sign_id": "ds_sleepy" }
+  ],
+  "derived": [
+    {
+      "id": "fast_breathing",
+      "label": "Fast breathing",
+      "definition": { "all": [ { "ref": "cough" }, { "any": [ { "threshold": 2 }, { "threshold": 3 } ] } ] },
+      "cite": ["n_crit_fast_breathing"]
+    },
+    {
+      "id": "danger_sign",
+      "label": "Any danger sign",
+      "definition": {
+        "any": [
+          { "all": [ { "ref": "cough" }, { "threshold": 0 } ] },
+          { "ref": "convulsions" },
+          { "ref": "not_able_to_drink_or_feed" },
+          { "ref": "vomits_everything" },
+          { "ref": "chest_indrawing" },
+          { "ref": "unusually_sleepy" }
+        ]
+      },
+      "cite": ["n_dec_danger", "ds_cough_14d"]
+    }
+  ],
+  "outcomes": [
+    {
+      "id": "refer_urgent_with_antibiotic",
+      "severity": 1,
+      "title": "Danger sign: refer urgently and give first dose of antibiotic",
+      "action_ids": ["act_refer_urgent", "act_amox_referral", "n_explain", "n_ref_fluids", "act_referral_note", "n_ref_transport"],
+      "followup_id": "fu_weekly_after_referral",
+      "cite": ["n_out_refer"]
+    },
+    {
+      "id": "refer_urgent",
+      "severity": 1,
+      "title": "Danger sign: refer urgently",
+      "action_ids": ["act_refer_urgent", "n_explain", "n_ref_fluids", "act_referral_note", "n_ref_transport"],
+      "followup_id": "fu_weekly_after_referral",
+      "cite": ["n_out_refer"]
+    },
+    {
+      "id": "treat_fast_breathing_at_home",
+      "severity": 3,
+      "title": "Fast breathing (pneumonia): treat at home and follow up in 3 days",
+      "action_ids": ["n_home_amox", "act_amox_home", "n_home_first_dose", "n_home_fluids", "n_home_return"],
+      "followup_id": "fu_3days_home",
+      "cite": ["n_dec_fast_breathing_row"]
+    },
+    {
+      "id": "cough_no_fast_breathing",
+      "severity": 4,
+      "title": "Cough without fast breathing or danger signs",
+      "action_ids": ["n_home_fluids", "n_home_return"],
+      "followup_id": null
+    },
+    {
+      "id": "no_cough",
+      "severity": 5,
+      "title": "No cough: this form does not apply. Assess other problems.",
+      "action_ids": []
+    }
+  ],
+  "rules": [
+    { "priority": 1, "when": { "all": [ { "ref": "danger_sign" }, { "any": [ { "ref": "fast_breathing" }, { "ref": "chest_indrawing" } ] } ] }, "outcome": "refer_urgent_with_antibiotic", "cite": ["n_ref_amox"] },
+    { "priority": 2, "when": { "ref": "danger_sign" }, "outcome": "refer_urgent", "cite": ["n_dec_danger"] },
+    { "priority": 3, "when": { "ref": "fast_breathing" }, "outcome": "treat_fast_breathing_at_home", "cite": ["n_dec_fast_breathing_row"] },
+    { "priority": 4, "when": { "ref": "cough" }, "outcome": "cough_no_fast_breathing" },
+    { "priority": 5, "when": "otherwise", "outcome": "no_cough" }
+  ],
+  "open_questions": [
+    {
+      "text": "The guideline gives no treatment row for cough without fast breathing. What should the health worker do, and is there a follow-up?",
+      "route_to": "clinician",
+      "related_ids": ["n_crit_cough_lt14", "cough_no_fast_breathing"]
+    },
+    {
+      "text": "The guideline sends the health worker to page 10 to give the first dose of oral medicine, but page 10 is the ORS page and the oral medicine steps are on page 11. Which page should the form point to?",
+      "route_to": "program_officer",
+      "related_ids": ["u1"]
+    },
+    {
+      "text": "After an urgent referral the guideline says to follow up on return at least once a week until the child is well. The form records the follow-up on return only. Is a weekly reminder needed?",
+      "route_to": "clinician",
+      "related_ids": ["fu_weekly_after_referral"]
+    }
+  ]
+}

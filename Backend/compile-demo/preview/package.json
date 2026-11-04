@@ -1,0 +1,24 @@
+{
+  "name": "cht-form-preview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Preview tooling: renders the cht-conf compiled XForm with the same enketo-core engine as the CHT webapp, takes screenshots and verifies outcomes. Not part of the form.",
+  "scripts": {
+    "build": "node build-preview.mjs",
+    "serve": "node serve.mjs",
+    "preview": "node build-preview.mjs && node serve.mjs",
+    "screenshots": "node screenshots.mjs"
+  },
+  "dependencies": {
+    "enketo-core": "7.2.5",
+    "mermaid": "12.3.0",
+    "openrosa-xpath-evaluator": "2.0.13"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "node-html-parser": "9.0.4",
+    "playwright-core": "1.56.1",
+    "sass": "1.93.2"
+  }
+}

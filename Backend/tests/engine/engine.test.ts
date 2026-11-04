@@ -34,7 +34,7 @@ function flow(overrides: Partial<Record<"ingest" | "extract" | "fill_logic", Arr
   ];
 }
 
-function setup(steps: Step[], opts: { store?: Store; owner?: string; clock?: { t: number } } = {}) {
+function setup(steps: Step[], opts: { store?: Store; owner?: string; clock?: { t: number }; finalState?: RunState } = {}) {
   const store = opts.store ?? new MemoryStore();
   const clock = opts.clock ?? { t: 1000 };
   const sleeps: number[] = [];
@@ -54,6 +54,7 @@ function setup(steps: Step[], opts: { store?: Store; owner?: string; clock?: { t
       prices: {},
     },
     now: () => clock.t++,
+    ...(opts.finalState !== undefined ? { finalState: opts.finalState } : {}),
   });
   return { store, orch, clock, sleeps };
 }
@@ -65,6 +66,39 @@ const transient = async (): Promise<StepResult> => {
   throw new TransientError("throttled");
 };
 const ok = async (): Promise<StepResult> => ({ artifactRefs: { out: "ok" } });
+
+describe("Orchestrator with the checks step and the sign-off end state (DEC-019)", () => {
+  it("runs fill_logic, then checks, and stops in awaiting_officer", async () => {
+    const steps = [...flow(), fakeStep("checks", "checking")];
+    const { store, orch } = setup(steps, { finalState: "awaiting_officer" });
+    const run = await orch.createRun(undefined, "doc.pdf");
+    await orch.onUploaded(run.runId);
+    expect((await store.getRun(run.runId))!.state).toBe("awaiting_officer");
+    const states = (await store.listAudit(run.runId)).filter((a) => a.type === "run_state").map((a) => {
+      const d = a.detail as { from: string | null; to: string };
+      return `${d.from}->${d.to}`;
+    });
+    expect(states.slice(-2)).toEqual(["filling_logic->checking", "checking->awaiting_officer"]);
+    expect((await store.listSteps(run.runId)).map((s) => s.step)).toEqual(["ingest", "extract", "fill_logic", "checks"]);
+  });
+
+  it("a failed checks step fails the run and resumes into checking", async () => {
+    const steps = [...flow(), fakeStep("checks", "checking", [failHard, ok])];
+    const { store, orch } = setup(steps, { finalState: "awaiting_officer" });
+    const run = await orch.createRun(undefined, "doc.pdf");
+    await orch.onUploaded(run.runId);
+    expect((await store.getRun(run.runId))!).toMatchObject({ state: "failed", currentStep: "checks" });
+    await orch.resume(run.runId);
+    expect((await store.getRun(run.runId))!.state).toBe("awaiting_officer");
+  });
+
+  it("refuses an end state the last step cannot reach", async () => {
+    const { orch, store } = setup(flow(), { finalState: "locked" });
+    const run = await orch.createRun(undefined, "doc.pdf");
+    await expect(orch.onUploaded(run.runId)).rejects.toThrow(/Illegal transition/);
+    expect((await store.getRun(run.runId))!.state).toBe("failed");
+  });
+});
 
 describe("Orchestrator", () => {
   it("creates a run in state created with audit", async () => {

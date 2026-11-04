@@ -1,13 +1,54 @@
+import { readFile } from "node:fs/promises";
 import { NotFound, artifactKey } from "../artifacts/artifactStore.js";
-import type { Step } from "../engine/step.js";
+import { UsageError, type Step, type StepContext, type StepResult, type StepUsage } from "../engine/step.js";
+import { DraftSchema, type Draft } from "../logic/fill/draftSchema.js";
+import { resolveDraft, type ResolveOptions, type ResolvedModel } from "../logic/fill/resolve.js";
+import { ModelOutputError, type ModelContent } from "../model/modelClient.js";
 import { Conflict } from "../store/store.js";
+import { ExtractionOutput } from "./extractionSchema.js";
 import type { LogicModelValidator } from "./logicModelValidator.js";
 
-export function createFillLogicStep(opts: { validator: LogicModelValidator }): Step {
+export interface FillLogicOptions {
+  validator: LogicModelValidator;
+  modelId: string;
+  /** System prompt file (extraction/fill_prompt.txt by default, see config FILL_PROMPT). */
+  promptPath: string;
+  maxTokens?: number;
+  /** Logic model meta.pathway_id; defaults to a slug of the guideline source id. */
+  pathwayId?: string;
+  guideline?: { title?: string; publisher?: string; edition?: string };
+}
+
+const MAX_PROBLEMS_LISTED = 30;
+
+function addUsage(a: StepUsage | undefined, b: StepUsage | undefined): StepUsage | undefined {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  return { inputTokens: a.inputTokens + b.inputTokens, outputTokens: a.outputTokens + b.outputTokens, modelId: b.modelId };
+}
+
+function slug(s: string | undefined): string | undefined {
+  if (s === undefined) return undefined;
+  const t = s.toLowerCase().replace(/\.pdf$/, "").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64);
+  return /^[a-z][a-z0-9_]*$/.test(t) ? t : undefined;
+}
+
+/** The extraction as the model sees it: thresholds carry their index, which is all the draft may write. */
+function extractionContent(runId: string, ex: ExtractionOutput): ModelContent[] {
+  const thresholds = ex.thresholds.map((t, index) => ({ index, ...t }));
+  return [
+    { type: "text", text: `Run: ${runId}\nMode: new_guideline\nThe guideline extraction follows. Refer to its items by id, and to thresholds by index.` },
+    { type: "text", text: "Thresholds (use {\"threshold\": index}):\n" + JSON.stringify(thresholds) },
+    { type: "text", text: "Extraction:\n" + JSON.stringify({ ...ex, thresholds: undefined }) },
+    { type: "text", text: "Return one JSON object: the draft." },
+  ];
+}
+
+export function createFillLogicStep(opts: FillLogicOptions): Step {
   return {
     name: "fill_logic",
     runState: "filling_logic",
-    async run(ctx) {
+    async run(ctx): Promise<StepResult> {
       const runId = ctx.run.runId;
 
       // Version 1 is the only one this step may create. If it exists (for example a
@@ -32,21 +73,84 @@ export function createFillLogicStep(opts: { validator: LogicModelValidator }): S
         if (e instanceof SyntaxError) throw new Error(`Extraction output at ${inKey} is not valid JSON`);
         throw e;
       }
+      const parsedEx = ExtractionOutput.safeParse(output);
+      if (!parsedEx.success) {
+        const issues = parsedEx.error.issues.slice(0, 10).map((i) => `${i.path.join(".")}: ${i.message}`);
+        throw new Error(`Extraction output at ${inKey} does not match the extraction schema: ${issues.join("; ")}`);
+      }
+      const ex = parsedEx.data;
 
-      const unclear =
-        output !== null && typeof output === "object" && !Array.isArray(output)
-          ? ((output as Record<string, unknown>).unclear_items ?? [])
-          : [];
-      const body = { placeholder: true, extraction: output, unclear };
+      const resolveOpts = await resolveOptions(ctx, opts);
+      const system = await readFile(opts.promptPath, "utf8");
+      const content = extractionContent(runId, ex);
+      const maxTokens = opts.maxTokens ?? 16000;
+
+      const call = async (
+        c: ModelContent[],
+        rawName: string,
+      ): Promise<{ draft?: Draft; raw: string; usage?: StepUsage; problems: string[] }> => {
+        const rawKey = artifactKey(runId, "fill_logic", rawName);
+        try {
+          const r = await ctx.model.generateJson({ modelId: opts.modelId, system, content: c, schema: DraftSchema, maxTokens });
+          await ctx.artifacts.put(rawKey, r.raw, "text/plain");
+          return { draft: r.value, raw: r.raw, usage: r.usage, problems: [] };
+        } catch (e) {
+          if (!(e instanceof ModelOutputError)) throw e;
+          await ctx.artifacts.put(rawKey, e.raw, "text/plain");
+          return { raw: e.raw, ...(e.usage !== undefined ? { usage: e.usage } : {}), problems: e.issues ?? [e.message] };
+        }
+      };
+      const tryResolve = (d: Draft | undefined, problems: string[]): { model?: ResolvedModel; problems: string[] } => {
+        if (d === undefined) return { problems };
+        const r = resolveDraft(d, ex, resolveOpts);
+        return r.ok ? { model: r.model, problems: [] } : { problems: r.problems };
+      };
+
+      // First attempt.
+      const first = await call(content, "raw_response.txt");
+      let usage = first.usage;
+      let attempt = tryResolve(first.draft, first.problems);
+      let draft = first.draft;
+
+      // One repair call with the list of problems; content findings are not repaired here.
+      if (attempt.model === undefined) {
+        const listed = attempt.problems.slice(0, MAX_PROBLEMS_LISTED);
+        const repairContent: ModelContent[] = [
+          ...content,
+          { type: "text", text: "Your previous answer was:\n" + first.raw },
+          {
+            type: "text",
+            text:
+              "It cannot be used because of these problems:\n- " +
+              listed.join("\n- ") +
+              (attempt.problems.length > listed.length ? `\n(and ${attempt.problems.length - listed.length} more)` : "") +
+              "\nReturn the whole corrected draft as one JSON object. Change only what these problems need.",
+          },
+        ];
+        const second = await call(repairContent, "raw_repair.txt");
+        usage = addUsage(usage, second.usage);
+        attempt = tryResolve(second.draft, second.problems);
+        draft = second.draft;
+        if (attempt.model === undefined) {
+          throw new UsageError(
+            `fill_logic: the model draft still has ${attempt.problems.length} problem(s) after one repair: ${attempt.problems.slice(0, 10).join("; ")}`,
+            usage,
+          );
+        }
+      }
+      const body = attempt.model;
 
       const result = opts.validator.validate(body);
-      if (!result.ok) throw new Error(`Logic model failed validation: ${result.issues.join("; ")}`);
+      if (!result.ok) throw new UsageError(`Logic model failed validation: ${result.issues.join("; ")}`, usage);
 
       // Re-check right before writing so we never overwrite an object a version already
       // points at. The remaining window between this check and addVersion is accepted
       // because the engine lease serialises a run's steps.
       const raced = await existing();
-      if (raced !== undefined) return { artifactRefs: { version: raced } };
+      if (raced !== undefined) return { artifactRefs: { version: raced }, ...(usage !== undefined ? { usage } : {}) };
+
+      const draftKey = artifactKey(runId, "fill_logic", "draft.json");
+      await ctx.artifacts.put(draftKey, JSON.stringify(draft, null, 2), "application/json");
 
       // Artifact first, so a version never points at a missing object.
       const key = artifactKey(runId, "versions", "v1.json");
@@ -57,9 +161,32 @@ export function createFillLogicStep(opts: { validator: LogicModelValidator }): S
         if (!(e instanceof Conflict)) throw e;
         const winner = await existing();
         if (winner === undefined) throw e;
-        return { artifactRefs: { version: winner } };
+        return { artifactRefs: { version: winner }, ...(usage !== undefined ? { usage } : {}) };
       }
-      return { artifactRefs: { version: key } };
+      return { artifactRefs: { version: key, draft: draftKey }, ...(usage !== undefined ? { usage } : {}) };
+    },
+  };
+}
+
+/** meta comes from code: the run's file hash, else the ingest record's; titles from options or the ingest record. */
+async function resolveOptions(ctx: StepContext, opts: FillLogicOptions): Promise<ResolveOptions> {
+  let doc: { source_id?: unknown; doc_name?: unknown; doc_sha256?: unknown } = {};
+  try {
+    doc = JSON.parse(new TextDecoder().decode(await ctx.artifacts.get(artifactKey(ctx.run.runId, "ingest", "input_blocks.json")))) as typeof doc;
+  } catch (e) {
+    if (!(e instanceof NotFound) && !(e instanceof SyntaxError)) throw e;
+  }
+  const str = (v: unknown): string | undefined => (typeof v === "string" && v.trim() !== "" ? v : undefined);
+  const fileSha256 = str(ctx.run.docSha256) ?? str(doc.doc_sha256);
+  const title = opts.guideline?.title ?? str(doc.doc_name) ?? str(doc.source_id) ?? "Guideline";
+  return {
+    pathwayId: opts.pathwayId ?? slug(str(doc.source_id)) ?? "pathway",
+    createdAt: new Date(ctx.now()).toISOString(),
+    guideline: {
+      title,
+      ...(opts.guideline?.publisher !== undefined ? { publisher: opts.guideline.publisher } : {}),
+      ...(opts.guideline?.edition !== undefined ? { edition: opts.guideline.edition } : {}),
+      ...(fileSha256 !== undefined ? { fileSha256 } : {}),
     },
   };
 }

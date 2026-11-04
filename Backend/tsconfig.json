@@ -11,5 +11,5 @@
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["src", "tests", "vitest.config.ts"]
+  "include": ["src", "tests", "scripts", "compile-demo/chtConf.ts", "pipeline-demo", "vitest.config.ts"]
 }

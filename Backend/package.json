@@ -8,9 +8,16 @@
   },
   "scripts": {
     "test": "vitest run",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node -e \"require('node:fs').cpSync('src/compiler/template','dist/compiler/template',{recursive:true})\"",
     "start": "node dist/index.js",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "compile:demo": "tsx compile-demo/run.mjs",
+    "compile:preview": "node compile-demo/preview/cli.mjs preview",
+    "compile:screenshots": "node compile-demo/preview/cli.mjs screenshots",
+    "compile:verify": "tsx compile-demo/preview/verify-golden.mjs",
+    "fill:live": "tsx scripts/fillLive.ts",
+    "pipeline:demo": "tsx pipeline-demo/run.ts",
+    "compile:locked": "tsx scripts/compileLocked.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agentcore": "^3.1161.0",
@@ -20,7 +27,9 @@
     "@aws-sdk/lib-dynamodb": "^3.1161.0",
     "@aws-sdk/s3-request-presigner": "^3.1161.0",
     "@strands-agents/sdk": "^1.23.0",
+    "exceljs": "^4.4.0",
     "fastify": "^5.12.8",
+    "jszip": "^3.10.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {

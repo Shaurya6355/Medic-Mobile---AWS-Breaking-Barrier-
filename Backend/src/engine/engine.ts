@@ -30,6 +30,9 @@ export interface OrchestratorOptions {
   runnerOpts: Omit<RunStepOptions, "firstAttempt">;
   maxTotalAttempts?: number;
   now?: () => number;
+  // State the run enters after the last step (default in_review). Production registers the checks step
+  // last and ends in awaiting_officer, where the sign-off starts (DEC-019).
+  finalState?: RunState;
 }
 
 export class Orchestrator {
@@ -42,6 +45,7 @@ export class Orchestrator {
   private readonly runnerOpts: Omit<RunStepOptions, "firstAttempt">;
   private readonly now: () => number;
   private readonly maxTotalAttempts: number;
+  private readonly finalState: RunState;
   // Runs this instance is advancing right now. The lease is per owner, so it does
   // not stop two calls in the same process (for example a duplicate upload event
   // handled concurrently) from both advancing one run; this set does.
@@ -58,6 +62,7 @@ export class Orchestrator {
     this.runnerOpts = opts.runnerOpts;
     this.now = opts.now ?? Date.now;
     this.maxTotalAttempts = opts.maxTotalAttempts ?? DEFAULT_MAX_TOTAL_ATTEMPTS;
+    this.finalState = opts.finalState ?? "in_review";
   }
 
   // Number of runs this process is advancing right now (reported by /ping).
@@ -156,7 +161,7 @@ export class Orchestrator {
           }
         }
 
-        run = await this.transition(run, this.steps[index + 1]?.runState ?? "in_review");
+        run = await this.transition(run, this.steps[index + 1]?.runState ?? this.finalState);
       }
     } catch (e) {
       threw = true;

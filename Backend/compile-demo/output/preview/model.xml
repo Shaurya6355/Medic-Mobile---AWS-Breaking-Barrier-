@@ -1,0 +1,89 @@
+
+  <model xmlns:odk="http://www.opendatakit.org/xforms" odk:xforms-version="1.0.0">
+    <instance>
+        <data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="cough_fast_breathing" version="preview-ade81969" prefix="J1!cough_fast_breathing!" delimiter="#">
+          <inputs>
+            <meta>
+              <location>
+                <lat/>
+                <long/>
+                <error/>
+                <message/>
+              </location>
+            </meta>
+            <source>user</source>
+            <source_id/>
+            <contact>
+              <_id/>
+              <name/>
+              <patient_id/>
+            </contact>
+          </inputs>
+          <patient_uuid/>
+          <patient_id/>
+          <patient_name/>
+          <q_age_months>
+            <age_months/>
+          </q_age_months>
+          <q_cough>
+            <cough/>
+          </q_cough>
+          <q_cough_days>
+            <cough_days/>
+          </q_cough_days>
+          <q_convulsions>
+            <convulsions/>
+          </q_convulsions>
+          <q_not_able_to_drink_or_feed>
+            <not_able_to_drink_or_feed/>
+          </q_not_able_to_drink_or_feed>
+          <q_vomits_everything>
+            <vomits_everything/>
+          </q_vomits_everything>
+          <q_chest_indrawing>
+            <chest_indrawing/>
+          </q_chest_indrawing>
+          <q_breaths_per_minute>
+            <breaths_per_minute/>
+          </q_breaths_per_minute>
+          <q_unusually_sleepy>
+            <unusually_sleepy/>
+          </q_unusually_sleepy>
+          <outside_age_range/>
+          <fast_breathing/>
+          <danger_sign/>
+          <outcome/>
+          <results>
+            <outcome_refer_urgent_outside_age_range/>
+            <outcome_refer_outside_age_range/>
+            <outcome_refer_urgent_with_antibiotic/>
+            <outcome_refer_urgent_with_antibiotic_dose_1_1/>
+            <outcome_refer_urgent_with_antibiotic_dose_1_2/>
+            <outcome_refer_urgent/>
+            <outcome_treat_fast_breathing_at_home/>
+            <outcome_treat_fast_breathing_at_home_dose_1_1/>
+            <outcome_treat_fast_breathing_at_home_dose_1_2/>
+            <outcome_cough_no_fast_breathing/>
+            <outcome_no_cough/>
+          </results>
+          <meta tag="hidden">
+            <instanceID/>
+          </meta>
+        </data>
+      </instance>
+    <instance id="contact-summary"/>
+    <instance id="user-contact-summary"/>
+    <instance id="yes_no">
+        <root xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms">
+          <item>
+            <itextId>yes_no-0</itextId>
+            <name>yes</name>
+          </item>
+          <item>
+            <itextId>yes_no-1</itextId>
+            <name>no</name>
+          </item>
+        </root>
+      </instance>
+  </model>
+
