@@ -13,6 +13,10 @@ const pattern = {
   sign: "/runs/:id/versions/:n/signatures/:role",
   // The clinician's rejection with a comment (AR-06, RR-02; DEC-020).
   reject: "/runs/:id/versions/:n/reject",
+  // Revision loop: comments on a version -> AI instruction (POST creates, GET lists) -> confirm -> new version.
+  revisions: "/runs/:id/versions/:n/revisions",
+  revision: "/runs/:id/revisions/:rid",
+  revisionConfirm: "/runs/:id/revisions/:rid/confirm",
   resume: "/runs/:id/resume",
   // Timing and cost of a run: per step, per model call, cumulative, with AWS extras estimated.
   metrics: "/runs/:id/metrics",
@@ -33,6 +37,9 @@ const proxiable = [
   pattern.status,
   pattern.sign,
   pattern.reject,
+  pattern.revisions,
+  pattern.revision,
+  pattern.revisionConfirm,
   pattern.resume,
   pattern.metrics,
 ] as const;
@@ -48,6 +55,9 @@ export const routes = {
   status: (id: string, n: number) => `/runs/${id}/versions/${n}/status`,
   sign: (id: string, n: number, role: string) => `/runs/${id}/versions/${n}/signatures/${role}`,
   reject: (id: string, n: number) => `/runs/${id}/versions/${n}/reject`,
+  revisions: (id: string, n: number) => `/runs/${id}/versions/${n}/revisions`,
+  revision: (id: string, rid: string) => `/runs/${id}/revisions/${rid}`,
+  revisionConfirm: (id: string, rid: string) => `/runs/${id}/revisions/${rid}/confirm`,
   resume: (id: string) => `/runs/${id}/resume`,
   metrics: (id: string) => `/runs/${id}/metrics`,
   ping: () => "/ping",

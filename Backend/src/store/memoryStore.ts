@@ -46,6 +46,9 @@ export class MemoryStore implements Store {
 
   async appendStep(rec: StepRecord): Promise<void> {
     const list = this.steps.get(rec.runId) ?? [];
+    if (list.some((s) => s.step === rec.step && s.attempt === rec.attempt)) {
+      throw new AlreadyExists(`Step exists: ${rec.runId}/${rec.step}/${rec.attempt}`);
+    }
     list.push(structuredClone(rec));
     this.steps.set(rec.runId, list);
   }

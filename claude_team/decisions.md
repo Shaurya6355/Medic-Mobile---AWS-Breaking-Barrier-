@@ -270,6 +270,7 @@ Why: Fewer questions per child (3.19 on average against 8.92 on the grid) with p
 Other options considered (and why not): Hand-written shown_when in v1.json (can drift from the rules); asking every question (the previous behaviour).
 Revisit if: the clinician requires all danger-sign questions, or v1.json gains questions that are not required.
 Related: DEC-016, DEC-017
+Update 2026-11-04 (utg1209, Claude session): under the final model (DEC-024) the minimal flow now asks the danger-sign questions of children outside the age range, and averages 4.67 questions on the 6,400 grid (it was 3.19 under the old 6-rule model). The 3.19 and 8.92 figures above refer to the old model.
 
 ### DEC-019 | Signatures bind to modelSha on the version record; lock, gates and compile guard enforced in code; identity deferred
 Status: decided (auth seam open until DEC-015 is built)
@@ -498,3 +499,33 @@ Update 2026-11-04 (DEC-035): Backend/validation/compare_outputs.py is now the dr
 
 Update 2026-11-04 (DEC-035): the flags are also stored by the pipeline. Every time the checks run for a version they store flags.json (the cross-check findings with messages for both roles) beside the findings, in the run's artifacts, keyed by content and inputs, and GET /runs/:id/versions/:n/flags serves it to the front end (the route is in the contract and the Infra route list). The document says whether the comparison ran, did not run (no second draft) or could not run (second draft invalid). It is a derived view, recomputed when missing and never read as proof of anything (a planted document for other content is ignored).
 
+### DEC-036 | logic-model/pathways/cough_fast_breathing/v1.json is the logic model contract
+Status: decided
+Date: 2026-11-04
+Decided by: project owner
+Feature or area: logic model contract (fill step, checks, compiler, fixtures)
+Decision: The final model at logic-model/pathways/cough_fast_breathing/v1.json is the logic model contract. It has 7 rules, a derived outside_age_range value, and allows origin "clinician" on rows the clinician decided. This refines DEC-017.
+Assumptions: The fill step, validation, compiler, fixtures and golden cases are aligned to this file; open questions Q1 to Q6 stay with the clinician.
+Why: The project owner chose this model as final, and one contract avoids two shapes to maintain.
+Other options considered (and why not): keep the earlier 6-rule v1.json (it left out-of-range children to a catch-all).
+Revisit if: the clinician changes a rule or the age range, or the schema needs fields this file lacks.
+Related: DEC-017, DEC-018, INT-034
+
+### DEC-037 | Revision loop: comments to an AI instruction, then structured edits applied by code
+Status: decided (design; not verified against real Bedrock)
+Date: 2026-11-04
+Decided by: utg1209 (Claude session), from the project request for a feedback loop
+Feature or area: revision (Backend/src/revision, Backend/src/api), routes, Infra
+Decision: Comments on a version go to the model (same model as the fill step) which writes a revision instruction shown to a person who can edit and confirm it (step 1). The confirmed instruction is appended to the original fill prompt and the model proposes structured edits by id (step 2). Deterministic code applies them to the current model and saves a new version with zero signatures that takes the normal checks. Revisions are S3 artifacts (runs/<id>/revisions/<id>.json plus index.json), no new table. Three explicit routes are added (revisions POST/GET, revision GET, revisionConfirm POST).
+Assumptions: Edits can be limited to items the comments point at; rows with origin clinician are refused, not changed; asks the edit types cannot express become open questions. Role and userId come from the body until Cognito (DEC-015).
+Why: Keeps human edits (no re-draft), keeps the model off numbers, quotes and clinical text (design rule 1), and puts a person between the comment and any change.
+Other options considered (and why not):
+- Re-draft from scratch: loses human edits.
+- Append the free-text comments to the system prompt: prompt injection risk.
+- Let the AI write content directly: violates design rule 1.
+Revisit if: live runs show the edit set is too narrow, instructions are often rewritten by people, or Cognito changes who may confirm.
+Related: DEC-009, DEC-010, DEC-015, DEC-019, INT-035
+Update 2026-11-04 (utg1209, Claude session): corrections to this entry. (1) Revisions are stored as S3 artifacts (runs/<id>/revisions/<id>.json) plus the AUDIT trail; there is no index.json. (2) The confirmed instruction goes in delimited data blocks of the user content; the static addendum is appended to the original fill prompt in `system`. (3) The AI may not edit severity (owned by someone else) and may not write free text: the text of open questions is built by code. (4) Step 2 (the slow Bedrock proposal call) runs in the BACKGROUND: `POST /runs/:id/revisions/:rid/confirm` answers 202 at once and the UI polls `GET /runs/:id/revisions/:rid`, because API Gateway HTTP APIs cut a request at 30 seconds; in lambda mode the app invokes itself asynchronously (Infra grants lambda:InvokeFunction on its own ARN only, no automatic retries); in container and agentcore modes the work runs in-process. Step 1 stays synchronous (small prompt). (5) "Send to IT" is the clinician's existing signature, not a new action.
+Update 2026-11-04 (utg1209, Claude session): a line quoting "936 tests, 27 blocking findings, 3.19 questions" was reported as misplaced under this entry. Those numbers belong to INT-009 and DEC-018 (old 6-rule model) and are not part of DEC-037; they are superseded by DEC-036 and INT-034. No figure in this entry depends on them.
+
+Update 2026-11-04 (DEC-037, utg1209 (Claude session)): scope was narrowed after review. A comment on a rule unlocks only that rule (set_threshold on its condition, set_rule_outcome); a comment on an outcome unlocks only that outcome (replace_action, set_follow_up). A comment no longer unlocks the outcome of a rule or the rules that lead to an outcome. set_rule_outcome marks the rule origin team; an edit never upgrades team to guideline. Revision lease 12 minutes and stale `applying` cut-off 13 minutes (see INT-037). Open decisions: whether replace_action must be limited to extraction actions tied to that outcome; whether a stuck `applying` revision needs a retry or sweep; how agentcore mode keeps a session alive during background revisions; whether step 1 also moves to the background.

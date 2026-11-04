@@ -25,7 +25,7 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
-COPY extraction/prepare_input.py extraction/final_prompt.txt extraction/fill_prompt.txt ./extraction/
+COPY extraction/prepare_input.py extraction/final_prompt.txt extraction/fill_prompt.txt extraction/revise_instruction_prompt.txt extraction/revise_prompt.txt ./extraction/
 USER node
 EXPOSE 8080
 CMD ["node", "dist/index.js"]

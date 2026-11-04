@@ -8,7 +8,8 @@ is unchanged; each request adds a short batch note (see batch_note).
 Needs: AWS credentials, `pip install boto3`, env CROSSCHECK_MODEL_ID (a us. inference profile id).
 Settings may also be put in Backend/.env (git-ignored).
 Optional env: CROSSCHECK_MAX_TOKENS (default 8192, the model limit), CROSSCHECK_BATCH_SIZE (default 3),
-AWS_REGION, PRICE_IN_PER_MTOK, PRICE_OUT_PER_MTOK (USD).
+AWS_REGION.
+Optional env for cost: PRICES_JSON (the server's price map, keyed by model id), or the older PRICE_IN_PER_MTOK / PRICE_OUT_PER_MTOK (USD).
 Writes: extraction_output.json, run_metrics.json, raw_response.txt in this folder.
 """
 import json, os, sys, time
@@ -16,6 +17,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import boto3
 from botocore.config import Config
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "extraction"))  # shared cost helper
+from usage_cost import cost_usd
 
 LISTS = ["nodes", "edges", "variables", "danger_signs", "thresholds", "actions", "followups", "unclear_items"]
 PREFIXED = ["nodes", "actions", "followups", "danger_signs", "unclear_items"]
@@ -155,13 +158,13 @@ if resolved or unresolved:
 # ---- metrics ----
 ok = [r for r in results if "input_tokens" in r]
 tin, tout = sum(r["input_tokens"] for r in ok), sum(r["output_tokens"] for r in ok)
-pin, pout = float(os.environ.get("PRICE_IN_PER_MTOK", 0)), float(os.environ.get("PRICE_OUT_PER_MTOK", 0))
+cost = cost_usd(os.environ, model_id, tin, tout)
 metrics = {"run_id": run_id, "process": "cross_check", "model_id": model_id, "temperature": 0.1,
            "batch_size": batch_size, "max_tokens_per_batch": max_tokens,
            "input_tokens": tin, "output_tokens": tout,
            "latency_seconds": max([r["latency_seconds"] for r in results] or [0]),
            "latency_note": "longest batch; batches ran in parallel",
-           "cost_usd": round(tin / 1e6 * pin + tout / 1e6 * pout, 4) if pin or pout else None,
+           "cost_usd": round(cost, 4) if cost is not None else None,
            "pages": doc["page_count"], "doc_sha256": doc["doc_sha256"],
            "batches": [{k: r.get(k) for k in ("batch", "pdf_pages", "input_tokens", "output_tokens",
                                               "latency_seconds", "stop_reason", "json_was_wrapped", "error")}

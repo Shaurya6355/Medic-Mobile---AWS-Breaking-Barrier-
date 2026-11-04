@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cost, loadPrices } from "../../src/metrics/cost.js";
+import { cost, loadPrices, unpricedModelIds } from "../../src/metrics/cost.js";
 
 const prices = { m1: { inPerMTok: 3, outPerMTok: 15 } };
 
@@ -37,5 +37,15 @@ describe("loadPrices", () => {
     expect(() => loadPrices({ PRICES_JSON: bad })).toThrow(/PRICES_JSON/);
     const missing = JSON.stringify({ m1: { inPerMTok: 1 } });
     expect(() => loadPrices({ PRICES_JSON: missing })).toThrow(/PRICES_JSON/);
+  });
+});
+
+describe("unpricedModelIds", () => {
+  it("lists configured models with no price, de-duplicated and sorted", () => {
+    expect(unpricedModelIds(prices, ["m1", "z", "a", "z"])).toEqual(["a", "z"]);
+  });
+
+  it("is empty when every model is priced", () => {
+    expect(unpricedModelIds(prices, ["m1"])).toEqual([]);
   });
 });

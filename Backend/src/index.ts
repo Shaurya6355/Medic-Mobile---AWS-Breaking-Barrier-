@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
@@ -12,17 +13,34 @@ import { startResumeSweep } from "./engine/sweep.js";
 import { withDeadline } from "./shutdown.js";
 import { createAgentCoreModelClient } from "./model/agentcore.js";
 import { createStrandsModelClient } from "./model/strands.js";
+import * as revisionEngine from "./revision/engine.js";
+import { LambdaClient } from "@aws-sdk/client-lambda";
+import { InProcessDispatcher, LambdaAsyncDispatcher } from "./revision/dispatch.js";
+import type { RevisionDispatcher } from "./revision/dispatch.js";
+import { RevisionService } from "./revision/service.js";
 import { Signoff } from "./signoff/signoff.js";
 import { createChecksStep } from "./steps/checks.js";
 import { createExtractStep } from "./steps/extract.js";
 import { createFillLogicStep } from "./steps/fillLogic.js";
 import { createIngestStep, createPdfInfoPageCount, defaultExec } from "./steps/ingest.js";
 import { parseModelValidator } from "./steps/logicModelValidator.js";
+import { unpricedModelIds } from "./metrics/cost.js";
+import { recordProcess } from "./metrics/record.js";
+import { summarize } from "./metrics/usage.js";
 import { DynamoStore } from "./store/dynamoStore.js";
 import { startQueueConsumer } from "./trigger/queueConsumer.js";
 
 const PRESIGN_EXPIRES_SECONDS = 900;
 const SERVER_CLOSE_TIMEOUT_MS = 5000;
+
+// A prompt the revision loop needs must exist at startup, with a message that names the file.
+async function readPrompt(name: string, file: string): Promise<string> {
+  try {
+    return await readFile(file, "utf8");
+  } catch (e) {
+    throw new Error(`Cannot read the ${name} prompt file at ${file}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
 
 const resumeSweepIntervalMs = (leaseMs: number): number => Math.max(1, Math.min(60000, Math.floor(leaseMs / 2)));
 
@@ -33,6 +51,8 @@ const log = (msg: string, detail?: object): void => {
 
 async function main(): Promise<void> {
   const cfg = loadConfig(process.env);
+  const unpriced = unpricedModelIds(cfg.prices, [cfg.modelId, cfg.fillModelId]);
+  if (unpriced.length > 0) log("warning: no price in PRICES_JSON for these models; their cost will be missing from totals", { models: unpriced });
 
   const doc = DynamoDBDocumentClient.from(new DynamoDBClient({ region: cfg.region }));
   const store = new DynamoStore(doc, cfg.tables);
@@ -70,12 +90,64 @@ async function main(): Promise<void> {
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
       prices: cfg.prices,
       modelBackend: cfg.modelBackend,
+      ...(cfg.runBudgetUsd !== undefined
+        ? {
+            runBudgetUsd: cfg.runBudgetUsd,
+            // Revision model calls are not step records; `revisions` is created below, before any run starts.
+            extraSpentUsd: async (runId: string) =>
+              summarize(await revisions.usageRows(runId)).totals.costUsd ?? 0,
+          }
+        : {}),
     },
   });
 
   // Findings, status and signatures. Compile is not here: it runs on the build host (DEC-014),
   // see scripts/compileLocked.ts.
   const signoff = new Signoff({ store, artifacts });
+
+  // Every saved version is checked and goes back to the program officer (AR-01, AR-02, GR-03).
+  const onVersionSaved = async (runId: string, n: number): Promise<void> => {
+    log("version saved", { runId, version: n });
+    // Recorded as the "validate" process of this version (DEC-003).
+    await recordProcess(store, { runId, process: "validate", versionId: String(n), now: Date.now }, () => signoff.onVersionSaved(runId, n));
+  };
+
+  // Revision loop: the original fill prompt is step 2's system prompt, the addendum follows it.
+  const prompts = {
+    fill: await readPrompt("fill", cfg.fillPrompt),
+    instruction: await readPrompt("revise instruction", cfg.reviseInstructionPrompt),
+    revise: await readPrompt("revise", cfg.revisePrompt),
+  };
+  // Step 2 runs outside the HTTP request. Lambda freezes after the response, so it invokes itself
+  // asynchronously (POST /events); other modes keep the process alive and run it in-process.
+  let dispatcher: RevisionDispatcher;
+  let inProcess: InProcessDispatcher | undefined;
+  if (cfg.runMode === "lambda") {
+    const fn = process.env["AWS_LAMBDA_FUNCTION_NAME"];
+    if (!fn) throw new Error("RUN_MODE=lambda needs AWS_LAMBDA_FUNCTION_NAME (set by the Lambda runtime)");
+    dispatcher = new LambdaAsyncDispatcher(new LambdaClient({ region: cfg.region }), fn);
+  } else {
+    inProcess = new InProcessDispatcher(
+      (job) => revisions.runApply(job.runId, job.revisionId),
+      (job, e) => log("revision background step failed", { runId: job.runId, revisionId: job.revisionId, errName: e instanceof Error ? e.name : "unknown" }),
+    );
+    dispatcher = inProcess;
+  }
+  const revisions = new RevisionService({
+    dispatcher,
+    logger: {
+      warn: (d, m) => log(m, { level: "warn", ...d }),
+      error: (d, m) => log(m, { level: "error", ...d }),
+    },
+    store,
+    artifacts,
+    model,
+    engine: revisionEngine,
+    modelId: cfg.fillModelId,
+    prompts,
+    onVersionSaved,
+    prices: cfg.prices,
+  });
 
   const app = buildServer({
     orchestrator,
@@ -87,12 +159,9 @@ async function main(): Promise<void> {
       getSignedUrl(s3, new PutObjectCommand({ Bucket: cfg.artifactBucket, Key: key, ContentType: "application/pdf" }), {
         expiresIn: PRESIGN_EXPIRES_SECONDS,
       }),
-    // Every saved version is checked and goes back to the program officer (AR-01, AR-02, GR-03).
-    onVersionSaved: async (runId, n) => {
-      log("version saved", { runId, version: n });
-      await signoff.onVersionSaved(runId, n);
-    },
+    onVersionSaved,
     signoff,
+    revisions,
     maxPages: cfg.maxPages,
     runMode: cfg.runMode,
     logger: false,
@@ -125,7 +194,7 @@ async function main(): Promise<void> {
     // Do not wait for whole pipelines: give in-flight work SHUTDOWN_TIMEOUT_MS, then
     // exit. Interrupted runs keep their lease and the resume sweep of a later
     // process picks them up once it expires.
-    void withDeadline(consumer, cfg.shutdownTimeoutMs)
+    void withDeadline(Promise.all([consumer, inProcess?.drain()]), cfg.shutdownTimeoutMs)
       .then((drained) => {
         if (!drained) log("shutdown deadline reached; in-flight runs left for the resume sweep", { timeoutMs: cfg.shutdownTimeoutMs });
       })

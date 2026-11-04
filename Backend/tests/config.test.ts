@@ -23,6 +23,14 @@ describe("loadConfig", () => {
     expect(path.basename(path.dirname(c.fillPrompt))).toBe("extraction");
     expect(c.fillModelId).toBe("us.m");
   });
+  it("defaults and reads the revision prompts", () => {
+    const d = loadConfig(base);
+    expect(path.basename(d.reviseInstructionPrompt)).toBe("revise_instruction_prompt.txt");
+    expect(path.basename(d.revisePrompt)).toBe("revise_prompt.txt");
+    const c = loadConfig({ ...base, REVISE_INSTRUCTION_PROMPT: "/i.txt", REVISE_PROMPT: "/r.txt" });
+    expect(c).toMatchObject({ reviseInstructionPrompt: "/i.txt", revisePrompt: "/r.txt" });
+  });
+
   it("reads FILL_PROMPT and FILL_MODEL_ID", () => {
     const c = loadConfig({ ...base, FILL_PROMPT: "/f.txt", FILL_MODEL_ID: "us.small" });
     expect(c).toMatchObject({ fillPrompt: "/f.txt", fillModelId: "us.small", modelId: "us.m" });
@@ -54,6 +62,13 @@ describe("loadConfig", () => {
       expect(() => loadConfig({ ...base, [name]: value })).toThrow(name);
     },
   );
+  it("RUN_BUDGET_USD is optional and parsed as a positive number", () => {
+    expect(loadConfig(base).runBudgetUsd).toBeUndefined();
+    expect(loadConfig({ ...base, RUN_BUDGET_USD: "12.5" }).runBudgetUsd).toBe(12.5);
+    for (const bad of ["0", "-1", "abc", "Infinity"]) {
+      expect(() => loadConfig({ ...base, RUN_BUDGET_USD: bad })).toThrow("RUN_BUDGET_USD");
+    }
+  });
   it("propagates invalid PRICES_JSON", () => {
     expect(() => loadConfig({ ...base, PRICES_JSON: "{" })).toThrow(/PRICES_JSON/);
   });
