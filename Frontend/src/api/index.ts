@@ -1,8 +1,9 @@
 /* The only place that reads or writes data.
    Live (VITE_API_URL set): the orchestrator API in Backend/src (contract: Backend/src/contract/routes.ts).
      A guideline is a run: POST /runs gives a presigned S3 URL, the upload starts ingest -> extract -> fill_logic -> checks.
-     The review starts from the run's latest version. Approving saves the clinician's version and signs it twice:
-     the AI agent as program_officer, then the clinician (the backend's sign-off order and separation of duties).
+     The backend's officer agent then answers the program officer's questions and signs as program_officer; the
+     review starts from its latest version. Approving saves the clinician's version, waits for the officer agent
+     to sign it, then signs as the clinician (the backend refuses program_officer saves and signatures over HTTP).
    Without VITE_API_URL: an in-memory store seeded with sample data.
    Edits, the assistant and the checks run in the browser; nothing reaches the backend until approval. */
 import { clone, fnv, loadSpec } from "../domain/data";
@@ -34,12 +35,10 @@ interface VersionRec { n: number; author: string; authorRole?: string; createdAt
 interface FindingsView { modelSha: string; claimText: string; blocking: number; groups: { severity: "blocking" | "warning" | "info"; findings: { message: string; check: string }[] }[] }
 interface StatusView { n: number; modelSha: string; status: string; runState: RunState; nextStep: string }
 
-/** The AI agent's identity when it signs in the program officer's place. */
-const AGENT_ID = "ai-agent";
 const CLINICIAN_ID = (import.meta.env.VITE_CLINICIAN_ID as string | undefined) || "clinician";
 
-const WORK: [RunState, string][] = [["created", "Upload to S3"], ["ingesting", "Read pages"], ["extracting", "Extract"], ["filling_logic", "Draft logic model"], ["checking", "Backend checks"]];
-const READY: RunState[] = ["in_review", "awaiting_officer", "awaiting_clinician", "locked"];
+const WORK: [RunState, string][] = [["created", "Upload to S3"], ["ingesting", "Read pages"], ["extracting", "Extract"], ["filling_logic", "Draft logic model"], ["checking", "Backend checks"], ["awaiting_officer", "AI agent checks"]];
+const READY: RunState[] = ["in_review", "awaiting_clinician", "locked"];
 const names = (): Record<string, string> => { try { return JSON.parse(localStorage.getItem("runNames") || "{}"); } catch { return {}; } };
 const nameRun = (id: string, n: string) => { try { localStorage.setItem("runNames", JSON.stringify({ ...names(), [id]: n })); } catch { /* private mode */ } };
 
@@ -170,31 +169,24 @@ export async function approve(id: string): Promise<Workflow> {
   return mutate(id, x => wf.approveAll(x, locked));
 }
 
-/** Save and sign on the backend. Each open question must be answered in a version saved by the role it is routed to,
-    so questions routed to the program officer are answered first in a version the AI agent saves in that role. */
+/** Save the clinician's version, wait for the backend's officer agent to sign it, then sign as the clinician. */
 async function signOnBackend(w: Workflow): Promise<{ n: number; modelSha: string }> {
   const r = w.remote!, base = "/runs/" + r.runId;
   const vs = await call<VersionRec[]>(base + "/versions");
-  let n = vs[vs.length - 1].n;
-  const latest = (await call<{ body: Spec }>(base + "/versions/" + n)).body;
-  const save = async (body: Spec, author: string, authorRole: "program_officer" | "clinician", note: string) => {
-    const b: Spec = { ...body, meta: { ...body.meta, version: n + 1, parent_version: n, created_at: new Date().toISOString(), created_by: author, change_note: note } };
-    const res = await call<{ n: number; checks_status: string }>(base + "/versions", { method: "POST", body: JSON.stringify({ parentVersion: n, body: b, author, authorRole }) });
-    n = res.n;
-  };
-  const answer = (q: Spec["open_questions"][number]) => w.model.open_questions.find(x => x.id === q.id);
-  const forOfficer = latest.open_questions.filter(q => q.route_to === "program_officer" && q.status === "open" && answer(q)?.status === "resolved");
-  if (forOfficer.length) {
-    const body: Spec = { ...latest, open_questions: latest.open_questions.map(q => (forOfficer.includes(q) ? { ...q, status: "resolved", resolution: answer(q)!.resolution } : q)) };
-    await save(body, AGENT_ID, "program_officer", "AI agent recorded the answers to the program officer questions " + forOfficer.map(q => q.id).join(", ") + ", as the clinician confirmed them in review.");
-  }
+  const parent = vs[vs.length - 1].n;
   const edits = w.versions.filter(v => v.event.startsWith("Edited")).length;
-  await save(w.model, CLINICIAN_ID, "clinician", "Clinician review in the app: " + edits + " edit" + (edits === 1 ? "" : "s") + " to the rules, open questions answered, checks reviewed.");
-  const st = await call<StatusView>(base + "/versions/" + n + "/status");
-  const sign = (role: "program_officer" | "clinician", userId: string) =>
-    call(base + "/versions/" + n + "/signatures/" + role, { method: "POST", body: JSON.stringify({ role, userId, modelSha: st.modelSha }) });
-  await sign("program_officer", AGENT_ID);
-  await sign("clinician", CLINICIAN_ID);
+  const note = "Clinician review in the app: " + edits + " edit" + (edits === 1 ? "" : "s") + " to the rules, open questions answered, checks reviewed.";
+  const body: Spec = { ...w.model, meta: { ...w.model.meta, version: parent + 1, parent_version: parent, created_at: new Date().toISOString(), created_by: CLINICIAN_ID, change_note: note } };
+  const { n } = await call<{ n: number }>(base + "/versions", { method: "POST", body: JSON.stringify({ parentVersion: parent, body, author: CLINICIAN_ID, authorRole: "clinician" }) });
+  let st = await call<StatusView>(base + "/versions/" + n + "/status");
+  for (let i = 0; i < 60 && st.status === "awaiting_officer"; i++) {
+    await wait(1000);
+    st = await call<StatusView>(base + "/versions/" + n + "/status");
+  }
+  if (st.status !== "awaiting_clinician") {
+    throw new Error("Version " + n + " was saved, but the officer agent has not signed it (status: " + st.status.replace(/_/g, " ") + "). It may have left a comment on the version; check its findings.");
+  }
+  await call(base + "/versions/" + n + "/signatures/clinician", { method: "POST", body: JSON.stringify({ role: "clinician", userId: CLINICIAN_ID, modelSha: st.modelSha }) });
   return { n, modelSha: st.modelSha };
 }
 export const runVerify = (id: string) => mutate(id, wf.runVerify);

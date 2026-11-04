@@ -4,9 +4,11 @@
 // What is NOT real here:
 // - ingest and extract do not read the uploaded PDF: they store the committed outputs of the public cough booklet
 //   (extraction/input_blocks.json, extraction/extraction_output.json);
-// - fill_logic calls FakeModelClient, which returns the committed draft (tests/fixtures/fill/draft-cough.json).
-// So every upload produces the same cough logic model. Everything after that (versions, findings, gates,
-// signatures, lock) is the production code path.
+// - fill_logic gets the committed draft (tests/fixtures/fill/draft-cough.json) from a fake model;
+// - the officer agent (src/agent/officerAgent.ts) is real, but its model call is faked: it answers every open
+//   question routed to the program officer with a fixed sentence.
+// So every upload produces the same cough logic model. Everything else (officer agent loop and signature,
+// versions, findings, gates, clinician signature, lock) is the production code path.
 //
 // The presigned S3 URL is replaced by PUT /__upload/<key> on this server, which also stands in for the S3 event.
 //
@@ -19,7 +21,9 @@ import { buildServer, type OrchestratorPort } from "../src/api/server.js";
 import { MemoryArtifactStore, artifactKey, parseInputKey } from "../src/artifacts/artifactStore.js";
 import { Orchestrator } from "../src/engine/engine.js";
 import type { Step } from "../src/engine/step.js";
-import { FakeModelClient } from "../src/model/modelClient.js";
+import type { ModelClient, ModelRequest } from "../src/model/modelClient.js";
+import { parseModelJson } from "../src/model/modelClient.js";
+import { OfficerAgent } from "../src/agent/officerAgent.js";
 import { Signoff } from "../src/signoff/signoff.js";
 import { createChecksStep } from "../src/steps/checks.js";
 import { createFillLogicStep } from "../src/steps/fillLogic.js";
@@ -37,8 +41,26 @@ const draftText = read("tests/fixtures/fill/draft-cough.json");
 
 const store = new MemoryStore();
 const artifacts = new MemoryArtifactStore();
-// One canned answer per fill_logic call; plenty for a local session.
-const model = new FakeModelClient(Array.from({ length: 200 }, () => ({ raw: draftText, usage: { inputTokens: 0, outputTokens: 0, modelId: "fake.dev-local" } })));
+/** Fake model: the officer agent gets a patch resolving the program officer's open questions; everything else gets the draft. */
+const AGENT_ANSWER = "Answered by the officer agent from the guideline (dev:local stand-in for the model).";
+const model: ModelClient = {
+  async generateJson<T>(req: ModelRequest<T>) {
+    const usage = { inputTokens: 0, outputTokens: 0, modelId: "fake.dev-local" };
+    let raw = draftText;
+    if (req.system.startsWith("You fix metadata problems")) {
+      const text = req.content.map((c) => ("text" in c ? c.text : "")).join("\n");
+      const m = /<data label="model">\n([\s\S]*?)\n<\/data>/.exec(text);
+      const qs = (m ? (JSON.parse(m[1]!) as { open_questions?: { route_to: string; status: string }[] }).open_questions : undefined) ?? [];
+      const ops = qs.flatMap((q, i) =>
+        q.route_to === "program_officer" && q.status === "open"
+          ? [{ op: "replace", path: `/open_questions/${i}/status`, value: "resolved" }, { op: "add", path: `/open_questions/${i}/resolution`, value: AGENT_ANSWER }]
+          : [],
+      );
+      raw = JSON.stringify({ ops, explanation: "dev:local fake officer agent" });
+    }
+    return { value: parseModelJson(raw, req.schema, usage), usage, raw };
+  },
+};
 
 /** Stores a committed output as this step's artifact, after a short pause so the UI can show progress. */
 const provided = (name: string, runState: Step["runState"], key: string, body: string): Step => ({
@@ -51,6 +73,12 @@ const provided = (name: string, runState: Step["runState"], key: string, body: s
     return { artifactRefs: { [key]: k } };
   },
 });
+
+// As in src/index.ts: the officer agent runs when a run reaches awaiting_officer and after every saved version.
+const triggers: { agent?: OfficerAgent } = {};
+const triggerAgent = async (runId: string): Promise<void> => {
+  await triggers.agent?.onAwaitingOfficer(runId).catch((e: unknown) => console.error(`officer agent failed on ${runId}:`, e instanceof Error ? e.message : e));
+};
 
 const orchestrator = new Orchestrator({
   store,
@@ -69,11 +97,29 @@ const orchestrator = new Orchestrator({
     createChecksStep(),
   ],
   finalState: "awaiting_officer",
+  onFinalState: triggerAgent,
   owner: "dev-local",
   leaseMs: 60_000,
   runnerOpts: { maxAttempts: 1, backoffMs: () => 0, sleep: async () => {}, prices: {} },
 });
 const signoff = new Signoff({ store, artifacts });
+const onVersionSaved = async (runId: string, n: number): Promise<void> => {
+  await signoff.onVersionSaved(runId, n);
+  await triggerAgent(runId);
+};
+triggers.agent = new OfficerAgent({
+  store,
+  artifacts,
+  signoff,
+  model,
+  modelId: "fake.dev-local",
+  validator: parseModelValidator,
+  saveDeps: { store, artifacts, validator: parseModelValidator, onVersionSaved: (runId, n) => signoff.onVersionSaved(runId, n), now: Date.now },
+  now: Date.now,
+  budgetUsd: 1,
+  prices: { "fake.dev-local": { inPerMTok: 0, outPerMTok: 0 } }, // the budget check needs a price for the model
+  leaseMs: 60_000,
+});
 const port: OrchestratorPort = {
   createRun: (pages, filename) => orchestrator.createRun(pages, filename),
   resume: (id) => orchestrator.resume(id),
@@ -90,7 +136,8 @@ const app = buildServer({
   artifacts,
   validator: parseModelValidator,
   presign: async (key) => `http://localhost:${PORT}/__upload/${encodeURIComponent(key)}`,
-  onVersionSaved: (runId, n) => signoff.onVersionSaved(runId, n),
+  onVersionSaved,
+  onRejected: triggerAgent,
   signoff,
   maxPages: 200,
   logger: false,
@@ -113,7 +160,7 @@ app.put<{ Params: { "*": string } }>("/__upload/*", async (req, reply) => {
   const runId = parseInputKey(key);
   if (!runId) return reply.code(400).send({ error: "not an input key" });
   await artifacts.put(key, req.body as Buffer, "application/pdf");
-  console.log(`upload received for run ${runId}; running ingest -> extract -> fill_logic -> checks`);
+  console.log(`upload received for run ${runId}; running ingest -> extract -> fill_logic -> checks -> officer agent`);
   void orchestrator.onUploaded(runId).catch((e: unknown) => console.error(`run ${runId} failed:`, e instanceof Error ? e.message : e));
   return reply.code(200).send();
 });
