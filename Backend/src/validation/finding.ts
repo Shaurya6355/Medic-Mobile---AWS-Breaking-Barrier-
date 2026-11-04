@@ -68,6 +68,13 @@ export type ApprovedDeviation = { subject: string; number: number; by: string; n
 /** A clinician-approved case where a less urgent rule is checked before a more urgent one: [firstRuleId, overriddenRuleId]. */
 export type ApprovedException = { rules: readonly [string, string]; by: string; note: string };
 
+/**
+ * The second, independent draft for the cross-check (system design S3): a logic model produced separately from the one
+ * being checked, or the reasons it could not be read as one. It is only ever compared with the first; the checks never
+ * decide which of the two is right.
+ */
+export type CrossCheckInput = { model: Model } | { invalid: readonly string[] };
+
 export type CheckContext = {
   model: Model;
   document?: SourceDocument;
@@ -83,6 +90,8 @@ export type CheckContext = {
   compileSettings?: CompileSettings;
   /** The version that is already in use in the field, to catch renamed or removed fields. */
   deployed?: Model;
+  /** The second, independent draft. Without it the cross-check comparison does not run. */
+  crossCheck?: CrossCheckInput;
 };
 
 export type SourceDocument = {

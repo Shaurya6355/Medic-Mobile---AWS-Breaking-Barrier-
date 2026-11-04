@@ -6,6 +6,7 @@ Writes: extraction_output.json, run_metrics.json, raw_response.txt in this folde
 import json, os, sys, time
 from pathlib import Path
 import boto3
+from botocore.config import Config
 
 here = Path(__file__).parent
 doc = json.loads((here / "input_blocks.json").read_text())
@@ -21,13 +22,14 @@ for p in doc["pages"]:
     content.append({"text": "Blocks: " + json.dumps(p["blocks"], ensure_ascii=False)})
 content.append({"text": "Return one JSON object for the whole document."})
 
-client = boto3.client("bedrock-runtime", region_name="us-west-2")
+client = boto3.client("bedrock-runtime", config=Config(read_timeout=900, retries={"total_max_attempts": 1}), region_name="us-west-2")
 t0 = time.time()
 resp = client.converse(modelId=model_id, system=[{"text": system}],
                        messages=[{"role": "user", "content": content}],
-                       inferenceConfig={"maxTokens": 32000, "temperature": 0})
+                       inferenceConfig={"maxTokens": 32000})
 latency = time.time() - t0
-text = resp["output"]["message"]["content"][0]["text"]
+blocks_out = resp["output"]["message"]["content"]
+text = "".join(c.get("text", "") for c in blocks_out)  # the reply may start with a non-text block
 (here / "raw_response.txt").write_text(text)
 
 u = resp["usage"]
@@ -36,7 +38,8 @@ metrics = {"run_id": run_id, "process": "extraction", "model_id": model_id,
            "input_tokens": u["inputTokens"], "output_tokens": u["outputTokens"],
            "latency_seconds": round(latency, 2), "stop_reason": resp["stopReason"],
            "cost_usd": round(u["inputTokens"] / 1e6 * pin + u["outputTokens"] / 1e6 * pout, 4) if pin or pout else None,
-           "pages": doc["page_count"], "doc_sha256": doc["doc_sha256"]}
+           "pages": doc["page_count"], "doc_sha256": doc["doc_sha256"],
+           "content_block_types": [list(c.keys())[0] for c in blocks_out]}
 (here / "run_metrics.json").write_text(json.dumps(metrics, indent=2))
 
 out = json.loads(text)

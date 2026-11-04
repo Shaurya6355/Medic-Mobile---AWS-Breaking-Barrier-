@@ -77,6 +77,7 @@ Before emitting, `compileSnapshot` runs `verifyFlow` on every point of the exact
 | FILL_MODEL_ID | MODEL_ID | Bedrock model for the fill_logic draft. Infra grants Bedrock access to MODEL_ID only, so a different value also needs the IAM policy widened |
 | GOLDEN_CASES_PATH | tests/fixtures/logic/golden-proposed.json (proposed, awaiting Medic; TODO DEC-020) | Golden cases for the checks when the run has no `runs/<id>/inputs/golden_cases.json`. `none` switches them off; a set path that is missing is an error. Missing default (Lambda image): the findings say the test-case check did not run |
 | COMPILE_SETTINGS_PATH | compile-demo/settings.demo.json (TODO DEC-020) | Compile settings for the checks when the run has no `runs/<id>/inputs/compile_settings.json`. Their sha256 is recorded on each signature; a release build must use the same settings |
+| CROSS_CHECK_MODEL_PATH | not set (DEC-035) | A second, independent logic model for the cross-check comparison, used when the run has no `runs/<id>/inputs/cross_check_model.json`. `none` switches it off; a set path that is missing is an error. Without a second draft the comparison does not run and the findings say so. Its differences are warnings decided by the clinician and never block signing |
 | PRICES_JSON | none | JSON map of model ID to `{inPerMTok, outPerMTok}` for cost metrics |
 
 Startup fails with a list of the names of any missing required variables.
@@ -88,6 +89,8 @@ On SIGTERM or SIGINT the process stops polling SQS and the resume sweep, waits u
 ## HTTP API
 
 Route names and request/response shapes are defined only in `src/contract/` (`routes.ts`, `schemas.ts`). The API covers creating a run (returning a presigned upload URL), reading a run, saving versions, comments, resuming a run, and sign-off: `GET .../versions/:n/findings[?audience=program_officer|clinician]`, `GET .../versions/:n/status`, `POST .../versions/:n/signatures/:role` with body `{role, userId, modelSha}` (201, or 400/403/404/409/422 as listed under "Sign-off"). See that folder for the exact paths.
+
+The cross-check flags (the differences between the draft and a second, independent logic model, DEC-035) are stored with every version's checks as `flags.json` in the run's artifacts (`runs/<id>/flags/<checks version>/<modelSha>-<inputs>.json`, a derived document that is recomputed when missing) and served by `GET /runs/:id/versions/:n/flags`. The document holds `comparison` (`ran`, `not_run` when no second draft was supplied, or `second_draft_invalid`), a `summary`, a `notice` and the `flags`: each is a Finding with its message worded for the clinician and for the program officer and a status; all are warnings decided by the clinician and none blocks signing. `python3 validation/compare_outputs.py --first ... --second ...` produces the same flags for two logic model files.
 
 ## Docker
 

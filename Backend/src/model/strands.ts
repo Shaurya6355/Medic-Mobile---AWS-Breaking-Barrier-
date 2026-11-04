@@ -30,6 +30,15 @@ export function isTransientBedrockError(e: unknown): boolean {
   return false;
 }
 
+/**
+ * Claude Haiku 5.5 rejects any temperature but its default ("`temperature` is deprecated for this model", ERR-012,
+ * found with direct test calls), so none is sent for it. Every other model keeps temperature 0.
+ */
+const NO_TEMPERATURE = /claude-haiku-5/;
+export function temperatureSetting(modelId: string): { temperature?: number } {
+  return NO_TEMPERATURE.test(modelId) ? {} : { temperature: 0 };
+}
+
 export function toStrandsContent(content: ModelContent[]): (TextBlock | ImageBlock)[] {
   return content.map((c) =>
     c.type === "text"
@@ -49,7 +58,7 @@ export function createStrandsModelClient(opts: { region: string; timeoutMs?: num
         const model = new BedrockModel({
           region,
           modelId: req.modelId,
-          temperature: 0,
+          ...temperatureSetting(req.modelId),
           maxTokens: req.maxTokens,
         });
         // retryStrategy null: retries are owned by the orchestration engine (TransientError).

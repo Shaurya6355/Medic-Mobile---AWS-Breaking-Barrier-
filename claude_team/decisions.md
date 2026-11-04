@@ -311,7 +311,7 @@ Revisit if: Llama cannot take the page images or returns invalid JSON often (fla
 Related: INT-013, DEC-003, DEC-005
 
 ### DEC-022 | Compare the extraction schema outputs until the logic model schema exists
-Status: open
+Status: superseded by DEC-027 (the comparison now runs on the two logic models)
 Date: 2026-11-03
 Decided by: proposed by Claude session, awaiting human confirmation
 Feature or area: validation (Backend/validation)
@@ -325,7 +325,7 @@ Revisit if: the logic model schema is agreed, then the comparison moves to it.
 Related: INT-013, DEC-021
 
 ### DEC-023 | Validator flag rules: alignment, severity and what counts as a difference
-Status: decided (provisional, tune after the first real Llama run)
+Status: decided; pairing and severity rules superseded in part by DEC-025
 Date: 2026-11-03
 Decided by: Claude session, from the human's request for a deterministic comparer (Backend/validation)
 Feature or area: validation, flags for the clinician UI
@@ -434,4 +434,67 @@ Feature or area: Frontend and backend integration
 Decision: main's Backend is kept as it is. The local intake backend from feature/pathway-compiler is removed (DEC-025 to DEC-027 superseded). In live mode the frontend calls main's /runs API. On Approve, the AI agent saves the answers to questions routed to the program officer in a version with authorRole program_officer and signs as program_officer (userId ai-agent); the clinician's version is then saved and signed by the clinician, which locks it. The backend's sign-off order, separation of duties and gates are unchanged.
 Why: Human asked to merge into main so that it works with the backend there, while the program officer role is replaced by the AI agent (DEC-030).
 Related: DEC-019, DEC-020, DEC-030, INT-025
+
+### DEC-032 | Cross-check sends the guideline to Llama in batches of 3 pages
+Status: decided
+Date: 2026-11-04
+Decided by: human (Nirubama12)
+Feature or area: cross-check stage (Backend/cross-check/run_extraction.py)
+Decision: Llama 4 Scout receives the guideline in 4 requests of 3 pages each (run in parallel, 8192 output tokens each, temperature 0.1). The prompt file is unchanged; each request adds a batch note (id prefix b<N>_, go-to links to other batches written as page:<N>). Code merges the four results: lists are concatenated, variables are merged by id, node order is offset per batch, and page:<N> links resolve to the first top-level node of that page. Haiku 5.5 keeps the single whole-document call (DEC-005) and runs without a temperature setting.
+Assumptions: Llama 4 Scout allows at most 3 images and 8192 output tokens per request (verified by test calls on 2026-11-04). Edges that cross a batch boundary are lost and appear as flags.
+Why: The two limits make a single call impossible for Llama; batching is the only option that keeps the page images.
+Other options considered (and why not):
+- Tile 4 pages per image: arrows may become unreadable and the output cap would still cut the JSON.
+- Text blocks only: loses arrows and layout, so the cross-check would differ more from Haiku.
+Revisit if: Llama raises its limits, or the first comparison shows the batching causes most flags.
+Related: ERR-013, DEC-005, DEC-021, INT-027
+
+### DEC-033 | Comparer tuning after the first real Haiku vs Llama comparison
+Status: decided (provisional; thresholds are not yet checked against a clinician's judgement)
+Date: 2026-11-04
+Decided by: human (Nirubama12) asked for the tuning; rules chosen by the Claude session
+Feature or area: validation (Backend/validation/compare_outputs.py); supersedes parts of DEC-023
+Decision: (1) Items are still paired by cited block first; leftovers are then paired by matching text (similarity at least 0.8 for nodes and follow-ups, 0.85 for danger signs, 0.7 for actions by drug name, exact for thresholds). (2) A field difference that is only wording (units written another way, "in 3 days" against "3 days", a leading "Age", spelling amoxycillin or amoxicillin, one text containing the other) is a low flag and is never dropped; a real value difference keeps its severity. Numbers, operators, kind and boolean fields are always strict. (3) An unpaired danger sign, follow-up or node that repeats an item already compared is low and says so. (4) Missing nodes and missing edges are grouped into one flag per page and side, with the members listed in the flag; items that cite no source are one flag per list. (5) Edges whose two ends sit in different cross-check batches are low, as an expected gap of batching (DEC-032). (6) The model id of each side is read from the output, else from run_metrics.json beside it. Danger signs, actions, follow-ups and thresholds stay one flag each.
+Assumptions: The similarity cut-offs and the unit and spelling synonyms are the session's choices. Wording differences are worth showing but not worth a high flag.
+Why: The first comparison gave 185 flags (133 high), most of them wording or granularity noise that hid the real problems. After tuning it gives 103 (51 high, 33 medium, 19 low) on the same two outputs.
+Other options considered (and why not):
+- Drop wording differences completely: hides changes a clinician may care about, and breaks the rule that ambiguity is never settled silently.
+- Fuzzy-match everything: harder to audit; kept to the leftover pass only.
+Revisit if: a clinician finds a flag graded too low, or the logic model schema replaces the extraction schema (DEC-022).
+Related: DEC-022, DEC-023, DEC-032, INT-028
+
+### DEC-034 | Model outputs are never committed or pushed
+Status: decided
+Date: 2026-11-04
+Decided by: human (Nirubama12)
+Feature or area: repository hygiene for extraction, cross-check and validation runs
+Decision: Nothing a model produced is committed or pushed: raw replies (raw_response.txt), run metrics (run_metrics.json), flags (Backend/validation/flags.json) and real extraction outputs. These paths are git-ignored. The two extraction_output.json files already in git are the old in-session samples; they are restored to that committed content and marked skip-worktree locally, so later runs that overwrite them do not show in git status. Real outputs from the first runs were copied outside the repository (/tmp/model_outputs_backup on the running laptop).
+Assumptions: The two committed extraction_output.json files stay in main as sample data (they came from an in-session test, not Bedrock). skip-worktree is local to one clone and each laptop must set it for itself.
+Why: Model outputs are generated and can be large; they should not be mistaken for reviewed data, and the human wants none of them in git.
+Other options considered (and why not):
+- Remove the two sample files from git: changes main and the scripts and comparer read them as defaults; to be decided with the team.
+- Change the scripts to write outputs into a git-ignored output folder: cleaner, but changes paths in three scripts; not done yet.
+Revisit if: the team wants run outputs kept as artifacts (then record them in artifacts.md and store them in S3).
+Related: INT-029, INT-026, INT-027, INT-028
+
+### DEC-035 | Cross-check flags are Findings from comparing the two logic models, as warnings decided by the clinician
+Status: decided
+Date: 2026-11-04
+Decided by: human (Nirubama12) chose the base branch, where the second model comes from, the severity and what happens to the Python comparer; the design follows system design S3 (written by the Claude session)
+Feature or area: cross-check flags (Backend/src/validation/checks/crossCheck.ts); supersedes DEC-022 and the role of DEC-023/DEC-033 for the official flags
+Decision: Flags are the same Finding objects as every other check, so the review views, gates and stored findings read them. A new check, crossCheck, compares the draft being checked (first draft) with a second, independent logic model, supplied as a check input (run artifact runs/<id>/inputs/cross_check_model.json, then CROSS_CHECK_MODEL_PATH, no default). Items are matched by id, then by the words of the label. It reports, as warnings with decidedBy clinician and audience both roles: the age range, each question (kind of answer, unit, entry limits, only in one draft), the cut-off numbers used per question, each result (only in one draft, urgency rank, follow-up, actions, doses by age) and open questions raised by only one draft; and it runs both drafts through the one interpreter over the same combinations of answers (every question of either draft, split at every cut-off of either draft) and groups the combinations that get a different result by pair of results, each with one example child, both rules and their sources, and the direction (second draft more or less urgent). One information finding says how many combinations were compared. Nothing is blocking, so a weaker second draft cannot stall signing. With no second draft the check is silent and contextNotice says the comparison did not run. The Python comparer (Backend/validation/compare_outputs.py) is kept unchanged as an extraction-level debugging tool and is no longer the source of flags.
+Assumptions: The second logic model is produced by running the existing fill_logic draft-and-resolve process on the cross-check (Llama) extraction with Llama drafting; that step is not built into the pipeline yet and has not been run. Both drafts parse as v1 logic models. Warnings are enough because nothing in the code can accept a blocking finding yet (only approved deviations and exceptions exist for two checks).
+Why: The design (S3) asks for a deterministic comparison by the interpreter over a shared grid, not a block-by-block comparison of extraction records, and the checks pipeline, gates and role views only understand Findings.
+Other options considered (and why not):
+- Blocking for the clinician: stricter, but a weaker second model would stall the pipeline and nothing can clear such a finding except a new version.
+- Information only: carries no weight and is easy to miss.
+- Keep comparing extraction records: not what the design asks for, and its flags cannot reach the gates or review views.
+Revisit if: the clinician wants disagreements to block, an acceptance-with-note mechanism for findings is built, the grid becomes too large to compare (CROSS_CHECK_NOT_COMPARED), or the first real second draft shows the matching by label is too loose or too strict.
+Related: DEC-017, DEC-021, DEC-022, DEC-023, DEC-032, DEC-033, INT-030
+
+Update 2026-11-04 (DEC-035), after the first run on real logic models: (1) questions the drafts word differently are now paired by their clinical words (everyday words ignored) and, for whole-number questions, by being the only one in the same unit on each side; two different symptoms never pair. (2) Each draft's result is remembered per set of its own answers, so the check's default limit is now 2,000,000 combinations (a set limit in the check context still wins). (3) The example child names a few answers only the second draft asks about, and sums up the rest.
+
+Update 2026-11-04 (DEC-035): Backend/validation/compare_outputs.py is now the driver that generates and stores the flags. By default it takes two logic model files (--first, --second), runs the cross-check through scripts/crossCheckFlags.ts (so the one interpreter is used and no logic is re-implemented in Python) and writes the flags, each a Finding with a plain-language message per role, to flags.json (git-ignored, never committed). The earlier comparison of the two extraction records stays behind --records as a debugging aid.
+
+Update 2026-11-04 (DEC-035): the flags are also stored by the pipeline. Every time the checks run for a version they store flags.json (the cross-check findings with messages for both roles) beside the findings, in the run's artifacts, keyed by content and inputs, and GET /runs/:id/versions/:n/flags serves it to the front end (the route is in the contract and the Infra route list). The document says whether the comparison ran, did not run (no second draft) or could not run (second draft invalid). It is a derived view, recomputed when missing and never read as proof of anything (a planted document for other content is ignored).
 

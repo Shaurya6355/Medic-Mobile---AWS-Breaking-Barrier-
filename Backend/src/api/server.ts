@@ -279,6 +279,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return signoff.findingsView(req.params.id, n, q.audience);
   });
 
+  // The stored flags.json of a version (cross-check flags, one document per content and inputs).
+  app.get<{ Params: { id: string; n: string } }>(routes.pattern.flags, async (req, reply) => {
+    const n = parseVersionNumber(req.params.n, reply);
+    if (n === undefined) return reply;
+    return signoff.flagsDocument(req.params.id, n);
+  });
+
   app.get<{ Params: { id: string; n: string } }>(routes.pattern.status, async (req, reply) => {
     const n = parseVersionNumber(req.params.n, reply);
     if (n === undefined) return reply;

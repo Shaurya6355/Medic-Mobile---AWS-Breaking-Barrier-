@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { parseModel } from "../logic/schema.js";
+import type { CrossCheckInput } from "./finding.js";
 
 /**
  * Optional inputs of the checks, each validated on the way in: the extraction record (what the
@@ -88,4 +90,13 @@ export function isMeaningfulText(text: string | undefined): boolean {
   if (t.length < 15) return false;
   const words = (t.match(/\p{L}{2,}/gu) ?? []).filter((w) => !/^(\p{L})\1+$/u.test(w));
   return new Set(words.map((w) => w.toLowerCase())).size >= 3;
+}
+
+/**
+ * Reads the second, independent draft (a logic model as JSON). A draft that does not parse is not an error: it becomes
+ * { invalid: [...] } so the cross-check can say plainly that it was not compared.
+ */
+export function loadCrossCheck(json: unknown): CrossCheckInput {
+  const r = parseModel(json);
+  return r.ok ? { model: r.value } : { invalid: r.issues.slice(0, 20) };
 }

@@ -33,6 +33,7 @@ export const API_ROUTES: readonly string[] = [
   "POST /runs/{id}/versions/{n}/comments",
   // Sign-off (DEC-019). Role and user come from the body until Cognito (DEC-015) adds an authorizer.
   "GET /runs/{id}/versions/{n}/findings",
+  "GET /runs/{id}/versions/{n}/flags",
   "GET /runs/{id}/versions/{n}/status",
   "POST /runs/{id}/versions/{n}/signatures/{role}",
   // The clinician's rejection with a comment (AR-06, RR-02; DEC-020). Same DynamoDB actions as a signature.

@@ -3,7 +3,7 @@ import { DEFAULT_CHECKS, runChecks } from "../../src/validation/runChecks.js";
 import { getAnalysis } from "../../src/validation/analysis.js";
 import { goldenCases, matchedCtx, realCtx, v1Copy } from "./helpers.js";
 
-const REST = ["fieldNames", "followUpConsistency", "clinicalText", "openQuestions", "dangerSignCoverage", "sourceCoverage", "goldenCases", "compileReady", "contextNotice"];
+const REST = ["fieldNames", "followUpConsistency", "clinicalText", "openQuestions", "dangerSignCoverage", "sourceCoverage", "goldenCases", "compileReady", "crossCheck", "contextNotice"];
 const LOGIC = ["closedTable", "exclusivity", "reachability", "deadInputs", "useBeforeAsk", "severityOrder", "requiredQuestions", "ageGroups", "boundaryCards"];
 
 describe("logic checks together on v1", () => {
