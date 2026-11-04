@@ -47,6 +47,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
   const stages = checkStages(w.model, w.evidence);
   const g = gate(w, checks);
   const { mk, tone } = markersFor(w, checks);
+  const edited = Object.values(mk).filter(l => l.some(([c]) => c === "ed")).length;
   const edit = (item: string, field: string, patch: Parameters<Actions["edit"]>[2]) => act.edit(item, field, patch);
   const toEdit = (about: string) => { setSel(about); setTab("edit"); setChatRaw(x => ({ ...x, edit: true })); };
   const why = g.blockIds.length ? g.blockIds.length + " blocking check problem" + (g.blockIds.length > 1 ? "s" : "") + " to fix first"
@@ -61,7 +62,9 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
         </div>
         <div className="vtabs" role="tablist" aria-label="Mode">
           <button type="button" role="tab" aria-selected={tab === "view"} onClick={() => setTab("view")}>View</button>
-          <button type="button" role="tab" aria-selected={tab === "edit"} onClick={() => setTab("edit")}>Edit</button>
+          <button type="button" role="tab" aria-selected={tab === "edit"} onClick={() => setTab("edit")}>
+            Edit{edited ? <span className="tcount" aria-label={edited + " edited"}>{edited}</span> : null}
+          </button>
         </div>
         <div className="rvact">
           {!chatOn ? <button type="button" className="btn" onClick={() => setChat(true)}>Assistant{g.asks.length ? " (" + g.asks.length + ")" : ""}</button> : null}
@@ -82,21 +85,27 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
 
       <div className={"rvbody" + (chatOn ? "" : " nochat")}>
         {tab === "view" ? (
-          <div className="rvmain">
+          <div className="rvmain tabpane" key="view">
+            {edited ? (
+              <div className="rvtip">
+                <span className="dotc" aria-hidden="true" />
+                {edited + " step" + (edited > 1 ? "s" : "") + " edited since the AI hand-over, marked Edited in the flowchart."}
+                {canEdit ? <button type="button" className="linkb" onClick={() => setTab("edit")}>Back to the table</button> : null}
+              </div>
+            ) : null}
             <section className="panel flowpanel">
               <Flow m={w.model} selected={sel === "scope" ? undefined : sel} onSelect={setSel} markers={mk} tone={tone} label="Decision flow" />
             </section>
             <section className="panel"><GoldenCases m={w.model} onSelect={setSel} /></section>
           </div>
         ) : (
-          <div className="rvedit">
+          <div className="rvedit tabpane" key="edit">
+            <div className="rvtip">
+              {canEdit ? "Edit any cell. The flowchart, test patients and checks update as you type; open View to see them." : "Read-only" + (role !== "clinician" ? " for your role." : ".")}
+              <button type="button" className="linkb" onClick={() => setTab("view")}>{edited ? "See " + edited + " change" + (edited > 1 ? "s" : "") + " in the flowchart" : "Open the flowchart"}</button>
+            </div>
             <section className="panel">
-              {!canEdit ? <div className="note">Read-only{role !== "clinician" ? " for your role" : ""}.</div> : null}
               <RuleTable w={w} canEdit={canEdit} checks={checks} sel={sel} onSelect={setSel} edit={edit} markers={mk} />
-            </section>
-            <section className="panel flowpanel live">
-              <div className="note">Live flow: redraws as you edit the table.</div>
-              <Flow m={w.model} selected={sel === "scope" ? undefined : sel} onSelect={setSel} markers={mk} tone={tone} label="Decision flow, live" />
             </section>
           </div>
         )}
