@@ -1,26 +1,25 @@
-"""Compare the two extraction outputs and write a list of flags for the clinician UI.
+"""Generate the flags for the clinician and store them in flags.json.
 
-Deterministic code only: no model call, no network, no judgement about clinical correctness.
-It reads the output of Backend/extraction (model 1) and Backend/cross-check (model 2) and reports
-where they differ. The same two inputs always give the same flags, in the same order.
+Two modes. Neither calls a model, the network or AWS; the same inputs always give the same flags in the same order.
 
-How items are paired: first by the block they cite (block_id); items left over are then paired by
-matching text (the same sentence can appear on two pages, so two models may cite different blocks).
-Model-chosen ids are never compared.
+1. Logic models (the default). Compares two logic models (JSON files in the v1 logic model format, schema_version 1.0):
+   the first draft (the one being reviewed) and a second, independent draft. The comparison is the repository's own
+   cross-check (Backend/src/validation/checks/crossCheck.ts), run through scripts/crossCheckFlags.ts, so both drafts go
+   through the one interpreter over the same answer combinations; this script does not re-implement any logic. Each flag is
+   a Finding (code, severity, audience, who decides, subjects, plain-language message for each role, booklet source).
+   Differences are warnings decided by the clinician; nothing here says which draft is right.
 
-How differences are graded: a value that differs keeps the field's severity (for example a threshold
-number is high). A difference that is only wording (units written another way, "in 3 days" against
-"3 days", a leading "Age") is kept as a low flag and never dropped. Missing nodes and edges are
-grouped into one flag per page and side. Edges whose two ends sit in different cross-check batches
-are reported as expected gaps (low).
+     python3 compare_outputs.py --first first_logic_model.json --second second_logic_model.json [--out flags.json]
 
-Usage:
-  python3 compare_outputs.py
-  python3 compare_outputs.py --extraction A.json --crosscheck B.json \
-      --extraction-input A_blocks.json --crosscheck-input B_blocks.json --out flags.json
+   Needs Node.js 20 or later and `npm ci` once in Backend/ (the comparison runs with tsx).
 
-Defaults read ../extraction and ../cross-check (extraction_output.json, input_blocks.json)
-and write flags.json in this folder.
+2. Extraction records (--records). The earlier comparison of the two extraction outputs of Backend/extraction and
+   Backend/cross-check, block by block. Kept as a debugging aid; it is not the official flags.
+
+     python3 compare_outputs.py --records [--extraction A.json --crosscheck B.json ...]
+
+Flags are written to flags.json in this folder unless --out says otherwise. flags.json holds model output, so it is
+git-ignored and is never committed.
 """
 import argparse
 import difflib
@@ -28,6 +27,8 @@ import hashlib
 import json
 import math
 import re
+import shutil
+import subprocess
 import sys
 import unicodedata
 from pathlib import Path
@@ -507,17 +508,7 @@ def model_of(output, output_path):
     return "not recorded"
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--extraction", default=str(here.parent / "extraction" / "extraction_output.json"))
-    ap.add_argument("--crosscheck", default=str(here.parent / "cross-check" / "extraction_output.json"))
-    ap.add_argument("--extraction-input", default=str(here.parent / "extraction" / "input_blocks.json"))
-    ap.add_argument("--crosscheck-input", default=str(here.parent / "cross-check" / "input_blocks.json"))
-    ap.add_argument("--crosscheck-batch-size", type=int, default=None,
-                    help="pages per cross-check request; inferred from the output when it records its batches")
-    ap.add_argument("--out", default=str(here / "flags.json"))
-    args = ap.parse_args()
-
+def main_records(args):
     paths = {"extraction_output": args.extraction, "crosscheck_output": args.crosscheck,
              "extraction_input": args.extraction_input, "crosscheck_input": args.crosscheck_input}
     data = {k: json.loads(Path(p).read_text()) for k, p in paths.items()}
@@ -558,6 +549,91 @@ def main():
         print(f"  {name:13s} extraction {c['extraction']:3d}  crosscheck {c['crosscheck']:3d}  matched {c['matched']:3d}  (by text {c['matched_by_text']})")
     print(f"written: {args.out}")
     return 0
+
+
+# ---------- logic models: the default mode ----------
+BACKEND = here.parent
+
+
+def run_cross_check(first_path, second_path):
+    """Runs scripts/crossCheckFlags.ts (the repository's cross-check) and returns its JSON."""
+    npx = shutil.which("npx")
+    if npx is None:
+        sys.exit("npx was not found: install Node.js 20 or later")
+    if not (BACKEND / "node_modules").is_dir():
+        sys.exit("Backend/node_modules is missing: run `npm ci` in Backend/ once")
+    proc = subprocess.run([npx, "tsx", "scripts/crossCheckFlags.ts", "--first", str(first_path), "--second", str(second_path)],
+                          cwd=str(BACKEND), capture_output=True, text=True)
+    if proc.returncode != 0:
+        sys.exit("the cross-check could not run:\n" + "\n".join((proc.stderr or proc.stdout).strip().splitlines()[:8]))
+    try:
+        return json.loads(proc.stdout)
+    except ValueError:
+        sys.exit("the cross-check printed something that is not JSON:\n" + proc.stdout[:300])
+
+
+def draft_info(path):
+    """Who made a logic model and for which booklet, from its own meta block (empty when it cannot be read)."""
+    try:
+        meta = (json.loads(Path(path).read_text()).get("meta") or {})
+    except (ValueError, OSError, AttributeError):
+        return {}
+    guideline = meta.get("guideline") if isinstance(meta.get("guideline"), dict) else {}
+    return {k: v for k, v in (("created_by", meta.get("created_by")), ("version", meta.get("version")),
+                              ("guideline_sha256", guideline.get("file_sha256"))) if v is not None}
+
+
+def main_logic_models(args):
+    for p in (args.first, args.second):
+        if not Path(p).is_file():
+            sys.exit(f"file not found: {p}")
+    res = run_cross_check(args.first, args.second)
+    if not res.get("ok"):
+        sys.exit("The first logic model is not a valid logic model, so nothing was compared:\n  " + "\n  ".join(res.get("issues", [])[:10]))
+    flags, summary = res["flags"], res["summary"]
+    result = {
+        "mode": "logic_models",
+        "drafts": {"first": draft_info(args.first), "second": draft_info(args.second)},
+        "files": {"first": {"path": str(args.first), "sha256": sha256_file(args.first)},
+                  "second": {"path": str(args.second), "sha256": sha256_file(args.second)}},
+        "summary": summary,
+        "notice": "No flags means the two drafts agree. It does not mean either is right; both could repeat the same mistake, "
+                  "and a person still reviews the draft. Every flag here is a warning decided by the clinician; none blocks signing.",
+        "flags": flags,
+    }
+    Path(args.out).write_text(json.dumps(result, indent=2, ensure_ascii=False))
+
+    sev = summary["bySeverity"]
+    print(f"first draft : {args.first}")
+    print(f"second draft: {args.second}")
+    print(f"flags: {summary['flagCount']}  (blocking {sev['blocking']}, warning {sev['warning']}, info {sev['info']})")
+    if "compared" in summary:
+        print(f"compared {summary['compared']} combinations of answers: {summary.get('differing', 0)} give a different result "
+              f"({summary.get('groups', 0)} ways, {summary.get('skipped', 0)} not comparable)")
+    for code, n in sorted(summary["byCode"].items(), key=lambda kv: (-kv[1], kv[0])):
+        print(f"  {n:3d}  {code}")
+    print(f"written: {args.out}")
+    return 0
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Generate flags and store them in flags.json (see the module comment).")
+    ap.add_argument("--first", help="logic model (JSON) of the first draft, the one being reviewed")
+    ap.add_argument("--second", help="logic model (JSON) of the second, independent draft")
+    ap.add_argument("--records", action="store_true", help="compare the two extraction records instead of two logic models")
+    ap.add_argument("--extraction", default=str(here.parent / "extraction" / "extraction_output.json"))
+    ap.add_argument("--crosscheck", default=str(here.parent / "cross-check" / "extraction_output.json"))
+    ap.add_argument("--extraction-input", default=str(here.parent / "extraction" / "input_blocks.json"))
+    ap.add_argument("--crosscheck-input", default=str(here.parent / "cross-check" / "input_blocks.json"))
+    ap.add_argument("--crosscheck-batch-size", type=int, default=None,
+                    help="(--records) pages per cross-check request; inferred from the output when it records its batches")
+    ap.add_argument("--out", default=str(here / "flags.json"), help="where the flags are stored (default: flags.json in this folder)")
+    args = ap.parse_args()
+    if args.records:
+        return main_records(args)
+    if not args.first or not args.second:
+        ap.error("give --first and --second (two logic model files), or --records to compare the two extraction records")
+    return main_logic_models(args)
 
 
 if __name__ == "__main__":

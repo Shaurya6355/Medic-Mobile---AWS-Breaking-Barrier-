@@ -89,6 +89,8 @@ On SIGTERM or SIGINT the process stops polling SQS and the resume sweep, waits u
 
 Route names and request/response shapes are defined only in `src/contract/` (`routes.ts`, `schemas.ts`). The API covers creating a run (returning a presigned upload URL), reading a run, saving versions, comments, resuming a run, and sign-off: `GET .../versions/:n/findings[?audience=program_officer|clinician]`, `GET .../versions/:n/status`, `POST .../versions/:n/signatures/:role` with body `{role, userId, modelSha}` (201, or 400/403/404/409/422 as listed under "Sign-off"). See that folder for the exact paths.
 
+The cross-check flags (the differences between the draft and a second, independent logic model, DEC-027) are stored with every version's checks as `flags.json` in the run's artifacts (`runs/<id>/flags/<checks version>/<modelSha>-<inputs>.json`, a derived document that is recomputed when missing) and served by `GET /runs/:id/versions/:n/flags`. The document holds `comparison` (`ran`, `not_run` when no second draft was supplied, or `second_draft_invalid`), a `summary`, a `notice` and the `flags`: each is a Finding with its message worded for the clinician and for the program officer and a status; all are warnings decided by the clinician and none blocks signing. `python3 validation/compare_outputs.py --first ... --second ...` produces the same flags for two logic model files.
+
 ## Docker
 
 `docker build -t orchestrator .` from this folder. The Dockerfile is written to install `poppler-utils` and `python3` for ingest, to run as the non-root `node` user and to copy no credentials into the image; supply AWS credentials through the runtime (for example an instance or task role). The image has not been built or scanned, so none of this has been verified.

@@ -38,3 +38,5 @@ export { loadCrossCheck, loadExtraction, loadGoldenCases } from "./context.js";
 export type { Extraction, GoldenCase } from "./context.js";
 export { loadGoldenCasesFile, withCheckInputs } from "./checkInputs.js";
 export type { OptionalInputs } from "./checkInputs.js";
+export { FLAGS_NOTICE, FlagSchema, FlagsDocumentSchema, FlagsSummarySchema, buildFlags } from "./flags.js";
+export type { Flag, FlagsDocument, FlagsSummary } from "./flags.js";

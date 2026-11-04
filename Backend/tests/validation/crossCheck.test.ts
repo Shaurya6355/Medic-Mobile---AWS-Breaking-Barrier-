@@ -31,6 +31,17 @@ function renameEveryId(m: any): void {
   for (const o of m.outcomes) o.id = `o_${o.id}`;
 }
 
+/** Removes a yes-or-no question and every condition that reads it. */
+function dropQuestion(m: any, id: string): void {
+  const strip = (c: any): any => {
+    if ("field" in c) return c;
+    const kids = (c.all ?? c.any).filter((k: any) => !("field" in k && k.field === id)).map(strip);
+    return "all" in c ? { all: kids } : { any: kids };
+  };
+  for (const d of m.derived) d.definition = strip(d.definition);
+  m.questions = m.questions.filter((q: any) => q.id !== id);
+}
+
 /** Replaces every cut-off number `from` with `to` in the calculated values of a draft. */
 function changeCutoff(m: any, from: number, to: number): void {
   const walk = (c: any): void => {
@@ -93,6 +104,44 @@ describe("crossCheck: structure", () => {
     expect(hit?.params["child"]).toContain("aged");
     expect(Number(hit?.params["count"])).toBeGreaterThan(0);
     expect(hit?.example).toBeDefined();
+  });
+
+  it("pairs questions the drafts word a little differently, by their clinical words and by the one whole-number question in a unit", () => {
+    const out = crossCheck(
+      ctxWith((m) => {
+        m.questions.find((q: any) => q.id === "cough_days").label = "For how many days has the child had a cough?";
+        m.questions.find((q: any) => q.id === "chest_indrawing").label = "Is there chest indrawing?";
+        m.questions.find((q: any) => q.id === "age_months").label = "How old is the child, in months?";
+        m.questions.find((q: any) => q.id === "breaths_per_minute").label = "If the child has a cough, how many breaths are counted in 1 minute?";
+      }),
+    );
+    expect(find(out, "CROSS_CHECK_QUESTION_ONLY_IN_ONE")).toBeUndefined();
+    expect(warnings(out)).toEqual([]);
+    expect(find(out, "CROSS_CHECK_SUMMARY")?.params["differing"]).toBe(0);
+  });
+
+  it("never pairs different symptoms just because they are the same kind of question", () => {
+    const out = crossCheck(
+      ctxWith((m) => {
+        dropQuestion(m, "vomits_everything");
+        m.questions.push({ id: "has_rash", order: 100, label: "Does the child have a rash?", answer_type: "yes_no", required: true, origin: "team" });
+      }),
+    );
+    const only = all(out, "CROSS_CHECK_QUESTION_ONLY_IN_ONE");
+    expect(only.map((f) => f.params["draft"]).sort()).toEqual(["first", "second"]);
+    expect(only.some((f) => String(f.params["question"]).includes("rash") && f.params["draft"] === "second")).toBe(true);
+  });
+
+  it("compares a large shared set of combinations (hundreds of thousands) within the default limit", () => {
+    const out = crossCheck(
+      ctxWith((m) => {
+        for (let i = 0; i < 5; i++) m.questions.push({ id: `extra_${i}`, order: 200 + i, label: `Unused extra question ${i}?`, answer_type: "yes_no", required: true, origin: "team" });
+      }),
+    );
+    expect(find(out, "CROSS_CHECK_NOT_COMPARED")).toBeUndefined();
+    const s = find(out, "CROSS_CHECK_SUMMARY");
+    expect(Number(s?.params["compared"])).toBeGreaterThan(300000);
+    expect(s?.params["differing"]).toBe(0);
   });
 
   it("reports a question only one draft asks, and what that does to the result", () => {

@@ -11,6 +11,7 @@ import type { Store } from "../store/store.js";
 import { loadExtraction, type Extraction, type VersionHistoryEntry } from "../validation/context.js";
 import { FindingSchema, loadSourceDocument, type Finding, type SourceDocument } from "../validation/finding.js";
 import { findingsFor, gates as computeGates, type FindingGroup } from "../validation/gates.js";
+import { FLAGS_NOTICE, FlagsDocumentSchema, buildFlags, type FlagsDocument } from "../validation/flags.js";
 import { runChecks } from "../validation/runChecks.js";
 import { defaultCheckInputs, type CheckInputs, type CheckInputsProvider } from "./checkInputs.js";
 
@@ -116,6 +117,13 @@ export function inputsShaOf(inputs: CheckInputs): string {
 
 export const findingsKey = (runId: string, sha: string, inputsSha: string): string =>
   artifactKey(runId, "checks", CHECKS_VERSION, `${sha}-${String(inputsSha).slice(0, 16)}.json`);
+/**
+ * The flags document of a version (flags.json, read by the front end through GET /runs/:id/versions/:n/flags): the
+ * cross-check findings in the form the front end reads. Keyed like the findings, by content and inputs. Like the
+ * findings it is derived (from the stored versions and inputs), so it is a cache that can be recomputed, not a record.
+ */
+export const flagsKey = (runId: string, sha: string, inputsSha: string): string =>
+  artifactKey(runId, "flags", CHECKS_VERSION, `${sha}-${String(inputsSha).slice(0, 16)}.json`);
 export const ingestBlocksKey = (runId: string): string => artifactKey(runId, "ingest", "input_blocks.json");
 export const extractionKey = (runId: string): string => artifactKey(runId, "extract", "extraction_output.json");
 
@@ -294,7 +302,51 @@ export async function computeFindings(
   );
   const key = findingsKey(runId, loaded.sha, inputsSha);
   await io.artifacts.put(key, JSON.stringify(record), "application/json");
+  await io.artifacts.put(flagsKey(runId, loaded.sha, inputsSha), JSON.stringify(flagsDocumentOf(record, inputs)), "application/json");
   return { record, key, loaded, inputs };
+}
+
+/** The flags document for a findings record: only the cross-check's findings, and whether the comparison ran. */
+export function flagsDocumentOf(record: FindingsRecord, inputs: CheckInputs): FlagsDocument {
+  const cc = inputs.crossCheck;
+  const { flags, summary } = buildFlags(record.findings.filter((f) => f.check === "crossCheck"));
+  return {
+    mode: "logic_models",
+    runId: record.runId,
+    n: record.n,
+    modelSha: record.modelSha,
+    checksVersion: record.checksVersion,
+    inputsSha: record.inputsSha,
+    comparison: cc === undefined ? "not_run" : "model" in cc ? "ran" : "second_draft_invalid",
+    secondDraftSha: cc !== undefined && "model" in cc ? modelSha(cc.model) : null,
+    checkedAt: record.checkedAt,
+    summary,
+    notice: FLAGS_NOTICE,
+    flags,
+  };
+}
+
+/**
+ * The stored flags document for the current content and inputs of version n, computed (with the findings) when it is
+ * missing or does not belong to this content. For the front end's view only; a signature or a build never reads it.
+ */
+export async function ensureFlags(io: StoreIo, runId: string, n: number): Promise<{ doc: FlagsDocument; key: string }> {
+  const loaded = await loadVersion(io, runId, n);
+  const inputs = await inputsFor(io, runId);
+  const inputsSha = inputsShaOf(inputs);
+  const key = flagsKey(runId, loaded.sha, inputsSha);
+  const read = async (): Promise<FlagsDocument | undefined> => {
+    const parsed = FlagsDocumentSchema.safeParse(await optionalJson(io.artifacts, key));
+    return parsed.success && parsed.data.runId === runId && parsed.data.modelSha === loaded.sha && parsed.data.inputsSha === inputsSha && parsed.data.checksVersion === CHECKS_VERSION
+      ? parsed.data
+      : undefined;
+  };
+  const hit = await read();
+  if (hit !== undefined) return { doc: hit, key };
+  await computeFindings(io, runId, n, inputs);
+  const fresh = await read();
+  if (fresh === undefined) throw new Error(`flags for version ${n} of run ${runId} could not be stored`);
+  return { doc: fresh, key };
 }
 
 /**

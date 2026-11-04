@@ -441,7 +441,7 @@ const TEMPLATES: Record<string, Template> = {
     `The first and the second draft were compared for ${s(p, "compared")} combinations of answers: ${s(p, "differing")} give a different result${Number(p["differing"]) > 0 ? `, in ${s(p, "groups")} different ways` : ""}${Number(p["skipped"]) > 0 ? `, and ${s(p, "skipped")} could not be compared because one draft does not accept those answers` : ""}. This is for information. Two drafts agreeing does not make either of them right, since both could repeat the same mistake; a person still reviews the draft.`,
 
   CROSS_CHECK_DISAGREEMENT: (p, a) =>
-    `The two independent drafts give different results. For example ${s(p, "child")}${s(p, "extra") === "" ? "" : `, and in the second draft also ${s(p, "extra")}`}, gets "${s(p, "firstOutcome")}" in the first draft (${s(p, "firstRule")}) and "${s(p, "secondOutcome")}" in the second (${s(p, "secondRule")}); ${s(p, "count")} of the ${s(p, "total")} combinations compared differ in this way.${
+    `The two independent drafts give different results. For example ${s(p, "child")}${s(p, "extra") === "" ? "" : `, and, in the second draft only, ${s(p, "extra")}`}, gets "${s(p, "firstOutcome")}" in the first draft (${s(p, "firstRule")}) and "${s(p, "secondOutcome")}" in the second (${s(p, "secondRule")}); ${s(p, "count")} of the ${s(p, "total")} combinations compared differ in this way.${
       p["direction"] === "less_urgent_in_second" ? " The second draft treats this child as less urgent." : p["direction"] === "more_urgent_in_second" ? " The second draft treats this child as more urgent." : ""
     } ${bookletOpt(p)} ${
       a === "clinician"

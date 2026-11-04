@@ -28,7 +28,8 @@ export const CHECK = "crossCheck";
 
 type Aud = ("clinician" | "program_officer")[];
 const BOTH: Aud = ["clinician", "program_officer"];
-const DEFAULT_MAX_POINTS = 200000;
+// Each draft's result is remembered per set of its own answers, so a large shared set of combinations stays cheap.
+const DEFAULT_MAX_POINTS = 2000000;
 const MAX_EXAMPLES_TEXT = 300;
 
 function warning(code: string, subjects: Subject[], params: Record<string, string | number | boolean>, source: { page: number; quote: string }[], example?: Record<string, number | boolean>): Finding {
@@ -60,7 +61,9 @@ function info(code: string, params: Record<string, string | number | boolean>): 
 
 // ---------- text helpers ----------
 const norm = (s: string): string => s.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-const words = (s: string): Set<string> => new Set(norm(s).split(" ").filter((w) => w.length > 1));
+/** Everyday words that carry no clinical meaning; "not" and "no" are kept because they reverse one. */
+const STOP = new Set(["is", "are", "the", "a", "an", "of", "to", "for", "in", "if", "does", "do", "did", "has", "have", "had", "there", "child", "look", "ask", "by", "on", "or", "and", "with", "this", "that", "it"]);
+const words = (s: string): Set<string> => new Set(norm(s).split(" ").filter((w) => w.length > 1 && !STOP.has(w)));
 
 /** Dice coefficient of the word sets of two texts, 0 to 1. */
 function dice(a: string, b: string): number {
@@ -80,7 +83,13 @@ const monthsText = (n: number): string => `${n} month${n === 1 ? "" : "s"}`;
 type Match<T> = { pairs: Array<[T, T]>; onlyFirst: T[]; onlySecond: T[] };
 
 /** Pairs items by id, then the leftovers by identical label words. Deterministic: first-draft order. */
-function matchItems<T extends { id: string }>(first: readonly T[], second: readonly T[], label: (x: T) => string): Match<T> {
+function matchItems<T extends { id: string }>(
+  first: readonly T[],
+  second: readonly T[],
+  label: (x: T) => string,
+  /** Score above 0 for a leftover pair that is probably the same item; the best scores pair first. */
+  similarity?: (a: T, b: T, leftFirst: readonly T[], leftSecond: readonly T[]) => number,
+): Match<T> {
   const pairs: Array<[T, T]> = [];
   const usedSecond = new Set<T>();
   const left: T[] = [];
@@ -100,7 +109,36 @@ function matchItems<T extends { id: string }>(first: readonly T[], second: reado
       usedSecond.add(b);
     } else onlyFirst.push(a);
   }
-  return { pairs, onlyFirst, onlySecond: second.filter((x) => !usedSecond.has(x)) };
+  let onlySecond = second.filter((x) => !usedSecond.has(x));
+  if (similarity !== undefined && onlyFirst.length > 0 && onlySecond.length > 0) {
+    const cands: Array<[number, number, number]> = [];
+    onlyFirst.forEach((a, i) => onlySecond.forEach((b, j) => {
+      const sc = similarity(a, b, onlyFirst, onlySecond);
+      if (sc > 0) cands.push([sc, i, j]);
+    }));
+    cands.sort((x, y) => y[0] - x[0] || x[1] - y[1] || x[2] - y[2]);
+    const takenFirst = new Set<number>();
+    const takenSecond = new Set<number>();
+    for (const [, i, j] of cands) {
+      if (takenFirst.has(i) || takenSecond.has(j)) continue;
+      takenFirst.add(i);
+      takenSecond.add(j);
+      pairs.push([onlyFirst[i] as T, onlySecond[j] as T]);
+    }
+    const stillFirst = onlyFirst.filter((_, i) => !takenFirst.has(i));
+    onlySecond = onlySecond.filter((_, j) => !takenSecond.has(j));
+    return { pairs, onlyFirst: stillFirst, onlySecond };
+  }
+  return { pairs, onlyFirst, onlySecond };
+}
+
+/** Questions that are probably the same: same kind of answer and mostly the same clinical words, or the only whole-number question in the same unit on each side. */
+function questionSimilarity(a: Question, b: Question, leftFirst: readonly Question[], leftSecond: readonly Question[]): number {
+  if (a.answer_type !== b.answer_type) return 0;
+  const d = dice(a.label, b.label);
+  if (d >= 0.6) return d;
+  const sameUnit = (q: Question): boolean => q.answer_type === "integer" && q.unit !== undefined && q.unit === a.unit;
+  return a.answer_type === "integer" && a.unit !== undefined && a.unit === b.unit && leftFirst.filter(sameUnit).length === 1 && leftSecond.filter(sameUnit).length === 1 ? 0.5 : 0;
 }
 
 // ---------- cut-offs ----------
@@ -198,7 +236,7 @@ export function crossCheck(ctx: CheckContext): Finding[] {
   }
 
   // --- questions
-  const qm = matchItems(A.questions, B.questions, (q) => q.label);
+  const qm = matchItems(A.questions, B.questions, (q) => q.label, questionSimilarity);
   const bToA = new Map<string, string>();
   const compatible = new Map<string, Question>(); // first-draft id -> second-draft question, same kind of answer
   for (const [a, b] of qm.pairs) {
@@ -421,23 +459,42 @@ function behaviour(
   let differing = 0;
   let skipped = 0;
   const choice: Array<number | boolean> = new Array(dims.length);
+  type Ev = ReturnType<typeof evaluate>;
+  const memoA = new Map<string, Ev | null>();
+  const memoB = new Map<string, Ev | null>();
+  const evalOnce = (model: Model, memo: Map<string, Ev | null>, key: string, answers: Answers): Ev | null => {
+    if (memo.has(key)) return memo.get(key) as Ev | null;
+    let r: Ev | null;
+    try {
+      r = evaluate(model, answers, { allowMissing: true });
+    } catch {
+      r = null;
+    }
+    memo.set(key, r);
+    return r;
+  };
 
   const run = (): void => {
     const answersA: Answers = {};
     const answersB: Answers = {};
     let score = 0;
+    let keyA = "";
+    let keyB = "";
     dims.forEach((d, i) => {
       const v = choice[i] as number | boolean;
       if (v === true) score++;
-      if (d.aId !== undefined) answersA[d.aId] = v;
-      if (d.bId !== undefined) answersB[d.bId] = v;
+      if (d.aId !== undefined) {
+        answersA[d.aId] = v;
+        keyA += `${String(v)}|`;
+      }
+      if (d.bId !== undefined) {
+        answersB[d.bId] = v;
+        keyB += `${String(v)}|`;
+      }
     });
-    let ea: ReturnType<typeof evaluate>;
-    let eb: ReturnType<typeof evaluate>;
-    try {
-      ea = evaluate(A, answersA, { allowMissing: true });
-      eb = evaluate(B, answersB, { allowMissing: true });
-    } catch {
+    const ea = evalOnce(A, memoA, keyA, answersA);
+    const eb = evalOnce(B, memoB, keyB, answersB);
+    if (ea === null || eb === null) {
       skipped++;
       return;
     }
@@ -468,9 +525,12 @@ function behaviour(
     const ra = ruleOf(A, g.a.rule);
     const rb = ruleOf(B, g.b.rule);
     const direction = g.b.severity > g.a.severity ? "less_urgent_in_second" : g.b.severity < g.a.severity ? "more_urgent_in_second" : "same_urgency";
-    const onlyInSecond = B.questions
-      .filter((q) => g.answersB[q.id] !== undefined && !dimsHasFirst(dims, q.id))
-      .map((q) => `"${clip(q.label, 60)}" ${typeof g.answersB[q.id] === "boolean" ? (g.answersB[q.id] ? "yes" : "no") : String(g.answersB[q.id])}`);
+    const secondOnly = B.questions.filter((q) => g.answersB[q.id] !== undefined && !dimsHasFirst(dims, q.id));
+    const onlyInSecond = secondOnly.filter((q) => g.answersB[q.id] !== false).map((q) => `"${clip(q.label, 60)}" ${typeof g.answersB[q.id] === "boolean" ? "yes" : String(g.answersB[q.id])}`);
+    const answeredNo = secondOnly.filter((q) => g.answersB[q.id] === false);
+    // A few "no" answers are named (they may be what makes the difference); many are summed up.
+    if (answeredNo.length > 0 && answeredNo.length <= 2) onlyInSecond.push(...answeredNo.map((q) => `"${clip(q.label, 60)}" no`));
+    else if (answeredNo.length > 2) onlyInSecond.push("the other yes-or-no questions answered no");
     const c = ra === undefined ? { params: {}, source: [] as { page: number; quote: string }[] } : citation(ra);
     const source = [...c.source, ...(rb === undefined ? [] : citation(rb).source)];
     out.push(
