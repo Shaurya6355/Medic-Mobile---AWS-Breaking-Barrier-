@@ -12,18 +12,28 @@ const danger = (op: "at_least" | "less_than", quote: string) => (m: any) => {
 const codes = (mutate?: (m: any) => void) => run(mutate).map((f) => f.code);
 
 describe("inclusivityWording on v1.json", () => {
-  it("agrees with the booklet except the reading of 'up to 12 months', which is flagged as an assumption pointing at Q1", () => {
+  it("agrees with the booklet except the reading of 'up to 5 years' (60 months), flagged once for each value that ends there", () => {
     const fs = run();
     expect(fs.filter((f) => f.severity === "blocking")).toEqual([]);
-    expect(fs.map((f) => f.code)).toEqual(["INCLUSIVITY_ASSUMED"]);
-    const f = fs[0]!;
-    expect(f.severity).toBe("info");
-    expect(f.decidedBy).toBe("clinician");
+    expect(fs.map((f) => f.code)).toEqual(["INCLUSIVITY_ASSUMED", "INCLUSIVITY_ASSUMED"]);
+    expect(fs.map((f) => f.subjects[0]!.id).sort()).toEqual(["fast_breathing", "outside_age_range"]);
+    for (const f of fs) {
+      expect(f.severity).toBe("info");
+      expect(f.decidedBy).toBe("clinician");
+      expect(f.params["number"]).toBe(60);
+      expect(f.message).toContain("up to 5 years");
+      expect(f.message).toContain("exactly 60 months");
+    }
+    expect(fs.find((f) => f.subjects[0]!.id === "fast_breathing")!.message).toContain("page 8");
+    expect(fs.find((f) => f.subjects[0]!.id === "outside_age_range")!.message).toContain("page 3");
+  });
+  it("12 months is not flagged: the booklet's own row 'age 12 months up to 5 years' puts exactly 12 months in the higher group, and the item cites both rows", () => {
+    expect(run().some((f) => f.params["number"] === 12)).toBe(false);
+    // with only the first row cited the reading stays an assumption, pointing at Q1
+    const f = run((m) => { m.derived.find((d: any) => d.id === "fast_breathing").source = [{ page: 8, quote: "In a child age 2 months up to 12 months, 50 breaths or more per minute" }]; }).find((x) => x.params["number"] === 12)!;
+    expect(f.code).toBe("INCLUSIVITY_ASSUMED");
     expect(f.params["openQuestion"]).toBe("Q1");
-    expect(f.params["number"]).toBe(12);
-    expect(f.message).toContain("up to 12 months");
     expect(f.message).toContain("Q1");
-    expect(f.message).toContain("page 8");
   });
 });
 
@@ -57,22 +67,22 @@ describe("inclusivityWording phrases", () => {
   });
   it("a number with no inclusivity wording next to it raises nothing; so does a number absent from the quote", () => {
     expect(codes(danger("at_least", "Cough for 14 days"))).not.toContain("INCLUSIVITY_MISMATCH");
-    expect(codes(danger("at_least", "Cough for weeks"))).toEqual(["INCLUSIVITY_ASSUMED"]);
+    expect(codes(danger("at_least", "Cough for weeks"))).toEqual(["INCLUSIVITY_ASSUMED", "INCLUSIVITY_ASSUMED"]);
   });
   it("uses the item's own quote near the same number, not another item's", () => {
-    const fs = run((m) => { danger("at_least", "Cough for 14 days or more")(m); m.rules[0].source = [{ page: 8, quote: "Cough for more than 14 days" }]; });
+    const fs = run((m) => { danger("at_least", "Cough for 14 days or more")(m); m.rules[1].source = [{ page: 8, quote: "Cough for more than 14 days" }]; });
     expect(fs.map((f) => f.code)).not.toContain("INCLUSIVITY_MISMATCH");
   });
   it("one agreeing phrase beats a conflicting one for the same number", () => {
     expect(codes(danger("at_least", "Cough for 14 days or more (not more than 14 days at the clinic)"))).not.toContain("INCLUSIVITY_MISMATCH");
   });
   it("converts years to months: '5 years or more' agrees with at-least 60 months; 'more than 5 years' does not", () => {
-    const set = (q: string) => (m: any) => { m.rules[0].when = { all: [{ field: "age_months", op: "at_least", value: 60 }] }; m.rules[0].source = [{ page: 3, quote: q }]; };
+    const set = (q: string) => (m: any) => { m.rules[1].when = { all: [{ field: "age_months", op: "at_least", value: 60 }] }; m.rules[1].source = [{ page: 3, quote: q }]; };
     expect(codes(set("child aged 5 years or more"))).not.toContain("INCLUSIVITY_MISMATCH");
     expect(codes(set("child older than 5 years"))).toContain("INCLUSIVITY_MISMATCH");
   });
   it("the words 'N up to M' mean N included and M excluded; 12 months up to 5 years agrees with at-least 12", () => {
-    const set = (m: any) => { m.rules[0].when = { all: [{ field: "age_months", op: "at_least", value: 12 }, { field: "age_months", op: "less_than", value: 60 }] }; m.rules[0].source = [{ page: 8, quote: "age 12 months up to 5 years" }]; };
+    const set = (m: any) => { m.rules[1].when = { all: [{ field: "age_months", op: "at_least", value: 12 }, { field: "age_months", op: "less_than", value: 60 }] }; m.rules[1].source = [{ page: 8, quote: "age 12 months up to 5 years" }]; };
     const fs = run(set);
     expect(fs.filter((f) => f.code === "INCLUSIVITY_MISMATCH")).toEqual([]);
     expect(fs.filter((f) => f.code === "INCLUSIVITY_ASSUMED").map((f) => f.params["number"])).toContain(60);
@@ -110,7 +120,7 @@ describe("inclusivityWording: direction of the comparison (red team 2: B22, B23,
     expect(codes(danger(op, q))).not.toContain("DIRECTION_MISMATCH");
   });
   it("C5/B23: fast breathing turned into fewer than 50 breaths is blocking", () => {
-    const fs = run((m) => { m.derived[0].definition.all[1].any[0].all[2].op = "less_than"; });
+    const fs = run((m) => { m.derived[1].definition.all[1].any[0].all[2].op = "less_than"; });
     expect(fs.map((f) => f.code)).toContain("DIRECTION_MISMATCH");
   });
   it("age bands 'N up to M' agree with at least N and less than M; v1 has no direction finding", () => {

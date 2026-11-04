@@ -90,6 +90,11 @@ const TEMPLATES: Record<string, Template> = {
       a === "clinician" ? "The clinician confirms that they are right." : "The clinician confirms that they are right; the program officer passes them on."
     }`,
 
+  CLINICIAN_VALUE: (p, a) =>
+    `${cap(s(p, "item"))} has numbers the clinician decided (its origin is "clinician"), with no booklet quote: ${s(p, "usage")}. The booklet was not used to check them. This is for information. ${
+      a === "clinician" ? "These numbers rest on the clinician's word." : "These numbers rest on the clinician's word; the program officer does not need to find a booklet source for them."
+    }`,
+
   ENTRY_LIMIT_TEAM_CHOICE: (p) =>
     `The limits on what a health worker may type in were chosen by the team, not taken from the booklet: ${s(p, "limits")}. The booklet was not used to check them. This is for information; the clinician says whether they are sensible.`,
 
@@ -278,6 +283,11 @@ const TEMPLATES: Record<string, Template> = {
   AGE_GAP: (p, a) =>
     `${cap(s(p, "where"))} leave out children aged ${s(p, "from")} up to ${s(p, "to")} months: no age band applies to them. ${bookletOpt(p)} ${
       a === "clinician" ? "The clinician decides which band they belong to." : "The program officer asks the clinician which band they belong to."
+    }`,
+
+  OUTSIDE_AGE_BANDS_MISMATCH: (p, a) =>
+    `${cap(s(p, "where"))} are meant for children outside the covered ages (${s(p, "lo")} up to ${s(p, "hi")} months), but they leave out children aged ${s(p, "range")}: such a child would be treated as if this form applied to them. ${bookletOpt(p)} ${
+      a === "clinician" ? "The clinician decides which ages are meant to be outside." : "The program officer asks the clinician which ages are meant to be outside."
     }`,
 
   AGE_OVERLAP: (p, a) =>

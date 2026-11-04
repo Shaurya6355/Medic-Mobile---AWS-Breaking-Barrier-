@@ -3,6 +3,8 @@
  * deployment choices (form title, icon, team default for the task window, contact types),
  * not clinical content, and they do not enter modelSha.
  */
+import type { Origin } from "../logic/schema.js";
+
 export interface CompileSettings {
   formTitle: string;
   /** CHT icon id, e.g. "icon-healthcare". */
@@ -63,7 +65,7 @@ export interface SourcemapEntry {
   item: string;
   /** Present on question rows (and their page group) whose relevant includes a derived-flow condition. */
   flowCondition?: FlowMode;
-  origin: "guideline" | "team";
+  origin: Origin;
   sources: SourceRef[];
 }
 

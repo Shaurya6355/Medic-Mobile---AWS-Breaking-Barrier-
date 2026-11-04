@@ -57,12 +57,12 @@ export const SCENARIOS = [
   },
   // Shortened flow (flowMode minimal only; the expected screens are the minimal flow's sequence).
   {
-    file: "12-minimal-one-month-old-straight-to-result.png",
-    title: "Minimal flow: a 1-month-old (with convulsions, cough...): after the age screen the form goes straight to the Result page (page 2 of 2)",
+    file: "12-minimal-one-month-old-with-convulsions-urgent.png",
+    title: "Minimal flow: a 1-month-old with cough and convulsions = yes: age, cough, cough days, convulsions, then the Result page (page 5 of 5), refer urgently (R1)",
     answers: { ...FAST, age_months: 1, convulsions: "yes" },
-    expect: "refer_outside_age_range",
-    expectScreens: ["age_months"],
-    expectPages: 2,
+    expect: "refer_urgent_outside_age_range",
+    expectScreens: ["age_months", "cough", "cough_days", "convulsions"],
+    expectPages: 5,
     onlyMode: "minimal",
   },
   {

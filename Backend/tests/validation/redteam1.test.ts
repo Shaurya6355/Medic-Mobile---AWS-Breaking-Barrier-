@@ -3,7 +3,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseModel } from "../../src/logic/schema.js";
 import { runChecks } from "../../src/validation/runChecks.js";
-import { demoSettings, goldenCases, realDocument, realExtraction } from "./helpers.js";
+import { loadGoldenCases } from "../../src/validation/context.js";
+import { demoSettings, goldenCases, matchedCtx, realDocument, realExtraction } from "./helpers.js";
 import { MUTS } from "./redteam1.mutations.js";
 
 /**
@@ -22,10 +23,9 @@ const baseline = (): any => {
 
 const doc = realDocument();
 const extraction = realExtraction();
-// golden-proposed.json uses the outcome id of v1.json for the outside-age result
-const golden = goldenCases((g) => {
-  for (const c of g) if (c.expected_outcome === "refer_outside_age_range") c.expected_outcome = "outside_age_range";
-});
+// The baseline is the first, six-rule draft, so it is run with the test cases written for that draft (frozen copy of the
+// proposed cases of that time), not with the shared proposed cases of the final model.
+const golden = loadGoldenCases(JSON.parse(readFileSync(path.join(import.meta.dirname, "../fixtures/validation/redteam1-golden.json"), "utf8")));
 const settings = demoSettings();
 
 /** The checks this work changed; the baseline must have no blocking finding from them. */
@@ -112,4 +112,42 @@ describe("red team 1 regressions", () => {
       expect(caughtBy(n, false), n).not.toEqual([]);
     });
   }
+});
+
+/**
+ * The final model (R1 outside the ages AND a danger sign, R2 outside the ages): mistakes in the new structure are caught
+ * by a blocking finding of the logic checks, with and without the proposed test cases.
+ */
+describe("red team 1 on the final model (R1 and R2)", () => {
+  const finalGolden = goldenCases();
+  const blockingFinal = (mutate: (m: any) => void, withCases: boolean): string[] => {
+    const ctx: any = { ...matchedCtx(mutate), extraction };
+    if (withCases) ctx.goldenCases = finalGolden;
+    const r = runChecks(ctx);
+    return [...new Set(r.findings.filter((f) => f.severity === "blocking").map((f) => `${f.check}:${f.code}`))].filter((x) => LOGIC_CHECKS.has(x.split(":")[0]!));
+  };
+  const rule = (m: any, id: string) => m.rules.find((r: any) => r.id === id);
+  const outside = (m: any) => m.derived.find((d: any) => d.id === "outside_age_range").definition.any;
+  const swap = (m: any, a: string, b: string) => { [rule(m, a).priority, rule(m, b).priority] = [rule(m, b).priority, rule(m, a).priority]; };
+  const MUTS_FINAL: Record<string, (m: any) => void> = {
+    F00_R2_checked_before_R1: (m) => swap(m, "R1", "R2"),
+    F01_R3_checked_before_R1: (m) => { rule(m, "R3").priority = 1; rule(m, "R1").priority = 3; rule(m, "R2").priority = 2; m.rules.sort((a: any, b: any) => a.priority - b.priority); },
+    F02_R1_gives_the_routine_referral: (m) => { rule(m, "R1").outcome = "refer_outside_age_range"; },
+    F03_R1_dropped: (m) => { m.rules = m.rules.filter((r: any) => r.id !== "R1"); },
+    F04_R1_loses_its_danger_sign: (m) => { rule(m, "R1").when = { field: "outside_age_range", op: "is_yes" }; },
+    F05_outside_value_lower_cutoff_2_to_1: (m) => { outside(m)[0].value = 1; },
+    F06_outside_value_upper_cutoff_60_to_62: (m) => { outside(m)[1].value = 62; },
+    F07_outside_value_upper_cutoff_60_to_58: (m) => { outside(m)[1].value = 58; },
+    F08_urgent_outside_result_ranked_below_urgent: (m) => { m.outcomes.find((o: any) => o.id === "refer_urgent_outside_age_range").severity = 4; },
+    F09_urgent_outside_result_loses_its_follow_up: (m) => { m.outcomes.find((o: any) => o.id === "refer_urgent_outside_age_range").follow_up = null; },
+  };
+  for (const [n, fn] of Object.entries(MUTS_FINAL)) {
+    it(`${n} is blocked without test cases and with them`, { timeout: 60000 }, () => {
+      expect(blockingFinal(fn, false), n).not.toEqual([]);
+      expect(blockingFinal(fn, true), n).not.toEqual([]);
+    });
+  }
+  it("the final model itself has no blocking finding from these checks once the proposed test cases are supplied", () => {
+    expect(blockingFinal(() => {}, true)).toEqual([]);
+  });
 });

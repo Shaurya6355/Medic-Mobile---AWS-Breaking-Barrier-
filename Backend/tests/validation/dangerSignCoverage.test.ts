@@ -61,7 +61,7 @@ describe("dangerSignCoverage", () => {
   });
 
   it("a sign the draft covers through a calculated value's quote counts as modelled", () => {
-    const fs = run((m) => { m.derived[1].source.push({ page: 6, quote: "Diarrhoea for 14 days or more" }); });
+    const fs = run((m) => { m.derived[2].source.push({ page: 6, quote: "Diarrhoea for 14 days or more" }); });
     const d = fs.filter((f) => f.subjects[0]!.id === "danger_sign:ds_diarrhoea_14d");
     // modelled, so neither "not modelled" nor "left out"; but no question asks about it, which blocks
     expect(d.map((f) => f.code)).toEqual(["DANGER_SIGN_QUESTION_UNKNOWN"]);
@@ -75,7 +75,7 @@ describe("dangerSignCoverage", () => {
 
   it("a cough-relevant sign named as left out blocks: only signs the extraction marked as not related to cough may be left out (M91)", () => {
     const fs = run((m) => {
-      m.derived[1].definition.any = m.derived[1].definition.any.filter((x: any) => x.field !== "convulsions");
+      m.derived[2].definition.any = m.derived[2].definition.any.filter((x: any) => x.field !== "convulsions");
       m.questions = m.questions.filter((q: any) => q.id !== "convulsions");
       m.scope.excluded.push({ item: "Convulsions", reason: "handled by the referral form" });
     });

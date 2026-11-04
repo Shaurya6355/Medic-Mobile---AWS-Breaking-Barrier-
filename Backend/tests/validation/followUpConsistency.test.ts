@@ -10,8 +10,8 @@ describe("followUpConsistency", () => {
   it("v1.json: on-return follow-ups that also carry a number of days are noted for the clinician; nothing blocks", () => {
     const fs = run();
     expect(fs.filter((f) => f.severity === "blocking")).toEqual([]);
-    expect(fs.map((f) => f.code)).toEqual(["FOLLOWUP_RETURN_DAYS_IGNORED", "FOLLOWUP_RETURN_DAYS_IGNORED"]);
-    expect(fs.map((f) => f.subjects[0]!.id).sort()).toEqual(["refer_urgent", "refer_urgent_with_antibiotic"]);
+    expect(fs.map((f) => f.code)).toEqual(["FOLLOWUP_RETURN_DAYS_IGNORED", "FOLLOWUP_RETURN_DAYS_IGNORED", "FOLLOWUP_RETURN_DAYS_IGNORED"]);
+    expect(fs.map((f) => f.subjects[0]!.id).sort()).toEqual(["refer_urgent", "refer_urgent_outside_age_range", "refer_urgent_with_antibiotic"]);
     expect(fs[0]!.severity).toBe("info");
     expect(fs[0]!.decidedBy).toBe("clinician");
     expect(fs[0]!.message).toContain("7 days");
@@ -30,7 +30,7 @@ describe("followUpConsistency", () => {
     expect(codes()).not.toContain("FOLLOWUP_MISSING_OUTCOME");
   });
   it("a non-referral outcome without follow-up is fine when nothing it cites or says asks for one", () => {
-    expect(codes((m) => { m.outcomes[idx("cough_no_fast_breathing")(m)].follow_up = null; })).toEqual(["FOLLOWUP_RETURN_DAYS_IGNORED", "FOLLOWUP_RETURN_DAYS_IGNORED"]);
+    expect(codes((m) => { m.outcomes[idx("cough_no_fast_breathing")(m)].follow_up = null; })).toEqual(["FOLLOWUP_RETURN_DAYS_IGNORED", "FOLLOWUP_RETURN_DAYS_IGNORED", "FOLLOWUP_RETURN_DAYS_IGNORED"]);
   });
   it("a scheduled follow-up with negative days blocks", () => {
     const fs = run((m) => { m.outcomes[idx("treat_fast_breathing_at_home")(m)].follow_up.due_in_days = -2; });
@@ -43,10 +43,10 @@ describe("followUpConsistency", () => {
     expect(codes((m) => { m.outcomes[idx("treat_fast_breathing_at_home")(m)].follow_up.task_window_days_after_due = -1; })).toContain("FOLLOWUP_INVALID_DAYS");
     const nulls = run((m) => { const f = m.outcomes[idx("treat_fast_breathing_at_home")(m)].follow_up; f.due_in_days = null; f.task_window_days_after_due = null; });
     expect(nulls.map((f) => f.code)).not.toContain("FOLLOWUP_INVALID_DAYS");
-    expect(nulls.length).toBe(2);
+    expect(nulls.length).toBe(3);
   });
   it("an on-return follow-up without days raises nothing", () => {
-    expect(codes((m) => { m.outcomes[idx("refer_urgent")(m)].follow_up.due_in_days = null; })).toEqual(["FOLLOWUP_RETURN_DAYS_IGNORED"]);
+    expect(codes((m) => { m.outcomes[idx("refer_urgent")(m)].follow_up.due_in_days = null; })).toEqual(["FOLLOWUP_RETURN_DAYS_IGNORED", "FOLLOWUP_RETURN_DAYS_IGNORED"]);
   });
 });
 

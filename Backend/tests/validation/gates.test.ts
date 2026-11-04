@@ -39,6 +39,10 @@ describe("gates", () => {
     expect(g.summary).toMatch(/clinician cannot sign yet/i);
     expect(g.summary).toMatch(/waits for the program officer/i);
   });
+  it("names a gap in the out-of-range value's age bands in plain words in the summary", () => {
+    const f = mk("blocking", "clinician", "x", "OUTSIDE_AGE_BANDS_MISMATCH", ["clinician", "program_officer"]);
+    expect(gates(res([f])).summary).toMatch(/rule for children outside the covered ages that leaves some of them out/);
+  });
   it("a blocking item for the clinician blocks the clinician only; the officer may sign first", () => {
     const f = mk("blocking", "clinician", "q1");
     const g = gates(res([f]));

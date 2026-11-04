@@ -54,7 +54,7 @@ describe("analyzeRules", () => {
   it("is exact and finds no unreachable rules", () => {
     expect(a.exact).toBe(true);
     expect(a.unreachableRules).toEqual([]);
-    for (const id of ["R1", "R2", "R3", "R4", "R5", "R6"]) {
+    for (const id of ["R1", "R2", "R3", "R4", "R5", "R6", "R7"]) {
       expect(a.perRule[id]!.first).toBeGreaterThan(0);
       expect(a.perRule[id]!.example).toBeDefined();
     }
@@ -65,16 +65,12 @@ describe("analyzeRules", () => {
     expect(Object.values(a.perOutcome).reduce((s, n) => s + n, 0)).toBe(a.points);
     expect(a.uncoveredByAnyRule).toBe(0);
   });
-  it("R6 (otherwise) matches every point; R3 is shadowed sometimes but still first elsewhere", () => {
-    expect(a.perRule["R6"]!.matched).toBe(a.points);
+  it("R7 (otherwise) matches every point; no rule is shadowed completely", () => {
+    expect(a.perRule["R7"]!.matched).toBe(a.points);
     expect(a.neverFirstButMatching).toEqual([]);
   });
-  it("reports the hazard: R1 fires first for under-2-month children that also match R3", () => {
-    const h = a.severityInversions.find((x) => x.firstRule === "R1" && x.overriddenRule === "R3");
-    expect(h).toBeDefined();
-    expect(h!.firstSeverity).toBe(2);
-    expect(h!.overriddenSeverity).toBe(1);
-    expect(h!.example["age_months"]).toBeLessThan(2);
+  it("the old hazard is gone: R1 sends an out-of-range child with a danger sign to urgent referral, so there are no severity inversions", () => {
+    expect(a.severityInversions).toEqual([]);
   });
   it("detects an unreachable rule in a modified model", () => {
     const raw = JSON.parse(JSON.stringify(m));

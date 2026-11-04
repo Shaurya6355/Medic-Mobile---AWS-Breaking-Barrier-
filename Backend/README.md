@@ -38,11 +38,11 @@ The form shows one question per screen. By default it asks only the questions wh
 
 `settings.flowMode` picks the flow, and the clinician chooses it:
 
-- `minimal` (default): only the questions that can still change the outcome. On the v1 grid this averages 3.19 questions instead of 8.92.
+- `minimal` (default): only the questions that can still change the outcome. On the v1 grid (6,400 points) this averages 4.67 questions instead of 8.92.
 - `danger_signs_always`: like minimal, but every danger-sign question is always asked (8.20).
 - `full`: the authored shown_when only, as before (8.92).
 
-The minimal flow never asks danger-sign questions of a child outside 2 to 59 months, because the outcome is already decided. For example, a 1-month-old with convulsions is referred without anyone asking about convulsions. That is the Q2 hazard, and minimal makes it silent. `danger_signs_always` exists for this reason.
+Under the final 7-rule model, rule R1 sends a child outside 2 to 59 months who has a danger sign to urgent referral (`refer_urgent_outside_age_range`), so the minimal flow still asks every child about cough and the danger signs. A 1-month-old with convulsions is asked about convulsions and is referred urgently; the old Q2 hazard (a lower-severity out-of-range result hiding a danger sign) is gone. `danger_signs_always` is kept for models where a rule can decide the outcome before a danger sign is asked.
 
 Before emitting, `compileSnapshot` runs `verifyFlow` on every point of the exact answer grid. The short form must give the same outcome as answering every question. Any mismatch is refused with a `CompileError`, and so is a flow too large to derive (`flowLimits`). The manifest (`flow`), the project README and `sourcemap.json` record flowMode, the derivation version, the flow stats and the average question counts. The sourcemap marks question rows that carry a flow condition with `flowCondition`. The saved answer of a skipped question is blank.
 

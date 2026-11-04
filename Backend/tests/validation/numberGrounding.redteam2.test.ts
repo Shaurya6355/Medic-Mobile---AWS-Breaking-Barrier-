@@ -56,10 +56,17 @@ describe("numberGrounding on the resolved real draft (red team 2)", () => {
     const bandOnly = (m: any) => { mut(m); for (const q of m.open_questions) { q.status = "resolved"; q.resolution = "Confirmed by Dr Test."; } };
     expect(codes(bandOnly)).toContain("TEAM_THRESHOLD_UNCONFIRMED");
   });
-  it("the team's out-of-age rule only compares the age with the covered range, so it stays a team value to confirm, not blocking", () => {
-    expect(run().filter((f) => f.code === "TEAM_VALUE").map((f) => f.subjects.map((x) => x.id))).toEqual([["age_months", "R1"]]);
+  it("the final model's out-of-age value is the guideline's own (quote on page 3), so no team value is left to confirm for it", () => {
+    expect(run().filter((f) => f.code === "TEAM_VALUE")).toEqual([]);
+  });
+  it("a team rule that tests the age against the covered range itself (the first model's shape) stays a team value to confirm, not blocking", () => {
+    const inline = (m: any) => { const r = m.rules.find((x: any) => x.id === "R2"); r.when = { any: [{ field: "age_months", op: "less_than", value: 2 }, { field: "age_months", op: "at_least", value: 60 }] }; delete r.source; r.origin = "team"; };
+    expect(run(inline).filter((f) => f.code === "TEAM_VALUE").map((f) => f.subjects.map((x) => x.id))).toEqual([["age_months", "R2"]]);
     // but a team rule with its own cut-off (not the covered range) blocks
-    expect(codes((m) => { m.rules[0].when.any[0].value = 3; })).toContain("TEAM_THRESHOLD_UNCONFIRMED");
+    expect(codes((m) => { inline(m); m.rules.find((x: any) => x.id === "R2").when.any[0].value = 3; })).toContain("TEAM_THRESHOLD_UNCONFIRMED");
+  });
+  it("a changed cut-off in the guideline's out-of-age value (below 3 instead of below 2) is an ungrounded number", () => {
+    expect(codes((m) => { m.derived.find((d: any) => d.id === "outside_age_range").definition.any[0].value = 3; })).toContain("UNGROUNDED_NUMBER");
   });
   it("C2/D1/D2: numbers in labels and titles must be in a quote of that item", () => {
     expect(codes((m) => { Q(m, "breaths_per_minute").label = "Count the child's breaths in 30 seconds"; })).toContain("NUMBER_IN_TEXT_UNSUPPORTED");

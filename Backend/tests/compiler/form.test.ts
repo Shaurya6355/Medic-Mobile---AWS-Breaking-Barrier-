@@ -164,11 +164,12 @@ describe("buildForm: logic", () => {
       type: "calculate",
       name: "outcome",
       calculation:
-        "if(((${age_months} != '' and ${age_months} < 2) or (${age_months} != '' and ${age_months} >= 60)), 'refer_outside_age_range', " +
+        "if((${outside_age_range} = 'yes' and ${danger_sign} = 'yes'), 'refer_urgent_outside_age_range', " +
+        "if(${outside_age_range} = 'yes', 'refer_outside_age_range', " +
         "if((${danger_sign} = 'yes' and (${fast_breathing} = 'yes' or ${chest_indrawing} = 'yes')), 'refer_urgent_with_antibiotic', " +
         "if(${danger_sign} = 'yes', 'refer_urgent', " +
         "if(${fast_breathing} = 'yes', 'treat_fast_breathing_at_home', " +
-        "if(${cough} = 'yes', 'cough_no_fast_breathing', 'no_cough')))))",
+        "if(${cough} = 'yes', 'cough_no_fast_breathing', 'no_cough'))))))",
     });
   });
 });
@@ -201,7 +202,7 @@ describe("buildForm: outcome display", () => {
     const begin = s.findIndex((r) => r.name === "results" && r.type === "begin group");
     const notes = s.filter((r) => r.type === "note");
     expect(s.slice(begin + 1, -1)).toEqual(notes);
-    expect(notes).toHaveLength(6 + 4);
+    expect(notes).toHaveLength(7 + 4);
   });
 });
 

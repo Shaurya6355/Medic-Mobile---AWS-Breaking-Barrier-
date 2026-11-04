@@ -1,5 +1,5 @@
 $ cht '--source=<repo>/Backend/compile-demo/output/project' --skip-dependency-check --skip-version-check --skip-git-check convert-app-forms
-# exit 0 in 719 ms
+# exit 0 in 401 ms
 # ---- stdout
 INFO Processing config in project. 
 INFO Actions:

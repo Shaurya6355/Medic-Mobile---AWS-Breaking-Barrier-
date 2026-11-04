@@ -8,7 +8,7 @@ import { citedItems, questionSubject } from "../describe.js";
 import { normalizeForQuote, quoteMatches } from "../text.js";
 import { monthsQuestionId } from "./ageBands.js";
 import { outcomeTitle, provenAnalysis, simplestPoint } from "./common.js";
-import { containsPassage, instructsReferral, signQuestion } from "./dangerSigns.js";
+import { containsPassage, dangerFieldIds, instructsReferral, signQuestion } from "./dangerSigns.js";
 import type { DangerSign } from "./dangerSigns.js";
 
 export const CHECK = "dangerSignCoverage";
@@ -60,7 +60,13 @@ export function dangerSignCoverage(ctx: CheckContext): Finding[] {
   // Quotes of the items that decide (questions, calculated values, rules), as opposed to the wording of a result.
   const logicQuotes = implementing.filter((c) => c.subject.kind === "question" || c.subject.kind === "derived" || c.subject.kind === "rule").flatMap((c) => c.sources.map((s) => s.quote));
   const excludedWords = new Set(normalizeForQuote(model.scope.excluded.map((e) => `${e.item} ${e.reason}`).join(" ")).split(/[^a-z]+/).filter(Boolean));
-  const dangerQuestion = model.open_questions.find((q) => /danger signs?/i.test(q.question));
+  // The open question about which danger signs the form covers is the one that affects a danger-sign value; a question that
+  // merely mentions "a danger sign" (for example about children outside the covered ages) is not it.
+  const dangerIds = dangerFieldIds(model, ex);
+  const dangerQuestion =
+    model.open_questions.find((q) => q.affects.some((x) => dangerIds.has(x)) && /danger signs?/i.test(q.question)) ??
+    model.open_questions.find((q) => q.affects.some((x) => dangerIds.has(x))) ??
+    model.open_questions.find((q) => /danger signs?/i.test(q.question));
   const logic = signLogic(ctx);
 
   const out: Finding[] = [];

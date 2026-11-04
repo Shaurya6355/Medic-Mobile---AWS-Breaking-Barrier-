@@ -1,9 +1,9 @@
 {
   "ok": true,
   "flowMode": "minimal",
-  "avgQuestions": 3.19125,
-  "goldenAvgScreens": 6.2,
-  "formSha256": "c6d6c7fb5cc40af65bb667f243d2682fd4b34f657406be33295d3f4b9ace0d37",
+  "avgQuestions": 4.675,
+  "goldenAvgScreens": 6.75,
+  "formSha256": "3f6d958695ee4eb4937492086bcf77b7b33bee82de31ef6fcf7ca9e4b926cd71",
   "golden": [
     {
       "id": "g01",
@@ -440,30 +440,34 @@
     {
       "id": "g08",
       "screens": [
-        "age_months"
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
       ],
       "expected_screens": [
-        "age_months"
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
       ],
       "tree_screens": [
-        "age_months"
-      ],
-      "skipped": [
-        "chest_indrawing",
-        "convulsions",
+        "age_months",
         "cough",
-        "not_able_to_drink_or_feed",
-        "unusually_sleepy",
-        "vomits_everything"
-      ],
-      "expected_skipped": [
-        "chest_indrawing",
         "convulsions",
-        "cough",
         "not_able_to_drink_or_feed",
-        "unusually_sleepy",
-        "vomits_everything"
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
       ],
+      "skipped": [],
+      "expected_skipped": [],
       "description": "60 months, no cough",
       "expected": "refer_outside_age_range",
       "interpreter": "refer_outside_age_range",
@@ -479,11 +483,18 @@
         "outcome_refer_outside_age_range"
       ],
       "note_text": [
-        "Refer to health facility: child is outside the age range this form covers\nRefer child to health facility, write a referral note, and follow up child on return."
+        "Outside this form's age range, no danger sign: refer to health facility\nRefer child to health facility, write a referral note, and follow up child on return."
       ],
       "advanced": true,
       "submitted": true,
-      "not_shown": [
+      "not_shown": [],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g09",
+      "screens": [
+        "age_months",
         "cough",
         "convulsions",
         "not_able_to_drink_or_feed",
@@ -491,36 +502,26 @@
         "chest_indrawing",
         "unusually_sleepy"
       ],
-      "errors": [],
-      "pass": true
-    },
-    {
-      "id": "g09",
-      "screens": [
-        "age_months"
-      ],
       "expected_screens": [
-        "age_months"
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
       ],
       "tree_screens": [
-        "age_months"
-      ],
-      "skipped": [
-        "chest_indrawing",
-        "convulsions",
+        "age_months",
         "cough",
-        "not_able_to_drink_or_feed",
-        "unusually_sleepy",
-        "vomits_everything"
-      ],
-      "expected_skipped": [
-        "chest_indrawing",
         "convulsions",
-        "cough",
         "not_able_to_drink_or_feed",
-        "unusually_sleepy",
-        "vomits_everything"
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
       ],
+      "skipped": [],
+      "expected_skipped": [],
       "description": "1 month, no cough",
       "expected": "refer_outside_age_range",
       "interpreter": "refer_outside_age_range",
@@ -536,18 +537,11 @@
         "outcome_refer_outside_age_range"
       ],
       "note_text": [
-        "Refer to health facility: child is outside the age range this form covers\nRefer child to health facility, write a referral note, and follow up child on return."
+        "Outside this form's age range, no danger sign: refer to health facility\nRefer child to health facility, write a referral note, and follow up child on return."
       ],
       "advanced": true,
       "submitted": true,
-      "not_shown": [
-        "cough",
-        "convulsions",
-        "not_able_to_drink_or_feed",
-        "vomits_everything",
-        "chest_indrawing",
-        "unusually_sleepy"
-      ],
+      "not_shown": [],
       "errors": [],
       "pass": true
     },
@@ -854,57 +848,366 @@
     {
       "id": "g15",
       "screens": [
-        "age_months"
+        "age_months",
+        "cough",
+        "convulsions"
       ],
       "expected_screens": [
-        "age_months"
+        "age_months",
+        "cough",
+        "convulsions"
       ],
       "tree_screens": [
-        "age_months"
+        "age_months",
+        "cough",
+        "convulsions"
       ],
       "skipped": [
         "chest_indrawing",
-        "convulsions",
-        "cough",
         "not_able_to_drink_or_feed",
         "unusually_sleepy",
         "vomits_everything"
       ],
       "expected_skipped": [
         "chest_indrawing",
-        "convulsions",
-        "cough",
         "not_able_to_drink_or_feed",
         "unusually_sleepy",
         "vomits_everything"
       ],
-      "description": "KNOWN HAZARD: 1 month old with convulsions",
-      "expected": "refer_outside_age_range",
-      "interpreter": "refer_outside_age_range",
-      "form": "refer_outside_age_range",
+      "description": "Outside the age range with a danger sign: 1 month old with convulsions",
+      "expected": "refer_urgent_outside_age_range",
+      "interpreter": "refer_urgent_outside_age_range",
+      "form": "refer_urgent_outside_age_range",
       "form_fast_breathing": "no",
-      "form_danger_sign": "no",
+      "form_danger_sign": "yes",
       "interp_fast_breathing": "no",
-      "interp_danger_sign": "no",
+      "interp_danger_sign": "yes",
       "notes": [
-        "outcome_refer_outside_age_range"
+        "outcome_refer_urgent_outside_age_range"
       ],
       "expected_notes": [
-        "outcome_refer_outside_age_range"
+        "outcome_refer_urgent_outside_age_range"
       ],
       "note_text": [
-        "Refer to health facility: child is outside the age range this form covers\nRefer child to health facility, write a referral note, and follow up child on return."
+        "Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.\nExplain why the child needs to go to the health facility. Write a referral note and help arrange transport.\nDo not give medicine from this form. The guideline gives no doses outside 2 months up to 5 years."
       ],
       "advanced": true,
       "submitted": true,
       "not_shown": [
-        "cough",
-        "convulsions",
         "not_able_to_drink_or_feed",
         "vomits_everything",
         "chest_indrawing",
         "unusually_sleepy"
       ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g16",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "chest_indrawing",
+        "breaths_per_minute"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "chest_indrawing",
+        "breaths_per_minute"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "chest_indrawing",
+        "breaths_per_minute"
+      ],
+      "skipped": [
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "expected_skipped": [
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "description": "6 months, convulsions and 55 breaths (danger sign with fast breathing in an infant)",
+      "expected": "refer_urgent_with_antibiotic",
+      "interpreter": "refer_urgent_with_antibiotic",
+      "form": "refer_urgent_with_antibiotic",
+      "form_fast_breathing": "yes",
+      "form_danger_sign": "yes",
+      "interp_fast_breathing": "yes",
+      "interp_danger_sign": "yes",
+      "notes": [
+        "outcome_refer_urgent_with_antibiotic",
+        "outcome_refer_urgent_with_antibiotic_dose_1_1"
+      ],
+      "expected_notes": [
+        "outcome_refer_urgent_with_antibiotic",
+        "outcome_refer_urgent_with_antibiotic_dose_1_1"
+      ],
+      "note_text": [
+        "Danger sign: refer urgently and give first dose of antibiotic\nGive first dose of oral antibiotic (amoxicillin tablet, 250 mg).\nExplain why the child needs to go to the health facility. Write a referral note and help arrange transport.",
+        "Age 2 to under 12 months: 1 tablet"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "unusually_sleepy"
+      ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g17",
+      "screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing"
+      ],
+      "skipped": [
+        "unusually_sleepy"
+      ],
+      "expected_skipped": [
+        "unusually_sleepy"
+      ],
+      "description": "Outside the age range with a danger sign: 1 month old with chest indrawing",
+      "expected": "refer_urgent_outside_age_range",
+      "interpreter": "refer_urgent_outside_age_range",
+      "form": "refer_urgent_outside_age_range",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "yes",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "yes",
+      "notes": [
+        "outcome_refer_urgent_outside_age_range"
+      ],
+      "expected_notes": [
+        "outcome_refer_urgent_outside_age_range"
+      ],
+      "note_text": [
+        "Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.\nExplain why the child needs to go to the health facility. Write a referral note and help arrange transport.\nDo not give medicine from this form. The guideline gives no doses outside 2 months up to 5 years."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "unusually_sleepy"
+      ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g18",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions"
+      ],
+      "skipped": [
+        "breaths_per_minute",
+        "chest_indrawing",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "expected_skipped": [
+        "breaths_per_minute",
+        "chest_indrawing",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "description": "60 months with convulsions (outside the age range, danger sign)",
+      "expected": "refer_urgent_outside_age_range",
+      "interpreter": "refer_urgent_outside_age_range",
+      "form": "refer_urgent_outside_age_range",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "yes",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "yes",
+      "notes": [
+        "outcome_refer_urgent_outside_age_range"
+      ],
+      "expected_notes": [
+        "outcome_refer_urgent_outside_age_range"
+      ],
+      "note_text": [
+        "Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.\nExplain why the child needs to go to the health facility. Write a referral note and help arrange transport.\nDo not give medicine from this form. The guideline gives no doses outside 2 months up to 5 years."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy",
+        "breaths_per_minute"
+      ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g19",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days"
+      ],
+      "skipped": [
+        "breaths_per_minute",
+        "chest_indrawing",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "expected_skipped": [
+        "breaths_per_minute",
+        "chest_indrawing",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "description": "1 month, cough 14 days (outside the age range, danger sign from long cough)",
+      "expected": "refer_urgent_outside_age_range",
+      "interpreter": "refer_urgent_outside_age_range",
+      "form": "refer_urgent_outside_age_range",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "yes",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "yes",
+      "notes": [
+        "outcome_refer_urgent_outside_age_range"
+      ],
+      "expected_notes": [
+        "outcome_refer_urgent_outside_age_range"
+      ],
+      "note_text": [
+        "Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.\nExplain why the child needs to go to the health facility. Write a referral note and help arrange transport.\nDo not give medicine from this form. The guideline gives no doses outside 2 months up to 5 years."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy",
+        "breaths_per_minute"
+      ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g20",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "skipped": [],
+      "expected_skipped": [],
+      "description": "2 months, 49 breaths, no signs (youngest covered age)",
+      "expected": "cough_no_fast_breathing",
+      "interpreter": "cough_no_fast_breathing",
+      "form": "cough_no_fast_breathing",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_cough_no_fast_breathing"
+      ],
+      "expected_notes": [
+        "outcome_cough_no_fast_breathing"
+      ],
+      "note_text": [
+        "Cough without fast breathing or danger signs\nAdvise the caregiver to give more fluids and continue feeding. Advise when to return."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [],
       "errors": [],
       "pass": true
     }
@@ -1115,10 +1418,24 @@
         "outcome_refer_outside_age_range"
       ],
       "screens": [
-        "age_months"
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
       ],
       "expected_screens": [
-        "age_months"
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
       ],
       "advanced": true,
       "submitted": true,
@@ -1131,7 +1448,8 @@
     "mismatches": 0,
     "firstMismatches": [],
     "perOutcome": {
-      "refer_outside_age_range": 3200,
+      "refer_urgent_outside_age_range": 3148,
+      "refer_outside_age_range": 52,
       "refer_urgent_with_antibiotic": 2344,
       "refer_urgent": 804,
       "cough_no_fast_breathing": 24,
@@ -1144,159 +1462,6 @@
     "mismatches": 0,
     "firstMismatches": []
   },
-  "mutations": [
-    {
-      "id": "m1",
-      "what": "fast-breathing boundary off by one: breaths >= 50 emitted as > 50",
-      "from": "breaths_per_minute  &gt;= 50",
-      "to": "breaths_per_minute  &gt; 50",
-      "equivalent": false,
-      "mismatches": 128,
-      "example": {
-        "answers": {
-          "age_months": 2,
-          "cough": true,
-          "cough_days": 0,
-          "convulsions": true,
-          "not_able_to_drink_or_feed": true,
-          "vomits_everything": true,
-          "chest_indrawing": false,
-          "breaths_per_minute": 50,
-          "unusually_sleepy": true
-        },
-        "diffs": [
-          "outcome form=refer_urgent interpreter=refer_urgent_with_antibiotic",
-          "fast_breathing form=no interpreter(shown)=yes",
-          "notes form=outcome_refer_urgent expected=outcome_refer_urgent_with_antibiotic+outcome_refer_urgent_with_antibiotic_dose_1_1"
-        ]
-      },
-      "verdict": "CAUGHT",
-      "pass": true
-    },
-    {
-      "id": "m2",
-      "what": "age band edge: age < 12 emitted as <= 12 in fast_breathing (EQUIVALENT mutant: at 12 months with 50+ breaths the 12-59 band, 40+, already holds, so no answer changes and no test can catch it)",
-      "from": "age_months  &lt; 12) and ( /data/q_breaths_per_minute/breaths_per_minute",
-      "to": "age_months  &lt;= 12) and ( /data/q_breaths_per_minute/breaths_per_minute",
-      "equivalentIn": [
-        "full",
-        "minimal",
-        "danger_signs_always"
-      ],
-      "equivalent": true,
-      "mismatches": 0,
-      "verdict": "EQUIVALENT (no change, as expected)",
-      "pass": true
-    },
-    {
-      "id": "m2b",
-      "what": "age band edge: age >= 12 emitted as > 12 in the 12-59 month fast-breathing band",
-      "from": "age_months  &gt;= 12) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and ( /data/q_breaths_per_minute/breaths_per_minute",
-      "to": "age_months  &gt; 12) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and ( /data/q_breaths_per_minute/breaths_per_minute",
-      "equivalent": false,
-      "mismatches": 256,
-      "example": {
-        "answers": {
-          "age_months": 12,
-          "cough": true,
-          "cough_days": 0,
-          "convulsions": true,
-          "not_able_to_drink_or_feed": true,
-          "vomits_everything": true,
-          "chest_indrawing": false,
-          "breaths_per_minute": 40,
-          "unusually_sleepy": true
-        },
-        "diffs": [
-          "outcome form=refer_urgent interpreter=refer_urgent_with_antibiotic",
-          "fast_breathing form=no interpreter(shown)=yes",
-          "notes form=outcome_refer_urgent expected=outcome_refer_urgent_with_antibiotic+outcome_refer_urgent_with_antibiotic_dose_1_2"
-        ]
-      },
-      "verdict": "CAUGHT",
-      "pass": true
-    },
-    {
-      "id": "m3",
-      "what": "rule order: danger_sign checked before the age range rule (R1/R3 swapped). EQUIVALENT under minimal: the swap only matters for a child outside the age range with a danger sign, and the minimal flow asks such a child no danger-sign question (danger_sign stays no): the Q2 hazard made silent",
-      "swapOutcome": true,
-      "equivalentIn": [
-        "minimal"
-      ],
-      "equivalent": true,
-      "mismatches": 0,
-      "verdict": "EQUIVALENT (no change, as expected)",
-      "pass": true
-    },
-    {
-      "id": "m4",
-      "what": "flow is_no emitted with the wrong value: convulsions = 'no' emitted as = 'yes' in every relevance (drink, vomit, sleepy screens follow the wrong answer)",
-      "fromAll": "/data/q_convulsions/convulsions  = 'no'",
-      "toAll": "/data/q_convulsions/convulsions  = 'yes'",
-      "needsFlow": true,
-      "equivalent": false,
-      "mismatches": 1664,
-      "example": {
-        "answers": {
-          "age_months": 2,
-          "cough": true,
-          "cough_days": 0,
-          "convulsions": true,
-          "not_able_to_drink_or_feed": true,
-          "vomits_everything": true,
-          "chest_indrawing": true,
-          "breaths_per_minute": 10,
-          "unusually_sleepy": true
-        },
-        "diffs": [
-          "shown form=age_months+cough+cough_days+convulsions+not_able_to_drink_or_feed+chest_indrawing flow=age_months+cough+cough_days+convulsions+chest_indrawing"
-        ]
-      },
-      "verdict": "CAUGHT",
-      "pass": true
-    },
-    {
-      "id": "m5",
-      "what": "flow is_no emitted so that blank counts as no: cough/convulsions/... = 'no' emitted as != 'yes'. EQUIVALENT for v1: every is_no atom sits next to the conditions that show its question, so the question is answered whenever the atom is read",
-      "regexAll": "/ (\\/data\\/q_[a-z_]+\\/[a-z_]+)  = 'no'/g",
-      "replace": " $1  != 'yes'",
-      "needsFlow": true,
-      "equivalentIn": [
-        "minimal",
-        "danger_signs_always"
-      ],
-      "equivalent": true,
-      "mismatches": 0,
-      "verdict": "EQUIVALENT (no change, as expected)",
-      "pass": true
-    },
-    {
-      "id": "m6",
-      "what": "flow threshold off by one: cough_days < 14 emitted as < 13 in the relevance of the danger-sign screens (a child coughing 13 days is not asked about convulsions)",
-      "fromAll": "cough_days  &lt; 14",
-      "toAll": "cough_days  &lt; 13",
-      "needsFlow": true,
-      "equivalent": false,
-      "mismatches": 768,
-      "example": {
-        "answers": {
-          "age_months": 2,
-          "cough": true,
-          "cough_days": 13,
-          "convulsions": true,
-          "not_able_to_drink_or_feed": true,
-          "vomits_everything": true,
-          "chest_indrawing": true,
-          "breaths_per_minute": 10,
-          "unusually_sleepy": true
-        },
-        "diffs": [
-          "shown form=age_months+cough+cough_days+chest_indrawing flow=age_months+cough+cough_days+convulsions+chest_indrawing"
-        ]
-      },
-      "verdict": "CAUGHT",
-      "pass": true
-    }
-  ],
+  "mutations": [],
   "browserProblems": []
 }

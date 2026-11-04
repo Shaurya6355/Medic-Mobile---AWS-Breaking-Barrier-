@@ -17,7 +17,7 @@ describe("fieldNames", () => {
     }
   });
   it("blocks a question named like a reserved name", () => {
-    const fs = run((m) => { m.questions[1].id = "inputs"; m.derived[0].definition.all[0].field = "inputs"; });
+    const fs = run((m) => { m.questions[1].id = "inputs"; m.derived[1].definition.all[0].field = "inputs"; });
     const f = fs.find((x) => x.code === "RESERVED_FIELD_NAME" && x.subjects[0]!.id === "inputs")!;
     expect(f).toBeDefined();
     expect(f.severity).toBe("blocking");
@@ -25,32 +25,32 @@ describe("fieldNames", () => {
     expect(f.message).toContain("inputs");
   });
   it("blocks a calculated value named outcome (case does not matter for the platform)", () => {
-    const fs = run((m) => { m.derived[0].id = "outcome"; });
+    const fs = run((m) => { m.derived[1].id = "outcome"; });
     expect(fs.map((f) => f.code)).toContain("RESERVED_FIELD_NAME");
-    const g = run((m) => { m.derived[0].id = "instanceID"; });
+    const g = run((m) => { m.derived[1].id = "instanceID"; });
     expect(g.map((f) => f.code)).toContain("RESERVED_FIELD_NAME");
   });
   it("blocks names starting with outcome_ and q_ collisions with the screens the builder creates", () => {
-    expect(run((m) => { m.derived[0].id = "outcome_refer"; }).map((f) => f.code)).toContain("RESERVED_FIELD_NAME");
-    expect(run((m) => { m.derived[0].id = "q_cough"; }).map((f) => f.code)).toContain("RESERVED_FIELD_NAME");
-    expect(run((m) => { m.derived[0].id = "q_nothing_like_it"; })).toEqual([]);
+    expect(run((m) => { m.derived[1].id = "outcome_refer"; }).map((f) => f.code)).toContain("RESERVED_FIELD_NAME");
+    expect(run((m) => { m.derived[1].id = "q_cough"; }).map((f) => f.code)).toContain("RESERVED_FIELD_NAME");
+    expect(run((m) => { m.derived[1].id = "q_nothing_like_it"; })).toEqual([]);
   });
   it("blocks names that are too long or not safe for a form", () => {
     const long = "a".repeat(33);
-    const fs = run((m) => { m.derived[0].id = long; });
+    const fs = run((m) => { m.derived[1].id = long; });
     const f = fs.find((x) => x.code === "INVALID_FIELD_NAME")!;
     expect(f.severity).toBe("blocking");
     expect(f.message).toContain("32");
-    expect(run((m) => { m.derived[0].id = "a".repeat(32); })).toEqual([]);
-    const bad = run((m) => { m.derived[0].id = "Fast-Breathing"; });
+    expect(run((m) => { m.derived[1].id = "a".repeat(32); })).toEqual([]);
+    const bad = run((m) => { m.derived[1].id = "Fast-Breathing"; });
     expect(bad.map((x) => x.code)).toContain("INVALID_FIELD_NAME");
-    expect(run((m) => { m.derived[0].id = "1abc"; }).map((x) => x.code)).toContain("INVALID_FIELD_NAME");
+    expect(run((m) => { m.derived[1].id = "1abc"; }).map((x) => x.code)).toContain("INVALID_FIELD_NAME");
   });
   it("without a deployed version there is no rename check", () => {
     expect(run().some((f) => f.code === "FIELD_RENAMED")).toBe(false);
   });
   it("a question that exists in the deployed version and is gone or renamed blocks, once for each person who must confirm", () => {
-    const fs = run((m) => { m.questions[1].id = "has_cough"; m.derived[0].definition.all[0].field = "has_cough"; m.derived[1].definition.any[0].all[0].field = "has_cough"; m.questions[2].shown_when.field = "has_cough"; m.questions[7].shown_when.field = "has_cough"; m.rules[4].when.field = "has_cough"; }, () => {});
+    const fs = run((m) => { m.questions[1].id = "has_cough"; m.derived[1].definition.all[0].field = "has_cough"; m.derived[2].definition.any[0].all[0].field = "has_cough"; m.questions[2].shown_when.field = "has_cough"; m.questions[7].shown_when.field = "has_cough"; m.rules[5].when.field = "has_cough"; }, () => {});
     const r = fs.filter((f) => f.code === "FIELD_RENAMED");
     expect(r.map((f) => f.decidedBy).sort()).toEqual(["clinician", "program_officer"]);
     for (const f of r) {

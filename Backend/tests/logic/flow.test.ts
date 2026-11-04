@@ -89,7 +89,7 @@ const q = (id: string, order: number, type: "integer" | "yes_no", extra: object 
 });
 
 describe("deriveFlow on v1: tree shape", () => {
-  it("starts by asking age, which splits into out-of-range leaves and two in-range subtrees", () => {
+  it("starts by asking age, which splits into four age regions that each go on to ask about cough", () => {
     const root = flow.root;
     expect("ask" in root && root.ask).toBe("age_months");
     if (!("ask" in root)) throw new Error("root is a leaf");
@@ -99,15 +99,13 @@ describe("deriveFlow on v1: tree shape", () => {
       { kind: "range", min: 12, below: 60 },
       { kind: "range", min: 60, below: null },
     ]);
-    expect(root.branches[0]!.next).toEqual({ leaf: "refer_outside_age_range", rule: "R1" });
-    expect(root.branches[3]!.next).toEqual({ leaf: "refer_outside_age_range", rule: "R1" });
-    expect("ask" in root.branches[1]!.next && root.branches[1]!.next.ask).toBe("cough");
-    expect("ask" in root.branches[2]!.next && root.branches[2]!.next.ask).toBe("cough");
+    // Under the final model an out-of-range child is still asked the danger signs: R1 (urgent) beats R2.
+    for (const b of root.branches) expect("ask" in b.next && b.next.ask).toBe("cough");
   });
 
-  it("only age is asked on every path; every other question is sometimes skipped; none unreachable", () => {
-    expect(flow.stats.questionsAlwaysAsked).toEqual(["age_months"]);
-    expect(flow.stats.questionsSometimesSkipped).toEqual(m.questions.map((x) => x.id).filter((id) => id !== "age_months"));
+  it("age and cough are asked on every path; every other question is sometimes skipped; none unreachable", () => {
+    expect(flow.stats.questionsAlwaysAsked).toEqual(["age_months", "cough"]);
+    expect(flow.stats.questionsSometimesSkipped).toEqual(m.questions.map((x) => x.id).filter((id) => id !== "age_months" && id !== "cough"));
     expect(flow.stats.neverAsked).toEqual([]);
     expect(flow.stats.maxDepth).toBe(9);
     expect(flow.stats.leaves).toBeGreaterThan(4);
@@ -143,12 +141,25 @@ describe("deriveFlow on v1: tree shape", () => {
 });
 
 describe("deriveFlow on v1: what is asked, in order, for typical children", () => {
-  it("age out of range: only age, then refer (R1)", () => {
+  it("age out of range with a danger sign: age, cough, convulsions, then refer urgently (R1)", () => {
     const w = walkFlow(flow, child({ age_months: 1, convulsions: true }));
-    expect(w.asked).toEqual(["age_months"]);
-    expect(w.leaf).toEqual({ leaf: "refer_outside_age_range", rule: "R1" });
+    expect(w.asked).toEqual(["age_months", "cough", "convulsions"]);
+    expect(w.leaf).toEqual({ leaf: "refer_urgent_outside_age_range", rule: "R1" });
   });
-  it("no cough and no danger signs: every danger-sign question is asked, then no_cough (R6)", () => {
+  it("age out of range with no danger sign: every danger-sign question is asked, then refer (R2)", () => {
+    const w = walkFlow(flow, child({ age_months: 1 }));
+    expect(w.asked).toEqual([
+      "age_months",
+      "cough",
+      "convulsions",
+      "not_able_to_drink_or_feed",
+      "vomits_everything",
+      "chest_indrawing",
+      "unusually_sleepy",
+    ]);
+    expect(w.leaf).toEqual({ leaf: "refer_outside_age_range", rule: "R2" });
+  });
+  it("no cough and no danger signs: every danger-sign question is asked, then no_cough (R7)", () => {
     const w = walkFlow(flow, child({}));
     expect(w.asked).toEqual([
       "age_months",
@@ -161,10 +172,10 @@ describe("deriveFlow on v1: what is asked, in order, for typical children", () =
     ]);
     expect(w.leaf.leaf).toBe("no_cough");
   });
-  it("danger sign present (convulsions): the other general danger signs are skipped, chest indrawing and breaths decide R2 vs R3", () => {
+  it("danger sign present (convulsions): the other general danger signs are skipped, chest indrawing and breaths decide R3 vs R4", () => {
     const w = walkFlow(flow, child({ cough: true, convulsions: true }));
     expect(w.asked).toEqual(["age_months", "cough", "cough_days", "convulsions", "chest_indrawing", "breaths_per_minute"]);
-    expect(w.leaf).toEqual({ leaf: "refer_urgent", rule: "R3" });
+    expect(w.leaf).toEqual({ leaf: "refer_urgent", rule: "R4" });
   });
   it("literal mode (pruneIrrelevant false) asks every question until the outcome is decided", () => {
     const lit = deriveFlow(m, { pruneIrrelevant: false });
@@ -185,23 +196,23 @@ describe("deriveFlow on v1: what is asked, in order, for typical children", () =
     expect(v.compiled.mismatchCount).toBe(0);
     expect(v.avgQuestions).toBeGreaterThan(verifyFlow(m, flow).avgQuestions);
   });
-  it("fast-breathing child: all nine questions are asked (sleepy still decides R2 vs R4)", () => {
+  it("fast-breathing child: all nine questions are asked (sleepy still decides R4 vs R5)", () => {
     const w = walkFlow(flow, child({ cough: true, breaths_per_minute: 52 }));
     expect(w.asked).toEqual(m.questions.map((x) => x.id));
-    expect(w.leaf).toEqual({ leaf: "treat_fast_breathing_at_home", rule: "R4" });
+    expect(w.leaf).toEqual({ leaf: "treat_fast_breathing_at_home", rule: "R5" });
   });
 });
 
-describe("Q2 hazard: a 1-month-old with convulsions", () => {
+describe("Q2: a 1-month-old with convulsions (the old hazard is fixed by R1)", () => {
   const baby = child({ age_months: 1, convulsions: true });
-  it("minimal flow: convulsions is never asked, because R1 is already decided (the hazard is silent)", () => {
-    expect(walkFlow(flow, baby).asked).not.toContain("convulsions");
-    expect(walkFlow(flow, baby).leaf.leaf).toBe("refer_outside_age_range");
+  it("minimal flow: convulsions is asked even though the age is out of range, and R1 refers urgently", () => {
+    expect(walkFlow(flow, baby).asked).toContain("convulsions");
+    expect(walkFlow(flow, baby).leaf).toEqual({ leaf: "refer_urgent_outside_age_range", rule: "R1" });
   });
   it("askAllDangerSigns: every danger-sign question is asked; the outcome is unchanged", () => {
     const w = walkFlow(safe, baby);
     expect(w.asked).toEqual(["age_months", ...DANGER.filter((id) => id !== "cough_days")]);
-    expect(w.leaf.leaf).toBe("refer_outside_age_range");
+    expect(w.leaf.leaf).toBe("refer_urgent_outside_age_range");
     const withCough = walkFlow(safe, child({ age_months: 1, cough: true }));
     expect(withCough.asked).toEqual(["age_months", ...DANGER]);
   });
@@ -209,16 +220,18 @@ describe("Q2 hazard: a 1-month-old with convulsions", () => {
     expect(dangerSignQuestions(m)).toEqual(DANGER);
     expect(safe.alwaysAsk).toEqual(DANGER);
     expect(flow.alwaysAsk).toEqual([]);
-    const noDanger = parse({ ...rawV1(), derived: rawV1().derived.filter((d: { id: string }) => d.id !== "danger_sign"), rules: rawV1().rules.map((r: { id: string; when: unknown }) => (r.id === "R2" || r.id === "R3" ? { ...r, when: { field: "convulsions", op: "is_yes" } } : r)) });
+    const noDanger = parse({ ...rawV1(), derived: rawV1().derived.filter((d: { id: string }) => d.id !== "danger_sign"), rules: rawV1().rules.map((r: { id: string; when: unknown }) => (r.id === "R1" || r.id === "R3" || r.id === "R4" ? { ...r, when: { field: "convulsions", op: "is_yes" } } : r)) });
     expect(dangerSignQuestions(noDanger)).toEqual([]);
   });
   it("explicit alwaysAsk ids are asked whenever their own shown_when allows", () => {
-    // breaths alone: its shown_when needs cough, which the flow skips once R1 is decided, so it stays hidden
+    // Out-of-range child: R2 is only decided once every danger sign is answered, so the questions are asked anyway.
+    // Breaths are asked only when cough is yes (their own shown_when), even though the outcome never depends on them here.
+    const all9 = ["age_months", "cough", "cough_days", "convulsions", "not_able_to_drink_or_feed", "vomits_everything", "chest_indrawing", "breaths_per_minute", "unusually_sleepy"];
     const f1 = deriveFlow(m, { alwaysAsk: ["breaths_per_minute"] });
-    expect(walkFlow(f1, child({ age_months: 1, cough: true })).asked).toEqual(["age_months"]);
+    expect(walkFlow(f1, child({ age_months: 1, cough: true })).asked).toEqual(all9);
     const f = deriveFlow(m, { alwaysAsk: ["cough", "breaths_per_minute"] });
-    expect(walkFlow(f, child({ age_months: 1, cough: true })).asked).toEqual(["age_months", "cough", "breaths_per_minute"]);
-    expect(walkFlow(f, child({ age_months: 1 })).asked).toEqual(["age_months", "cough"]);
+    expect(walkFlow(f, child({ age_months: 1, cough: true })).asked).toEqual(all9);
+    expect(walkFlow(f, child({ age_months: 1 })).asked).toEqual(all9.filter((id) => id !== "cough_days" && id !== "breaths_per_minute"));
     expect(verifyFlow(m, f).mismatchCount).toBe(0);
   });
 });
@@ -246,7 +259,7 @@ describe("verifyFlow", () => {
   it("mutated models: 0 mismatches (threshold moved, rule order swapped, shown_when added)", () => {
     const raws: unknown[] = [];
     const a = rawV1();
-    a.derived[0].definition = { all: [{ field: "cough", op: "is_yes" }, { field: "breaths_per_minute", op: "at_least", value: 45 }] };
+    a.derived[1].definition = { all: [{ field: "cough", op: "is_yes" }, { field: "breaths_per_minute", op: "at_least", value: 45 }] };
     raws.push(a);
     const b = rawV1();
     b.rules[1].priority = 3;
@@ -410,13 +423,13 @@ describe("shownWhen for v1", () => {
     for (const c of Object.values(flow.shownWhen)) if (c && c !== "never") visit(c);
     for (const op of ops) expect(["is_yes", "is_no", "at_least", "less_than"]).toContain(op);
     expect(ops.has("is_no")).toBe(true);
-    for (const c of Object.values(flow.shownWhen)) expect(canonicalJson(c).length).toBeLessThan(1500);
+    // chest_indrawing is the longest condition (about 2100 characters) under the final 7-rule model.
+    for (const c of Object.values(flow.shownWhen)) expect(canonicalJson(c).length).toBeLessThan(2500);
   });
-  it("age is always asked; questions after age require the age to be in range", () => {
+  it("age and cough are always asked (an out-of-range child still gets the danger-sign questions); cough_days needs cough yes", () => {
     expect(flow.shownWhen.age_months).toBeNull();
-    const inRange = { all: [{ field: "age_months", op: "at_least", value: 2 }, { field: "age_months", op: "less_than", value: 60 }] };
-    expect(flow.shownWhen.cough).toEqual(inRange);
-    expect(effectiveShownWhen(m, flow, "cough_days")).toEqual({ all: [...inRange.all, { field: "cough", op: "is_yes" }] });
+    expect(flow.shownWhen.cough).toBeNull();
+    expect(effectiveShownWhen(m, flow, "cough_days")).toEqual({ field: "cough", op: "is_yes" });
   });
   it("'no' steps appear as is_no: after 'convulsions is no' the next danger sign is asked; after 'yes' it is not", () => {
     const sw = flow.shownWhen.not_able_to_drink_or_feed;
@@ -452,9 +465,9 @@ describe("FlowCondition evaluation", () => {
 describe("compiled relevance equals the tree (is_no makes it exact)", () => {
   const cases: Array<[string, Flow, number, number]> = [
     // [name, flow, tree average, full form average]
-    ["minimal", flow, 3.19, 8.92],
+    ["minimal", flow, 4.675, 8.92],
     ["askAllDangerSigns", safe, 8.2, 8.92],
-    ["literal", deriveFlow(m, { pruneIrrelevant: false }), 4.24, 8.92],
+    ["literal", deriveFlow(m, { pruneIrrelevant: false }), 5.735, 8.92],
   ];
   for (const [name, f, avg, full] of cases) {
     it(`${name}: 0 mismatches over 6400 points (tree and compiled); compiled average equals tree average`, () => {
@@ -481,14 +494,15 @@ describe("plain outputs", () => {
     expect(s).toContain("60 months or more");
     expect(s).toContain('"yes"');
     expect(s).toContain('"no"');
-    expect(s).toContain("Refer to health facility: child is outside the age range this form covers");
+    expect(s).toContain("Outside this form's age range, no danger sign: refer to health facility");
+    expect(s).toContain("Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.");
     expect(flowToMermaid(flow, m)).toBe(s);
   });
   it("describeFlow gives plain sentences without operators or jargon", () => {
     const lines = describeFlow(flow, m);
     expect(lines.length).toBeGreaterThan(3);
     expect(lines).toContain(
-      'If "Child\'s age in months" is under 2 months or 60 months or more, the form ends: Refer to health facility: child is outside the age range this form covers.',
+      'If "Child\'s age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, the form ends: Danger sign, outside this form\'s age range: refer urgently. Give no medicine from this form.',
     );
     for (const l of lines) {
       expect(l).not.toMatch(/[<>=]|is_yes|at_least|less_than|AST|null|undefined/);
@@ -501,9 +515,16 @@ describe("describeFlowByOutcome (grouped for reviewers)", () => {
   it("groups the path sentences by outcome, in model outcome order, same paths as describeFlow", () => {
     const groups = describeFlowByOutcome(flow, m);
     expect(groups.map((g) => g.outcome)).toEqual(m.outcomes.map((o) => o.id).filter((id) => groups.some((g) => g.outcome === id)));
-    const r1 = groups.find((g) => g.outcome === "refer_outside_age_range")!;
-    expect(r1.title).toBe("Refer to health facility: child is outside the age range this form covers");
-    expect(r1.when).toEqual(['"Child\'s age in months" is under 2 months or 60 months or more']);
+    const r2 = groups.find((g) => g.outcome === "refer_outside_age_range")!;
+    expect(r2.title).toBe("Outside this form's age range, no danger sign: refer to health facility");
+    // two paths (cough yes with under 14 days, and no cough), each after all five danger-sign questions are answered no
+    expect(r2.when).toHaveLength(2);
+    for (const w of r2.when) {
+      expect(w.startsWith('"Child\'s age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is ')).toBe(true);
+      expect(w.endsWith('"Look: is the child unusually sleepy or unconscious?" is no')).toBe(true);
+    }
+    const r1 = groups.find((g) => g.outcome === "refer_urgent_outside_age_range")!;
+    expect(r1.title).toBe("Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.");
     const total = groups.reduce((a, g) => a + g.when.length, 0);
     expect(total).toBe(describeFlow(flow, m).filter((l) => l.includes("the form ends:")).length);
     for (const g of groups) for (const w of g.when) expect(w).not.toMatch(/[<>=]|is_yes|is_no|at_least|less_than/);
