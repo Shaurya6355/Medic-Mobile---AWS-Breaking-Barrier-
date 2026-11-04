@@ -1,0 +1,9 @@
+{
+  "name": "pathway-shared",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "sample-pdf": "node scripts/make-sample-pdf.ts"
+  }
+}

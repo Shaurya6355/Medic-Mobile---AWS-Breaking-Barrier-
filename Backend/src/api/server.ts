@@ -4,6 +4,8 @@ import type { ZodType } from "zod";
 import { inputPdfKey, NotFound } from "../artifacts/artifactStore.js";
 import type { ArtifactStore } from "../artifacts/artifactStore.js";
 import { routes } from "../contract/routes.js";
+import { buildRunMetrics } from "../metrics/analyze.js";
+import { loadAwsRates } from "../metrics/awsRates.js";
 import { withDeadline } from "../shutdown.js";
 import { parseS3Event } from "../trigger/s3Event.js";
 import { saveNewVersion } from "./saveVersion.js";
@@ -174,6 +176,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return { run, steps, totals, byProcess, byVersion };
   });
 
+  app.get<{ Params: { id: string } }>(routes.pattern.metrics, async (req, reply) => {
+    const run = await store.getRun(req.params.id);
+    if (!run) return reply.code(404).send({ error: "not_found" });
+    return buildRunMetrics(run, await store.listSteps(run.runId), { rates: loadAwsRates() });
+  });
+
   app.get<{ Params: { id: string } }>(routes.pattern.versions, async (req, reply) => {
     if (!(await store.getRun(req.params.id))) return reply.code(404).send({ error: "not_found" });
     return store.listVersions(req.params.id);
@@ -266,6 +274,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const q = parseBody(FindingsQuery, req.query ?? {}, reply);
     if (!q) return reply;
     return signoff.findingsView(req.params.id, n, q.audience);
+  });
+
+  // The stored flags.json of a version (cross-check flags, one document per content and inputs).
+  app.get<{ Params: { id: string; n: string } }>(routes.pattern.flags, async (req, reply) => {
+    const n = parseVersionNumber(req.params.n, reply);
+    if (n === undefined) return reply;
+    return signoff.flagsDocument(req.params.id, n);
   });
 
   app.get<{ Params: { id: string; n: string } }>(routes.pattern.status, async (req, reply) => {

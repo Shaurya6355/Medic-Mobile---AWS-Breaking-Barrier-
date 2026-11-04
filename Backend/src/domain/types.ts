@@ -12,6 +12,20 @@ export interface Run {
   lease?: { owner: string; expiresAt: number };
 }
 
+// One model call (request and response) inside a step attempt. Recorded by metrics/calls.ts.
+export interface CallRecord {
+  seq: number;
+  backend: "bedrock" | "agentcore" | "unknown";
+  modelId: string;
+  startedAt: number;
+  endedAt: number;
+  latencyMs: number;
+  status: "succeeded" | "failed";
+  inputTokens: number;
+  outputTokens: number;
+  error?: string;
+}
+
 export interface StepRecord {
   runId: string;
   step: string;
@@ -27,6 +41,8 @@ export interface StepRecord {
   modelId?: string;
   error?: string;
   artifactRefs: Record<string, string>;
+  // Model calls made by this attempt, in order (absent on records written before call metrics existed).
+  calls?: CallRecord[];
 }
 
 // One signature on one exact version (BRD AR-07). Bound to modelSha: if the content of the version

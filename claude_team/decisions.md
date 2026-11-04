@@ -312,7 +312,7 @@ Revisit if: Llama cannot take the page images or returns invalid JSON often (fla
 Related: INT-013, DEC-003, DEC-005
 
 ### DEC-022 | Compare the extraction schema outputs until the logic model schema exists
-Status: open
+Status: superseded by DEC-027 (the comparison now runs on the two logic models)
 Date: 2026-11-03
 Decided by: proposed by Claude session, awaiting human confirmation
 Feature or area: validation (Backend/validation)
@@ -326,7 +326,7 @@ Revisit if: the logic model schema is agreed, then the comparison moves to it.
 Related: INT-013, DEC-021
 
 ### DEC-023 | Validator flag rules: alignment, severity and what counts as a difference
-Status: decided (provisional, tune after the first real Llama run)
+Status: decided; pairing and severity rules superseded in part by DEC-025
 Date: 2026-11-03
 Decided by: Claude session, from the human's request for a deterministic comparer (Backend/validation)
 Feature or area: validation, flags for the clinician UI
@@ -340,7 +340,166 @@ Other options considered (and why not):
 Revisit if: the first Bedrock runs show too many or too few flags, or the logic model schema replaces the extraction schema (DEC-022).
 Related: INT-014, DEC-021, DEC-022
 
-### DEC-024 | logic-model/pathways/cough_fast_breathing/v1.json is the logic model contract
+### DEC-024 | Trimmed review UI for the first frontend build
+Status: decided
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Approval steps and review UI
+Decision: Build a trimmed version of the mockup. Kept: Guidelines, Review, Release, History screens; dagre flow; flags; checks; AI revision card; next-step strip; role switcher. Dropped for now: Compare screen (phone preview, side-by-side flows, outcome-change table), page thumbnails and page preview, plain-language rules tab, undo and reset-to-draft, the JSON/XLSForm/XForm code diffs and tasks.js diff, Runs screen.
+Assumptions: The core approval flow matters more for the demo than the comparison views. Dropped parts are still in Frontend/docs/mockup.html and can be ported later.
+Why: Human asked to trim the UI significantly and make it work.
+Other options considered (and why not):
+- Full port of the mockup: more surface to wire to a backend in the time available.
+Revisit if: reviewers need the v3 vs new comparison before approving. Note that dagre plus react-router does not match the cht-ui-builder stack (React Flow, Zustand), so DEC-001 may require a change here.
+Related: INT-015, DEC-001
+
+### DEC-025 | Intake pipeline runs in local mode first
+Status: superseded: the local intake backend was removed when merging into main; main's orchestrator (Backend/src) does intake
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Guideline intake
+Decision: Build the pipeline against on-disk emulators of S3, SQS and the state table behind interfaces, with local text extraction instead of Textract.
+Assumptions: No AWS credentials on this laptop yet. AWS adapters can replace the emulators without changing the worker or the HTTP API.
+Why: Human chose fully local, no AWS, for now.
+Other options considered (and why not):
+- Build against real AWS now: no credentials or bucket available.
+- Canned demo only: would not exercise a real upload, event and extraction.
+Revisit if: AWS sandbox access is set up.
+Related: INT-016
+
+### DEC-026 | S3 event to queue to worker, no Lambda
+Status: superseded: the local intake backend was removed when merging into main; main's orchestrator (Backend/src) does intake
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Guideline intake
+Decision: The bucket notification sends ObjectCreated events under uploads/ to a queue; a worker in the backend container polls it (visibility timeout, 3 receives, then dead-letter).
+Assumptions: SQS is acceptable under the Technical Environment Document's optional services; this has not been checked against the document.
+Why: Human chose the event-driven route. Lambda for application logic is out of scope (claude.md).
+Other options considered (and why not):
+- Backend starts processing after the browser reports the upload: simpler, not event-driven.
+Revisit if: SQS turns out to be out of scope.
+Related: INT-016
+
+### DEC-027 | Logic model step is a placeholder until AgentCore
+Status: superseded: the local intake backend was removed when merging into main; main's orchestrator (Backend/src) does intake
+Date: 2026-11-03
+Decided by: Vishnu Athreya
+Feature or area: Logic drafting
+Decision: No model call. The step returns the sample cough-pathway template through a LogicModelBuilder interface; output is Zod-validated and quote-checked like any future model output. The UI labels it as a placeholder.
+Assumptions: The team plans AgentCore, choosing models per task, instead of a direct Bedrock call. Whether AgentCore fits the rule that model calls go through Bedrock needs checking.
+Why: Human asked to keep the model step blank for now.
+Other options considered (and why not):
+- Direct Bedrock call: team is moving to AgentCore.
+- Leave the step empty: the review screen would have nothing to render.
+Revisit if: AgentCore integration starts, or the logic model format is generalised beyond the cough pathway.
+Related: INT-016, DEC-001
+
+### DEC-028 | Logic model is a pathway spec, compiled by shared code
+Status: decided
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Logic drafting, review UI, compiler
+Decision: The logic model is the pathway spec JSON (schema_version 1.0) the human supplied. One dependency-free compiler in shared/pathway does validation, evaluation, flow graph and XLSForm for both Backend and Frontend.
+Assumptions: Hit policy is first match by priority with exactly one final otherwise rule. A comparison on a hidden or unanswered field is false. Show conditions may only use earlier questions. Derived values are yes/no.
+Why: Human asked for the JSON to drive the flow as a logical, compiler-like rule set, keeping the user flow. Sharing the code keeps backend validation and UI behaviour identical.
+Other options considered (and why not):
+- Map the JSON onto the old fixed d1/d2/d3 model: lossy, breaks for any other pathway.
+- Separate Zod schema in Backend and hand-written checks in Frontend: two copies drift.
+Revisit if: A pathway needs a different hit policy, numeric derived values, or select-multiple questions.
+Related: INT-017, DEC-027
+
+
+### DEC-029 | Everything reaches the clinician through the PO
+Status: superseded by DEC-030
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Review workflow
+Decision: Open questions marked route_to clinician are flags for the PO first. The clinician sees only what the PO sent. Notes are required only to send something on or to request a change.
+Why: Human asked that nothing go to the clinician directly and that approvals not need a note.
+Related: INT-020
+
+### DEC-030 | No program officer: an AI agent checks the draft, the clinician reviews and edits
+Status: decided
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Review workflow
+Decision: The PO role is removed. An AI agent runs checks 1 to 3, fixes what is safe to fix, and sends everything to the clinician, open questions included. The clinician has a View tab (flowchart, test patients, six check widgets) and an Edit tab (rule table, live flow) plus an assistant chat. IT approves the deploy at the end.
+Why: Human asked for the architecture change.
+Related: DEC-029, INT-024
+
+### DEC-031 | Merged into main: the frontend uses main's orchestrator API; the AI agent signs as program officer
+Status: decided
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Frontend and backend integration
+Decision: main's Backend is kept as it is. The local intake backend from feature/pathway-compiler is removed (DEC-025 to DEC-027 superseded). In live mode the frontend calls main's /runs API. On Approve, the AI agent saves the answers to questions routed to the program officer in a version with authorRole program_officer and signs as program_officer (userId ai-agent); the clinician's version is then saved and signed by the clinician, which locks it. The backend's sign-off order, separation of duties and gates are unchanged.
+Why: Human asked to merge into main so that it works with the backend there, while the program officer role is replaced by the AI agent (DEC-030).
+Related: DEC-019, DEC-020, DEC-030, INT-025
+
+### DEC-032 | Cross-check sends the guideline to Llama in batches of 3 pages
+Status: decided
+Date: 2026-11-04
+Decided by: human (Nirubama12)
+Feature or area: cross-check stage (Backend/cross-check/run_extraction.py)
+Decision: Llama 4 Scout receives the guideline in 4 requests of 3 pages each (run in parallel, 8192 output tokens each, temperature 0.1). The prompt file is unchanged; each request adds a batch note (id prefix b<N>_, go-to links to other batches written as page:<N>). Code merges the four results: lists are concatenated, variables are merged by id, node order is offset per batch, and page:<N> links resolve to the first top-level node of that page. Haiku 5.5 keeps the single whole-document call (DEC-005) and runs without a temperature setting.
+Assumptions: Llama 4 Scout allows at most 3 images and 8192 output tokens per request (verified by test calls on 2026-11-04). Edges that cross a batch boundary are lost and appear as flags.
+Why: The two limits make a single call impossible for Llama; batching is the only option that keeps the page images.
+Other options considered (and why not):
+- Tile 4 pages per image: arrows may become unreadable and the output cap would still cut the JSON.
+- Text blocks only: loses arrows and layout, so the cross-check would differ more from Haiku.
+Revisit if: Llama raises its limits, or the first comparison shows the batching causes most flags.
+Related: ERR-013, DEC-005, DEC-021, INT-027
+
+### DEC-033 | Comparer tuning after the first real Haiku vs Llama comparison
+Status: decided (provisional; thresholds are not yet checked against a clinician's judgement)
+Date: 2026-11-04
+Decided by: human (Nirubama12) asked for the tuning; rules chosen by the Claude session
+Feature or area: validation (Backend/validation/compare_outputs.py); supersedes parts of DEC-023
+Decision: (1) Items are still paired by cited block first; leftovers are then paired by matching text (similarity at least 0.8 for nodes and follow-ups, 0.85 for danger signs, 0.7 for actions by drug name, exact for thresholds). (2) A field difference that is only wording (units written another way, "in 3 days" against "3 days", a leading "Age", spelling amoxycillin or amoxicillin, one text containing the other) is a low flag and is never dropped; a real value difference keeps its severity. Numbers, operators, kind and boolean fields are always strict. (3) An unpaired danger sign, follow-up or node that repeats an item already compared is low and says so. (4) Missing nodes and missing edges are grouped into one flag per page and side, with the members listed in the flag; items that cite no source are one flag per list. (5) Edges whose two ends sit in different cross-check batches are low, as an expected gap of batching (DEC-032). (6) The model id of each side is read from the output, else from run_metrics.json beside it. Danger signs, actions, follow-ups and thresholds stay one flag each.
+Assumptions: The similarity cut-offs and the unit and spelling synonyms are the session's choices. Wording differences are worth showing but not worth a high flag.
+Why: The first comparison gave 185 flags (133 high), most of them wording or granularity noise that hid the real problems. After tuning it gives 103 (51 high, 33 medium, 19 low) on the same two outputs.
+Other options considered (and why not):
+- Drop wording differences completely: hides changes a clinician may care about, and breaks the rule that ambiguity is never settled silently.
+- Fuzzy-match everything: harder to audit; kept to the leftover pass only.
+Revisit if: a clinician finds a flag graded too low, or the logic model schema replaces the extraction schema (DEC-022).
+Related: DEC-022, DEC-023, DEC-032, INT-028
+
+### DEC-034 | Model outputs are never committed or pushed
+Status: decided
+Date: 2026-11-04
+Decided by: human (Nirubama12)
+Feature or area: repository hygiene for extraction, cross-check and validation runs
+Decision: Nothing a model produced is committed or pushed: raw replies (raw_response.txt), run metrics (run_metrics.json), flags (Backend/validation/flags.json) and real extraction outputs. These paths are git-ignored. The two extraction_output.json files already in git are the old in-session samples; they are restored to that committed content and marked skip-worktree locally, so later runs that overwrite them do not show in git status. Real outputs from the first runs were copied outside the repository (/tmp/model_outputs_backup on the running laptop).
+Assumptions: The two committed extraction_output.json files stay in main as sample data (they came from an in-session test, not Bedrock). skip-worktree is local to one clone and each laptop must set it for itself.
+Why: Model outputs are generated and can be large; they should not be mistaken for reviewed data, and the human wants none of them in git.
+Other options considered (and why not):
+- Remove the two sample files from git: changes main and the scripts and comparer read them as defaults; to be decided with the team.
+- Change the scripts to write outputs into a git-ignored output folder: cleaner, but changes paths in three scripts; not done yet.
+Revisit if: the team wants run outputs kept as artifacts (then record them in artifacts.md and store them in S3).
+Related: INT-029, INT-026, INT-027, INT-028
+
+### DEC-035 | Cross-check flags are Findings from comparing the two logic models, as warnings decided by the clinician
+Status: decided
+Date: 2026-11-04
+Decided by: human (Nirubama12) chose the base branch, where the second model comes from, the severity and what happens to the Python comparer; the design follows system design S3 (written by the Claude session)
+Feature or area: cross-check flags (Backend/src/validation/checks/crossCheck.ts); supersedes DEC-022 and the role of DEC-023/DEC-033 for the official flags
+Decision: Flags are the same Finding objects as every other check, so the review views, gates and stored findings read them. A new check, crossCheck, compares the draft being checked (first draft) with a second, independent logic model, supplied as a check input (run artifact runs/<id>/inputs/cross_check_model.json, then CROSS_CHECK_MODEL_PATH, no default). Items are matched by id, then by the words of the label. It reports, as warnings with decidedBy clinician and audience both roles: the age range, each question (kind of answer, unit, entry limits, only in one draft), the cut-off numbers used per question, each result (only in one draft, urgency rank, follow-up, actions, doses by age) and open questions raised by only one draft; and it runs both drafts through the one interpreter over the same combinations of answers (every question of either draft, split at every cut-off of either draft) and groups the combinations that get a different result by pair of results, each with one example child, both rules and their sources, and the direction (second draft more or less urgent). One information finding says how many combinations were compared. Nothing is blocking, so a weaker second draft cannot stall signing. With no second draft the check is silent and contextNotice says the comparison did not run. The Python comparer (Backend/validation/compare_outputs.py) is kept unchanged as an extraction-level debugging tool and is no longer the source of flags.
+Assumptions: The second logic model is produced by running the existing fill_logic draft-and-resolve process on the cross-check (Llama) extraction with Llama drafting; that step is not built into the pipeline yet and has not been run. Both drafts parse as v1 logic models. Warnings are enough because nothing in the code can accept a blocking finding yet (only approved deviations and exceptions exist for two checks).
+Why: The design (S3) asks for a deterministic comparison by the interpreter over a shared grid, not a block-by-block comparison of extraction records, and the checks pipeline, gates and role views only understand Findings.
+Other options considered (and why not):
+- Blocking for the clinician: stricter, but a weaker second model would stall the pipeline and nothing can clear such a finding except a new version.
+- Information only: carries no weight and is easy to miss.
+- Keep comparing extraction records: not what the design asks for, and its flags cannot reach the gates or review views.
+Revisit if: the clinician wants disagreements to block, an acceptance-with-note mechanism for findings is built, the grid becomes too large to compare (CROSS_CHECK_NOT_COMPARED), or the first real second draft shows the matching by label is too loose or too strict.
+Related: DEC-017, DEC-021, DEC-022, DEC-023, DEC-032, DEC-033, INT-030
+
+Update 2026-11-04 (DEC-035), after the first run on real logic models: (1) questions the drafts word differently are now paired by their clinical words (everyday words ignored) and, for whole-number questions, by being the only one in the same unit on each side; two different symptoms never pair. (2) Each draft's result is remembered per set of its own answers, so the check's default limit is now 2,000,000 combinations (a set limit in the check context still wins). (3) The example child names a few answers only the second draft asks about, and sums up the rest.
+
+Update 2026-11-04 (DEC-035): Backend/validation/compare_outputs.py is now the driver that generates and stores the flags. By default it takes two logic model files (--first, --second), runs the cross-check through scripts/crossCheckFlags.ts (so the one interpreter is used and no logic is re-implemented in Python) and writes the flags, each a Finding with a plain-language message per role, to flags.json (git-ignored, never committed). The earlier comparison of the two extraction records stays behind --records as a debugging aid.
+
+Update 2026-11-04 (DEC-035): the flags are also stored by the pipeline. Every time the checks run for a version they store flags.json (the cross-check findings with messages for both roles) beside the findings, in the run's artifacts, keyed by content and inputs, and GET /runs/:id/versions/:n/flags serves it to the front end (the route is in the contract and the Infra route list). The document says whether the comparison ran, did not run (no second draft) or could not run (second draft invalid). It is a derived view, recomputed when missing and never read as proof of anything (a planted document for other content is ignored).
+
+### DEC-036 | logic-model/pathways/cough_fast_breathing/v1.json is the logic model contract
 Status: decided
 Date: 2026-11-04
 Decided by: project owner
@@ -350,9 +509,9 @@ Assumptions: The fill step, validation, compiler, fixtures and golden cases are 
 Why: The project owner chose this model as final, and one contract avoids two shapes to maintain.
 Other options considered (and why not): keep the earlier 6-rule v1.json (it left out-of-range children to a catch-all).
 Revisit if: the clinician changes a rule or the age range, or the schema needs fields this file lacks.
-Related: DEC-017, DEC-018, INT-015
+Related: DEC-017, DEC-018, INT-034
 
-### DEC-025 | Revision loop: comments to an AI instruction, then structured edits applied by code
+### DEC-037 | Revision loop: comments to an AI instruction, then structured edits applied by code
 Status: decided (design; not verified against real Bedrock)
 Date: 2026-11-04
 Decided by: utg1209 (Claude session), from the project request for a feedback loop
@@ -365,8 +524,8 @@ Other options considered (and why not):
 - Append the free-text comments to the system prompt: prompt injection risk.
 - Let the AI write content directly: violates design rule 1.
 Revisit if: live runs show the edit set is too narrow, instructions are often rewritten by people, or Cognito changes who may confirm.
-Related: DEC-009, DEC-010, DEC-015, DEC-019, INT-016
+Related: DEC-009, DEC-010, DEC-015, DEC-019, INT-035
 Update 2026-11-04 (utg1209, Claude session): corrections to this entry. (1) Revisions are stored as S3 artifacts (runs/<id>/revisions/<id>.json) plus the AUDIT trail; there is no index.json. (2) The confirmed instruction goes in delimited data blocks of the user content; the static addendum is appended to the original fill prompt in `system`. (3) The AI may not edit severity (owned by someone else) and may not write free text: the text of open questions is built by code. (4) Step 2 (the slow Bedrock proposal call) runs in the BACKGROUND: `POST /runs/:id/revisions/:rid/confirm` answers 202 at once and the UI polls `GET /runs/:id/revisions/:rid`, because API Gateway HTTP APIs cut a request at 30 seconds; in lambda mode the app invokes itself asynchronously (Infra grants lambda:InvokeFunction on its own ARN only, no automatic retries); in container and agentcore modes the work runs in-process. Step 1 stays synchronous (small prompt). (5) "Send to IT" is the clinician's existing signature, not a new action.
-Update 2026-11-04 (utg1209, Claude session): a line quoting "936 tests, 27 blocking findings, 3.19 questions" was reported as misplaced under this entry. Those numbers belong to INT-009 and DEC-018 (old 6-rule model) and are not part of DEC-025; they are superseded by DEC-024 and INT-015. No figure in this entry depends on them.
+Update 2026-11-04 (utg1209, Claude session): a line quoting "936 tests, 27 blocking findings, 3.19 questions" was reported as misplaced under this entry. Those numbers belong to INT-009 and DEC-018 (old 6-rule model) and are not part of DEC-037; they are superseded by DEC-036 and INT-034. No figure in this entry depends on them.
 
-Update 2026-11-04 (DEC-025, utg1209 (Claude session)): scope was narrowed after review. A comment on a rule unlocks only that rule (set_threshold on its condition, set_rule_outcome); a comment on an outcome unlocks only that outcome (replace_action, set_follow_up). A comment no longer unlocks the outcome of a rule or the rules that lead to an outcome. set_rule_outcome marks the rule origin team; an edit never upgrades team to guideline. Revision lease 12 minutes and stale `applying` cut-off 13 minutes (see INT-018). Open decisions: whether replace_action must be limited to extraction actions tied to that outcome; whether a stuck `applying` revision needs a retry or sweep; how agentcore mode keeps a session alive during background revisions; whether step 1 also moves to the background.
+Update 2026-11-04 (DEC-037, utg1209 (Claude session)): scope was narrowed after review. A comment on a rule unlocks only that rule (set_threshold on its condition, set_rule_outcome); a comment on an outcome unlocks only that outcome (replace_action, set_follow_up). A comment no longer unlocks the outcome of a rule or the rules that lead to an outcome. set_rule_outcome marks the rule origin team; an edit never upgrades team to guideline. Revision lease 12 minutes and stale `applying` cut-off 13 minutes (see INT-037). Open decisions: whether replace_action must be limited to extraction actions tied to that outcome; whether a stuck `applying` revision needs a retry or sweep; how agentcore mode keeps a session alive during background revisions; whether step 1 also moves to the background.

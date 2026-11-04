@@ -35,17 +35,20 @@ export const API_ROUTES: readonly string[] = [
   "POST /runs/{id}/versions/{n}/comments",
   // Sign-off (DEC-019). Role and user come from the body until Cognito (DEC-015) adds an authorizer.
   "GET /runs/{id}/versions/{n}/findings",
+  "GET /runs/{id}/versions/{n}/flags",
   "GET /runs/{id}/versions/{n}/status",
   "POST /runs/{id}/versions/{n}/signatures/{role}",
   // The clinician's rejection with a comment (AR-06, RR-02; DEC-020). Same DynamoDB actions as a signature.
   "POST /runs/{id}/versions/{n}/reject",
-  // Revision loop (DEC-025): comments -> AI instruction -> confirmed -> new version. Revisions are S3
+  // Revision loop (DEC-037): comments -> AI instruction -> confirmed -> new version. Revisions are S3
   // artifacts under runs/<id>/revisions/, covered by the existing object policy. Same auth seam as sign-off.
   "POST /runs/{id}/versions/{n}/revisions",
   "GET /runs/{id}/versions/{n}/revisions",
   "GET /runs/{id}/revisions/{rid}",
   "POST /runs/{id}/revisions/{rid}/confirm",
   "POST /runs/{id}/resume",
+  // Timing and cost of a run. Read-only: reads the same step records as GET /runs/{id}.
+  "GET /runs/{id}/metrics",
 ];
 
 export interface OrchestratorLambdaStackProps extends StackProps {
@@ -146,7 +149,7 @@ export class OrchestratorLambdaStack extends Stack {
     // With AgentCore the Lambda never calls Bedrock itself, so it gets no model invoke permission.
     if (modelBackend === "bedrock") this.function.role!.addManagedPolicy(props.bedrockPolicy!);
 
-    // Revision loop (DEC-025): POST /runs/{id}/revisions/{rid}/confirm answers 202 at once because the
+    // Revision loop (DEC-037): POST /runs/{id}/revisions/{rid}/confirm answers 202 at once because the
     // proposal call to Bedrock (step 2) can take longer than the 30 s API Gateway limit. In lambda mode
     // the function freezes after responding, so the app invokes ITSELF asynchronously (InvocationType
     // Event, payload {"source":"revision",...}); the Web Adapter forwards it to POST /events and the UI

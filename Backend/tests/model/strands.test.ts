@@ -21,7 +21,7 @@ vi.mock("@strands-agents/sdk", () => ({
   },
 }));
 
-const { DEFAULT_BEDROCK_TIMEOUT_MS, createStrandsModelClient } = await import("../../src/model/strands.js");
+const { DEFAULT_BEDROCK_TIMEOUT_MS, createStrandsModelClient, temperatureSetting } = await import("../../src/model/strands.js");
 
 const req = { modelId: "m", system: "s", maxTokens: 10, schema: z.object({ a: z.number() }), content: [{ type: "text" as const, text: "hi" }] };
 const result = (raw: string, stopReason = "endTurn") => ({
@@ -56,5 +56,13 @@ describe("createStrandsModelClient timeout", () => {
   it("still times out when the SDK ignores the signal (non-cancelling race)", async () => {
     state.invoke = () => new Promise(() => {});
     await expect(createStrandsModelClient({ region: "us-west-2", timeoutMs: 20 }).generateJson(req)).rejects.toBeInstanceOf(TransientError);
+  });
+});
+
+describe("temperatureSetting", () => {
+  it("sends no temperature to Claude Haiku 5.5, which rejects it, and 0 to every other model", () => {
+    expect(temperatureSetting("us.anthropic.claude-haiku-5-5")).toEqual({});
+    expect(temperatureSetting("us.meta.llama4-scout-17b-instruct-v1:0")).toEqual({ temperature: 0 });
+    expect(temperatureSetting("us.anthropic.claude-sonnet-4-5-20250929-v1:0")).toEqual({ temperature: 0 });
   });
 });
