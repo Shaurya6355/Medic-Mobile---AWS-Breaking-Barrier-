@@ -91,7 +91,7 @@ describe("resolve: items backed only by a cite are the team's, for the clinician
   });
   it("items with a cut-off from the guideline keep origin guideline", () => {
     const m = ok();
-    expect(m.derived.map((d: any) => d.origin)).toEqual(["guideline", "guideline"]);
+    expect(m.derived.map((d: any) => d.origin)).toEqual(["guideline", "guideline", "guideline"]);
   });
 });
 

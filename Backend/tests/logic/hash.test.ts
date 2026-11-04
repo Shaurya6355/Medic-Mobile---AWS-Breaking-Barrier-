@@ -3,7 +3,7 @@ import { modelSha } from "../../src/logic/hash.js";
 import { parseModel } from "../../src/logic/schema.js";
 import { rawV1, v1 } from "./helpers.js";
 
-const GOLDEN_SHA = "3dcbacce7f6065dd4394c6cea1b1e4b268c607e8fc487d40ad4a67d804b22955";
+const GOLDEN_SHA = "ade819699397846e36390e803232c81226724585d68b0d7c61deb6d0e1852deb";
 
 describe("modelSha", () => {
   it("is 64 hex and pinned for the v1 fixture", () => {
@@ -19,7 +19,7 @@ describe("modelSha", () => {
   });
   it("changes when a threshold changes", () => {
     const raw = rawV1();
-    raw.derived[0].definition.all[1].any[0].all[2].value = 51;
+    raw.derived[1].definition.all[1].any[0].all[2].value = 51;
     const r = parseModel(raw);
     expect(r.ok && modelSha(r.value)).not.toBe(modelSha(v1()));
   });

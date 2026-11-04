@@ -75,7 +75,7 @@ describe("fill_logic step", () => {
       pathway_id: "cough_fast_breathing",
       version: 1,
       parent_version: null,
-      created_by: "ai",
+      created_by: "ai_draft",
       created_at: "2026-11-04T12:00:00.000Z",
       guideline: { file_sha256: SHA },
     });

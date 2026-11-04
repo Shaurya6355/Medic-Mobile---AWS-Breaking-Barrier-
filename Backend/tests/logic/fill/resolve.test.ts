@@ -321,7 +321,7 @@ describe("what code adds", () => {
   });
   it("meta comes from code; a missing file hash is flagged, never invented", () => {
     const m = ok(draft());
-    expect(m.meta).toMatchObject({ pathway_id: "wheeze_test", version: 1, parent_version: null, created_by: "ai", guideline: { file_sha256: SHA } });
+    expect(m.meta).toMatchObject({ pathway_id: "wheeze_test", version: 1, parent_version: null, created_by: "ai_draft", guideline: { file_sha256: SHA } });
     const noSha = ok(draft(), extraction(), { ...opts, guideline: { title: "T" } });
     expect(noSha.meta.guideline.file_sha256).toBe("0".repeat(64));
     expect(noSha.meta.guideline.publisher).toBe("Not recorded");

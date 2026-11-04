@@ -208,7 +208,11 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
   draft.derived.forEach((d) => claim(d.id, "derived item"));
   draft.outcomes.forEach((o) => claim(o.id, "outcome"));
   const AGE_OUTCOME = "refer_outside_age_range";
-  if (draftIds.has(AGE_OUTCOME)) problem(`The id "${AGE_OUTCOME}" is reserved for the rule code adds; use another id.`);
+  const AGE_URGENT_OUTCOME = "refer_urgent_outside_age_range";
+  const AGE_DERIVED = "outside_age_range";
+  for (const reserved of [AGE_OUTCOME, AGE_URGENT_OUTCOME, AGE_DERIVED]) {
+    if (draftIds.has(reserved)) problem(`The id "${reserved}" is reserved for the rule code adds; use another id.`);
+  }
 
   const citeSources = (ids: readonly string[] | undefined, where: string): ExSrc[] => {
     const out: ExSrc[] = [];
@@ -533,11 +537,13 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
 
   // Out-of-range ages first: the guideline's cut-offs only hold inside its age range.
   let ageRuleId: string | undefined;
+  let ageUrgentRuleId: string | undefined;
   const extraOutcomes: typeof outcomes = [];
   if (ageQuestion !== undefined && ageQuestion.integer && scope !== undefined && mostUrgent !== undefined) {
     const parts: Condition[] = [];
     if (scope.min > 0) parts.push({ field: ageQuestion.id, op: "less_than", value: scope.min });
     parts.push({ field: ageQuestion.id, op: "at_least", value: scope.below });
+    const outsideCond: Condition = parts.length === 1 ? (parts[0] as Condition) : { any: parts };
     // Referral steps are quoted from the guideline when it has them (never drugs: doses are only
     // given for the covered ages); the choice to refer is the team's and is an open question.
     const referActs = ex.actions
@@ -546,21 +552,59 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
       .filter((a) => a.origin === "guideline");
     const onReturn = ex.followups.find((f) => parseFollowup(f.text, f.due_text)?.kind === "on_return");
     const onReturnSrc = onReturn !== undefined ? sources(onReturn.src) : [];
-    extraOutcomes.push({
-      id: AGE_OUTCOME,
-      severity: mostUrgent.severity,
-      title: "Refer to health facility: the child's age is outside the range this form covers",
-      actions:
-        referActs.length > 0
-          ? referActs
-          : [{ text: "Refer the child to a health facility. This form covers only the age range the guideline states.", origin: "team" }],
-      follow_up:
-        onReturnSrc.length > 0
-          ? { kind: "on_return", due_in_days: null, task_window_days_after_due: null, origin: "guideline", source: onReturnSrc }
-          : null,
-      origin: "team",
-    });
-    ageRuleId = addRule(parts.length === 1 ? (parts[0] as Condition) : { any: parts }, AGE_OUTCOME, []);
+    const followUp = (): (typeof outcomes)[number]["follow_up"] =>
+      onReturnSrc.length > 0
+        ? { kind: "on_return", due_in_days: null, task_window_days_after_due: null, origin: "guideline", source: onReturnSrc }
+        : null;
+    // The routine out-of-range outcome (the second of two) must not tell the worker to refer urgently:
+    // referral steps whose words or quotes say "urgent" are left to the urgent outcome.
+    const referOrTeam = (routine = false): (typeof outcomes)[number]["actions"] => {
+      const acts = routine ? referActs.filter((a) => !/urgent/i.test(a.text) && !(a.source ?? []).some((x) => /urgent/i.test(x.quote))) : referActs;
+      return acts.length > 0
+        ? acts.map((a) => ({ ...a }))
+        : [{ text: "Refer the child to a health facility. This form covers only the age range the guideline states.", origin: "team" as const }];
+    };
+    const withDanger = draft.derived.some((d) => d.id === "danger_sign");
+    // The age check as a calculated value (read by the rules below), placed before the draft's own.
+    const ageSrc = sources(ageVariable!.src).length > 0 ? sources(ageVariable!.src) : [{ page: 1, quote: ageVariable!.range_hint ?? "age" }];
+    if (withDanger) derived.unshift({ id: AGE_DERIVED, label: "Outside the age range this guideline covers", definition: outsideCond, ...sourced(ageSrc) });
+    const outsideIs: Condition = withDanger ? { field: AGE_DERIVED, op: "is_yes" } : outsideCond;
+    if (withDanger) {
+      extraOutcomes.push({
+        id: AGE_URGENT_OUTCOME,
+        severity: mostUrgent.severity,
+        title: "Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.",
+        actions: [
+          ...referOrTeam(),
+          {
+            text: "Do not give medicine from this form. The guideline gives no doses outside the age range this form covers.",
+            origin: "team" as const,
+          },
+        ],
+        follow_up: followUp(),
+        origin: "team",
+      });
+      extraOutcomes.push({
+        id: AGE_OUTCOME,
+        severity: Math.min(9, mostUrgent.severity + 1),
+        title: "Outside this form's age range, no danger sign: refer to health facility",
+        actions: referOrTeam(true),
+        follow_up: followUp(),
+        origin: "team",
+      });
+      ageUrgentRuleId = addRule({ all: [outsideIs, { field: "danger_sign", op: "is_yes" }] }, AGE_URGENT_OUTCOME, []);
+      ageRuleId = addRule(outsideIs, AGE_OUTCOME, []);
+    } else {
+      extraOutcomes.push({
+        id: AGE_OUTCOME,
+        severity: mostUrgent.severity,
+        title: "Refer to health facility: the child's age is outside the range this form covers",
+        actions: referOrTeam(),
+        follow_up: followUp(),
+        origin: "team",
+      });
+      ageRuleId = addRule(outsideIs, AGE_OUTCOME, []);
+    }
   }
 
   const ruleOwner = new Map<number, string>();
@@ -727,9 +771,14 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
     });
   }
   if (ageRuleId !== undefined && scope !== undefined) {
+    const two = ageUrgentRuleId !== undefined;
     oqs.push({
-      question: clipText(`The guideline covers children from ${scope.min} months up to ${scope.below} months. Rule ${ageRuleId} (added by the team) refers every other child to a health facility as the most urgent result. Is that the right handling?`),
-      affects: [ageRuleId, AGE_OUTCOME],
+      question: clipText(
+        two
+          ? `The guideline covers children from ${scope.min} months up to ${scope.below} months only. We refer out-of-range children urgently if they have a danger sign (${ageUrgentRuleId}) and routinely otherwise (${ageRuleId}), with no medicine. Is that right?`
+          : `The guideline covers children from ${scope.min} months up to ${scope.below} months. Rule ${ageRuleId} (added by the team) refers every other child to a health facility as the most urgent result. Is that the right handling?`,
+      ),
+      affects: two ? [ageUrgentRuleId!, ageRuleId, AGE_URGENT_OUTCOME, AGE_OUTCOME] : [ageRuleId, AGE_OUTCOME],
       // Who gets referred, and how urgently, is a clinical call: the clinician decides it.
       route_to: "clinician",
     });
@@ -794,7 +843,7 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
       version: 1,
       parent_version: null,
       created_at: opts.createdAt,
-      created_by: "ai",
+      created_by: "ai_draft",
       change_note:
         opts.changeNote ??
         "First AI draft. The model chose items by id; code copied every number, operator and quote from the guideline extraction. Team-added items are listed in the open questions.",

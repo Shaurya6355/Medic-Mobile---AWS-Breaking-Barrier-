@@ -130,34 +130,36 @@ describe("evaluate", () => {
     const r = evaluate(m, { ...base, age_months: 6, cough: true, cough_days: 3, breaths_per_minute: 52 });
     expect(r.outcome).toBe("treat_fast_breathing_at_home");
     expect(r.severity).toBe(3);
-    expect(r.rule).toBe("R4");
-    expect(r.derived).toEqual({ fast_breathing: true, danger_sign: false });
+    expect(r.rule).toBe("R5");
+    expect(r.derived).toEqual({ outside_age_range: false, fast_breathing: true, danger_sign: false });
     expect(r.trace.map((t) => [t.rule, t.priority, t.matched])).toEqual([
       ["R1", 1, false],
       ["R2", 2, false],
       ["R3", 3, false],
-      ["R4", 4, true],
+      ["R4", 4, false],
+      ["R5", 5, true],
     ]);
-    expect(r.trace[3]!.reads).toEqual({ fast_breathing: true });
+    expect(r.trace[4]!.reads).toEqual({ fast_breathing: true });
   });
   it("trace reads show absent", () => {
     const r = evaluate(m, base);
-    expect(r.rule).toBe("R6");
-    expect(r.trace[0]!.reads).toEqual({ age_months: 24 });
-    expect(r.trace[4]!.reads).toEqual({ cough: false });
+    expect(r.rule).toBe("R7");
+    expect(r.trace[0]!.reads).toEqual({ outside_age_range: false, danger_sign: false });
+    expect(r.trace[5]!.reads).toEqual({ cough: false });
     const r2 = evaluate(m, { ...base, cough: true, cough_days: 1, breaths_per_minute: 20 });
-    expect(r2.rule).toBe("R5");
+    expect(r2.rule).toBe("R6");
   });
   it("otherwise always matches", () => {
     expect(evaluate(m, base).outcome).toBe("no_cough");
   });
   it("allMatches lists every matching rule in priority order", () => {
-    expect(allMatches(m, { ...base, age_months: 1, convulsions: true })).toEqual(["R1", "R3", "R6"]);
+    expect(allMatches(m, { ...base, age_months: 1, convulsions: true })).toEqual(["R1", "R2", "R4", "R7"]);
   });
-  it("hazard: a child under 2 months with convulsions gets R1 first (severity 2) not R3 (severity 1)", () => {
+  it("a child under 2 months with convulsions gets R1 (urgent referral, severity 1), not the lower-severity out-of-range rule R2", () => {
     const r = evaluate(m, { ...base, age_months: 1, convulsions: true });
     expect(r.rule).toBe("R1");
-    expect(r.severity).toBe(2);
+    expect(r.outcome).toBe("refer_urgent_outside_age_range");
+    expect(r.severity).toBe(1);
   });
   it("evaluates rules in ascending priority regardless of array order", () => {
     const raw = rawV1();
@@ -176,12 +178,12 @@ describe("evaluate", () => {
     const p = parseModel(raw);
     if (!p.ok) throw new Error(p.issues.join());
     const r = evaluate(p.value, { ...base, age_months: 24, cough: true, cough_days: 14, breaths_per_minute: 45 });
-    expect(r.derived).toEqual({ chain: true, fast_breathing: true, danger_sign: true });
+    expect(r.derived).toEqual({ chain: true, outside_age_range: false, fast_breathing: true, danger_sign: true });
   });
   it("derived cycle throws DerivedCycleError", () => {
     const raw = rawV1();
-    raw.derived[0].definition = { field: "danger_sign", op: "is_yes" };
-    raw.derived[1].definition = { field: "fast_breathing", op: "is_yes" };
+    raw.derived[1].definition = { field: "danger_sign", op: "is_yes" };
+    raw.derived[2].definition = { field: "fast_breathing", op: "is_yes" };
     const p = parseModel(raw);
     if (!p.ok) throw new Error(p.issues.join());
     expect(() => evaluate(p.value, base)).toThrow(DerivedCycleError);
