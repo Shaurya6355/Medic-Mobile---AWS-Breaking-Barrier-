@@ -12,7 +12,9 @@ export interface RunStepOptions {
   firstAttempt?: number;
 }
 
-const MAX_ERROR_CHARS = 500;
+// Longest error text stored on a StepRecord; the audit copy is shorter.
+export const MAX_ERROR_CHARS = 2000;
+const AUDIT_ERROR_CHARS = 500;
 
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -72,7 +74,7 @@ export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions
         status: "failed",
         endedAt,
         latencyMs: endedAt - startedAt,
-        error: errorText(e),
+        error: errorText(e).slice(0, MAX_ERROR_CHARS),
       };
       const usage = usageOf(e);
       if (usage) Object.assign(patch, usagePatch(opts.prices, usage));
@@ -93,7 +95,7 @@ export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions
     await store.appendAudit(run.runId, {
       at: last.endedAt!,
       type: "step_failed",
-      detail: { step: step.name, attempt, error: (last.error ?? "").slice(0, MAX_ERROR_CHARS) },
+      detail: { step: step.name, attempt, error: (last.error ?? "").slice(0, AUDIT_ERROR_CHARS) },
     });
     if (!transient || attempt >= lastAttempt) return last;
 

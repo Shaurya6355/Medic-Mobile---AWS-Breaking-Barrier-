@@ -24,6 +24,20 @@ describe("parseModelJson", () => {
     expect(() => parseModelJson("not json", schema)).toThrow(ModelOutputError);
     expect(() => parseModelJson("not json", schema)).toThrow(/not json/);
   });
+  it("keeps only the first 200 characters of raw in the message, full raw on the error", () => {
+    const raw = "z".repeat(10000);
+    const err = (() => { try { parseModelJson(raw, schema); } catch (e) { return e; } })() as ModelOutputError;
+    expect(err.raw).toBe(raw);
+    expect(err.message).toContain("z".repeat(200));
+    expect(err.message).not.toContain("z".repeat(201));
+    expect(err.message.length).toBeLessThan(300);
+  });
+  it("does not put raw in the message on schema mismatch", () => {
+    const raw = JSON.stringify({ a: "no", b: "q".repeat(1000) });
+    const err = (() => { try { parseModelJson(raw, schema); } catch (e) { return e; } })() as ModelOutputError;
+    expect(err.raw).toBe(raw);
+    expect(err.message).not.toContain("qqqq");
+  });
   it("lists zod issues on schema mismatch", () => {
     try {
       parseModelJson('{"a":"no"}', schema);

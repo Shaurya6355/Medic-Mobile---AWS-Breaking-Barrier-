@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MemoryArtifactStore } from "../../src/artifacts/artifactStore.js";
-import { runStep } from "../../src/engine/runner.js";
+import { MAX_ERROR_CHARS, runStep } from "../../src/engine/runner.js";
 import { TransientError, UsageError, type Step, type StepContext } from "../../src/engine/step.js";
 import { MemoryStore } from "../../src/store/memoryStore.js";
 import type { ModelClient } from "../../src/model/modelClient.js";
@@ -163,6 +163,17 @@ describe("runStep", () => {
       expect(rec.modelId).toBeUndefined();
       expect(rec.costUsd).toBeUndefined();
     }
+  });
+
+  it("truncates the stored step error to MAX_ERROR_CHARS", async () => {
+    const { store, ctx, opts } = await setup();
+    expect(MAX_ERROR_CHARS).toBe(2000);
+    const long = "y".repeat(5000);
+    const rec = await runStep(stepFrom([async () => { throw new Error(long); }], "t"), ctx, opts);
+    expect(rec.error).toBe("y".repeat(2000));
+    expect((await store.listSteps("r1"))[0]!.error).toBe("y".repeat(2000));
+    const failed = (await store.listAudit("r1")).filter((e) => e.type === "step_failed");
+    expect((failed[0]!.detail as { error: string }).error).toBe("y".repeat(500));
   });
 
   it("ends failed after exhausting transient attempts", async () => {

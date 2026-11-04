@@ -158,6 +158,15 @@ describe("extract step", () => {
     await expect(createExtractStep({ modelId: "m1", promptPath }).run(ctx)).rejects.toBeInstanceOf(ModelOutputError);
   });
 
+  it("keeps the full raw text of an invalid response in raw_response.txt", async () => {
+    const raw = "not json " + "w".repeat(5000);
+    const model = new FakeModelClient([{ raw }]);
+    const { ctx, artifacts } = await setup(model);
+    const err = await createExtractStep({ modelId: "m1", promptPath }).run(ctx).catch((e) => e);
+    expect(err.message.length).toBeLessThan(300);
+    expect(await text(artifacts, artifactKey("r1", "extract", "raw_response.txt"))).toBe(raw);
+  });
+
   it("records the usage of a call whose output is invalid JSON on the failed step record", async () => {
     const model = new FakeModelClient([{ raw: "not json", usage }]);
     const { ctx } = await setup(model);

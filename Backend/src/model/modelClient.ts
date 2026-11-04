@@ -34,12 +34,16 @@ export class ModelOutputError extends UsageError {
   }
 }
 
+const RAW_IN_MESSAGE = 200;
+
 export function parseModelJson<T>(raw: string, schema: z.ZodType<T>, usage?: StepUsage): T {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new ModelOutputError(`Model output is not valid JSON: ${raw}`, raw, undefined, usage);
+    // Only the start of raw goes in the message; the full text stays on .raw.
+    const start = raw.length > RAW_IN_MESSAGE ? `${raw.slice(0, RAW_IN_MESSAGE)}...` : raw;
+    throw new ModelOutputError(`Model output is not valid JSON (starts: ${start})`, raw, undefined, usage);
   }
   const result = schema.safeParse(parsed);
   if (!result.success) {
