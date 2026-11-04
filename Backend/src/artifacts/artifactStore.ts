@@ -33,3 +33,7 @@ export class MemoryArtifactStore implements ArtifactStore {
     return this.objects.has(key);
   }
 }
+
+export function inputPdfKey(runId: string): string {
+  return artifactKey(runId, "input", "guideline.pdf");
+}

@@ -1,0 +1,129 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { MemoryArtifactStore, artifactKey, inputPdfKey } from "../../src/artifacts/artifactStore.js";
+import type { StepContext } from "../../src/engine/step.js";
+import type { ModelClient } from "../../src/model/modelClient.js";
+import { createIngestStep } from "../../src/steps/ingest.js";
+import { MemoryStore } from "../../src/store/memoryStore.js";
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+function fixtureDoc(pageCount: number) {
+  return {
+    source_id: "guideline",
+    doc_name: "guideline.pdf",
+    doc_sha256: "abc",
+    page_count: pageCount,
+    pages: Array.from({ length: pageCount }, (_, i) => ({
+      pdf_page: i + 1,
+      width: 595,
+      height: 842,
+      image: `pages/page-${String(i + 1).padStart(2, "0")}.png`,
+      blocks: [{ block_id: `p${i + 1}.b1`, pdf_page: i + 1, bbox: [0, 0, 1, 1], text: `text ${i + 1}` }],
+    })),
+  };
+}
+
+function fakeExec(pageCount: number, calls: { cmd: string; args: string[] }[] = []) {
+  return async (cmd: string, args: string[]) => {
+    calls.push({ cmd, args });
+    const outDir = args[2]!;
+    await mkdir(path.join(outDir, "pages"), { recursive: true });
+    await writeFile(path.join(outDir, "input_blocks.json"), JSON.stringify(fixtureDoc(pageCount)));
+    for (let i = 1; i <= pageCount; i++) {
+      await writeFile(path.join(outDir, "pages", `page-${String(i).padStart(2, "0")}.png`), PNG);
+    }
+  };
+}
+
+async function setup(pages?: number[], hasPdf = true) {
+  const artifacts = new MemoryArtifactStore();
+  if (hasPdf) await artifacts.put(inputPdfKey("r1"), new Uint8Array([37, 80, 68, 70]));
+  const run = { runId: "r1", state: "ingesting" as const, createdAt: 0, ...(pages ? { pages } : {}) };
+  const ctx: StepContext = {
+    run,
+    store: new MemoryStore(),
+    artifacts,
+    model: {} as ModelClient,
+    now: () => 0,
+  };
+  return { ctx, artifacts };
+}
+
+describe("ingest step", () => {
+  it("has name and runState", () => {
+    const s = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(1) });
+    expect(s.name).toBe("ingest");
+    expect(s.runState).toBe("ingesting");
+  });
+
+  it("keeps all pages when run.pages unset and stores blocks and images", async () => {
+    const calls: { cmd: string; args: string[] }[] = [];
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(3, calls) });
+    const { ctx, artifacts } = await setup();
+    const res = await step.run(ctx);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.cmd).toBe("py");
+    expect(calls[0]!.args[0]).toBe("s.py");
+    const doc = JSON.parse(new TextDecoder().decode(await artifacts.get(artifactKey("r1", "ingest", "input_blocks.json"))));
+    expect(doc.page_count).toBe(3);
+    expect(doc.pages.map((p: { pdf_page: number }) => p.pdf_page)).toEqual([1, 2, 3]);
+    for (const n of ["01", "02", "03"]) {
+      expect(await artifacts.get(artifactKey("r1", "ingest", "pages", `page-${n}.png`))).toEqual(PNG);
+    }
+    expect(res.artifactRefs).toEqual({
+      blocks: "runs/r1/ingest/input_blocks.json",
+      pages: "runs/r1/ingest/pages/",
+    });
+  });
+
+  it("keeps only selected pages, with original numbering", async () => {
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(5) });
+    const { ctx, artifacts } = await setup([2, 4]);
+    await step.run(ctx);
+    const doc = JSON.parse(new TextDecoder().decode(await artifacts.get(artifactKey("r1", "ingest", "input_blocks.json"))));
+    expect(doc.page_count).toBe(2);
+    expect(doc.pages.map((p: { pdf_page: number }) => p.pdf_page)).toEqual([2, 4]);
+    expect(doc.pages[0].blocks[0].block_id).toBe("p2.b1");
+    expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-02.png"))).toBe(true);
+    expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-04.png"))).toBe(true);
+    expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-01.png"))).toBe(false);
+    expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-03.png"))).toBe(false);
+  });
+
+  it("fails non-transient when a selected page is out of range", async () => {
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(3) });
+    const { ctx } = await setup([2, 7, 9]);
+    const err = await step.run(ctx).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe("Error");
+    expect(err.message).toContain("7");
+    expect(err.message).toContain("9");
+    expect(err.message).toContain("3");
+  });
+
+  it("fails clearly when the PDF is missing", async () => {
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(1) });
+    const { ctx } = await setup(undefined, false);
+    const err = await step.run(ctx).catch((e) => e);
+    expect(err.name).toBe("Error");
+    expect(err.message).toMatch(/input PDF/i);
+  });
+
+  it("removes the temp directory even when exec fails", async () => {
+    let seen = "";
+    const { stat } = await import("node:fs/promises");
+    const step = createIngestStep({
+      pythonBin: "py",
+      scriptPath: "s.py",
+      exec: async (_c, args) => {
+        seen = args[2]!;
+        throw new Error("boom");
+      },
+    });
+    const { ctx } = await setup();
+    await expect(step.run(ctx)).rejects.toThrow("boom");
+    await expect(stat(path.dirname(seen))).rejects.toThrow();
+  });
+});
