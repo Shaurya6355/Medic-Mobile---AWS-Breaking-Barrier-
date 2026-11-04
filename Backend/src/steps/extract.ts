@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { artifactKey } from "../artifacts/artifactStore.js";
+import { artifactKey, pageImageName } from "../artifacts/artifactStore.js";
 import type { Step } from "../engine/step.js";
 import { ModelOutputError, type ModelContent } from "../model/modelClient.js";
 import { ExtractionOutput } from "./extractionSchema.js";
@@ -61,12 +61,11 @@ export function createExtractStep(opts: { modelId: string; promptPath: string; m
         },
       ];
       for (const p of doc.pages) {
-        const name = p.image.split("/").pop()!;
         content.push({ type: "text", text: `--- pdf_page ${p.pdf_page} ---` });
         content.push({
           type: "image",
           format: "png",
-          bytes: await ctx.artifacts.get(artifactKey(runId, "ingest", "pages", name)),
+          bytes: await ctx.artifacts.get(artifactKey(runId, "ingest", "pages", pageImageName(p.pdf_page))),
         });
         content.push({ type: "text", text: "Blocks: " + JSON.stringify(p.blocks) });
       }

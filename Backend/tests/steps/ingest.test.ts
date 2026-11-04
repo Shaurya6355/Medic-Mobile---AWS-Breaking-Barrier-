@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { MemoryArtifactStore, artifactKey, inputPdfKey } from "../../src/artifacts/artifactStore.js";
+import { MemoryArtifactStore, artifactKey, inputPdfKey, pageImageName } from "../../src/artifacts/artifactStore.js";
 import type { StepContext } from "../../src/engine/step.js";
 import type { ModelClient } from "../../src/model/modelClient.js";
 import { createIngestStep } from "../../src/steps/ingest.js";
@@ -25,17 +25,28 @@ function fixtureDoc(pageCount: number) {
   };
 }
 
-function fakeExec(pageCount: number, calls: { cmd: string; args: string[] }[] = []) {
+// pad: digits used for page file names, like pdftoppm (digit count of the last page).
+// "fixed2" mimics the 2-digit names the input_blocks.json image field claims.
+function fakeExec(
+  pageCount: number,
+  calls: { cmd: string; args: string[] }[] = [],
+  pad: number | "fixed2" = "fixed2",
+  skip: number[] = [],
+) {
   return async (cmd: string, args: string[]) => {
     calls.push({ cmd, args });
     const outDir = args[2]!;
     await mkdir(path.join(outDir, "pages"), { recursive: true });
     await writeFile(path.join(outDir, "input_blocks.json"), JSON.stringify(fixtureDoc(pageCount)));
+    const width = pad === "fixed2" ? 2 : pad;
     for (let i = 1; i <= pageCount; i++) {
-      await writeFile(path.join(outDir, "pages", `page-${String(i).padStart(2, "0")}.png`), PNG);
+      if (skip.includes(i)) continue;
+      const bytes = new Uint8Array([...PNG, i % 256]);
+      await writeFile(path.join(outDir, "pages", `page-${String(i).padStart(width, "0")}.png`), bytes);
     }
   };
 }
+const pngFor = (i: number) => new Uint8Array([...PNG, i % 256]);
 
 async function setup(pages?: number[], hasPdf = true) {
   const artifacts = new MemoryArtifactStore();
@@ -69,8 +80,8 @@ describe("ingest step", () => {
     const doc = JSON.parse(new TextDecoder().decode(await artifacts.get(artifactKey("r1", "ingest", "input_blocks.json"))));
     expect(doc.page_count).toBe(3);
     expect(doc.pages.map((p: { pdf_page: number }) => p.pdf_page)).toEqual([1, 2, 3]);
-    for (const n of ["01", "02", "03"]) {
-      expect(await artifacts.get(artifactKey("r1", "ingest", "pages", `page-${n}.png`))).toEqual(PNG);
+    for (const [i, n] of [[1, "01"], [2, "02"], [3, "03"]] as const) {
+      expect(await artifacts.get(artifactKey("r1", "ingest", "pages", `page-${n}.png`))).toEqual(pngFor(i));
     }
     expect(res.artifactRefs).toEqual({
       blocks: "runs/r1/ingest/input_blocks.json",
@@ -90,6 +101,51 @@ describe("ingest step", () => {
     expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-04.png"))).toBe(true);
     expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-01.png"))).toBe(false);
     expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-03.png"))).toBe(false);
+  });
+
+  it("finds pdftoppm images with 1-digit names (fewer than 10 pages)", async () => {
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(9, [], 1) });
+    const { ctx, artifacts } = await setup();
+    await step.run(ctx);
+    for (let i = 1; i <= 9; i++) {
+      expect(await artifacts.get(artifactKey("r1", "ingest", "pages", `page-0${i}.png`))).toEqual(pngFor(i));
+    }
+    const doc = JSON.parse(new TextDecoder().decode(await artifacts.get(artifactKey("r1", "ingest", "input_blocks.json"))));
+    expect(doc.pages[0].image).toBe("pages/page-01.png");
+  });
+
+  it("finds pdftoppm images with 3-digit names (100 or more pages)", async () => {
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(101, [], 3) });
+    const { ctx, artifacts } = await setup([1, 9, 10, 100, 101]);
+    await step.run(ctx);
+    for (const [i, name] of [[1, "page-01.png"], [9, "page-09.png"], [10, "page-10.png"], [100, "page-100.png"], [101, "page-101.png"]] as const) {
+      expect(await artifacts.get(artifactKey("r1", "ingest", "pages", name))).toEqual(pngFor(i));
+      expect(pageImageName(i)).toBe(name);
+    }
+    expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-001.png"))).toBe(false);
+    const doc = JSON.parse(new TextDecoder().decode(await artifacts.get(artifactKey("r1", "ingest", "input_blocks.json"))));
+    expect(doc.pages.map((p: { image: string }) => p.image)).toEqual([
+      "pages/page-01.png",
+      "pages/page-09.png",
+      "pages/page-10.png",
+      "pages/page-100.png",
+      "pages/page-101.png",
+    ]);
+  });
+
+  it("fails non-transient naming the page when a kept page has no image", async () => {
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(3, [], 1, [2]) });
+    const { ctx } = await setup();
+    const err = await step.run(ctx).catch((e) => e);
+    expect(err.name).toBe("Error");
+    expect(err.message).toMatch(/image.*page 2/i);
+  });
+
+  it("does not need images for pages that were not selected", async () => {
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(3, [], 1, [2]) });
+    const { ctx, artifacts } = await setup([1, 3]);
+    await step.run(ctx);
+    expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-03.png"))).toBe(true);
   });
 
   it("fails non-transient when a selected page is out of range", async () => {

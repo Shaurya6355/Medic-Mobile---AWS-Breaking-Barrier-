@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { artifactKey, inputPdfKey } from "../artifacts/artifactStore.js";
+import { artifactKey, inputPdfKey, pageImageName } from "../artifacts/artifactStore.js";
 import type { Step } from "../engine/step.js";
 
 export type Exec = (cmd: string, args: string[]) => Promise<void>;
@@ -25,6 +25,26 @@ interface InputDoc {
   page_count: number;
   pages: InputPage[];
   [k: string]: unknown;
+}
+
+const PAGE_FILE = /^page-0*(\d+)\.png$/;
+
+// pdftoppm pads page numbers to the digit count of the last page (page-1.png,
+// page-01.png, page-001.png), so the image field in input_blocks.json cannot be
+// trusted. Map the files actually written to their page number instead.
+async function listPageImages(pagesDir: string): Promise<Map<number, string>> {
+  const out = new Map<number, string>();
+  let names: string[];
+  try {
+    names = await readdir(pagesDir);
+  } catch {
+    return out;
+  }
+  for (const name of names) {
+    const m = PAGE_FILE.exec(name);
+    if (m) out.set(Number(m[1]), name);
+  }
+  return out;
 }
 
 export function createIngestStep(opts: { pythonBin: string; scriptPath: string; exec: Exec }): Step {
@@ -68,12 +88,19 @@ export function createIngestStep(opts: { pythonBin: string; scriptPath: string; 
           doc.page_count = doc.pages.length;
         }
 
+        const pagesDir = path.join(outDir, "pages");
+        const images = await listPageImages(pagesDir);
+        const missing = doc.pages.filter((p) => !images.has(p.pdf_page)).map((p) => p.pdf_page);
+        if (missing.length > 0) {
+          throw new Error(`No page image found for page ${missing.join(", ")}`);
+        }
+        for (const p of doc.pages) p.image = `pages/${pageImageName(p.pdf_page)}`;
+
         const blocksKey = artifactKey(runId, "ingest", "input_blocks.json");
         await ctx.artifacts.put(blocksKey, JSON.stringify(doc, null, 2), "application/json");
         for (const p of doc.pages) {
-          const name = p.image.split("/").pop()!;
-          const bytes = await readFile(path.join(outDir, "pages", name));
-          await ctx.artifacts.put(artifactKey(runId, "ingest", "pages", name), bytes, "image/png");
+          const bytes = await readFile(path.join(pagesDir, images.get(p.pdf_page)!));
+          await ctx.artifacts.put(artifactKey(runId, "ingest", "pages", pageImageName(p.pdf_page)), bytes, "image/png");
         }
         return { artifactRefs: { blocks: blocksKey, pages: artifactKey(runId, "ingest", "pages") + "/" } };
       } finally {

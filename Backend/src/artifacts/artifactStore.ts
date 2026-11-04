@@ -49,3 +49,9 @@ export function parseInputKey(key: string): string | undefined {
   const runId = key.slice(KEY_PREFIX.length, key.length - KEY_SUFFIX.length);
   return /^[A-Za-z0-9-]+$/.test(runId) ? runId : undefined;
 }
+
+// Canonical stored name of a page image: page number padded to at least 2 digits
+// (page-07.png, page-123.png). Ingest writes it and extract reads it.
+export function pageImageName(pdfPage: number): string {
+  return `page-${String(pdfPage).padStart(2, "0")}.png`;
+}
