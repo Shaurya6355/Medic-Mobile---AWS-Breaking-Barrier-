@@ -126,3 +126,59 @@ Other options considered (and why not):
 - OpenAPI first: heavier than needed for a hackathon.
 Revisit if: the UI is not TypeScript.
 Related: DEC-006
+
+### DEC-008 | Use Amazon Bedrock AgentCore for hosting agents
+Status: open (pending organiser confirmation)
+Date: 2026-11-03
+Decided by: human (utg1209), provisional
+Feature or area: orchestrator hosting
+Decision: Use Amazon Bedrock AgentCore (for example AgentCore Runtime) to host the Strands-based agent steps, as the non-EC2 hosting in DEC-006.
+Assumptions: AgentCore can be used in the sandbox account and counts as an allowed AWS service. It is not on the approved list in the Technical Environment Document.
+Why: Human preference; Strands has a documented TypeScript deployment path to it.
+Other options considered (and why not):
+- EC2 containers: matches claude.md, human prefers managed hosting.
+- Lambda or Fargate: forbidden for app logic by claude.md.
+Revisit if: organisers refuse AgentCore, or the budget or sandbox blocks it.
+Related: DEC-006
+
+### DEC-009 | Infrastructure code is written and kept current with every backend change
+Status: decided
+Date: 2026-11-03
+Decided by: human (utg1209)
+Feature or area: infrastructure as code
+Decision: AWS infrastructure is defined in AWS CDK (TypeScript) in the Infra/ directory. Any change that adds or alters an AWS resource, an environment variable, or an IAM permission the application needs must update Infra/ in the same piece of work. Rule added to claude.md (Technical standards).
+Assumptions: CDK in TypeScript fits the TypeScript stack and is one of the two options claude.md allows (Terraform or CDK).
+Why: Hand-built resources drift and cannot be reviewed; permissions must match what the code calls.
+Other options considered (and why not):
+- Terraform: allowed, but a second language for a TypeScript team.
+- Manual console setup: not reproducible, not reviewable.
+Revisit if: organisers require Terraform.
+Related: DEC-006, DEC-008
+
+Update 2026-11-03 (DEC-008): human (utg1209) confirmed the choice is AgentCore for hosting. Status stays open only until the organisers confirm AgentCore is allowed in the sandbox. Infra/ will gain an AgentCore Runtime stack; EC2 is the fallback if refused.
+
+### DEC-010 | Lambda is allowed for application logic
+Status: decided
+Date: 2026-11-03
+Decided by: human (utg1209), reported as confirmed with the organisers
+Feature or area: compute scope
+Decision: AWS Lambda may be used for application logic. The claude.md out-of-scope entry for Lambda is removed.
+Assumptions: The organiser confirmation was received outside this repository; no written reference is available here.
+Why: Removes the forbidden-service constraint on hosting choices (DEC-006, DEC-008).
+Other options considered (and why not): none.
+Revisit if: the organisers contradict this in writing.
+Related: DEC-006, DEC-008
+
+### DEC-011 | Orchestrator runs on Lambda (container image); AgentCore is an optional model backend
+Status: decided (AgentCore part open pending organiser approval, see DEC-008)
+Date: 2026-11-03
+Decided by: human (utg1209), implemented by Claude session
+Feature or area: hosting
+Decision: The orchestrator runs as an AWS Lambda container image behind the AWS Lambda Web Adapter (RUN_MODE=lambda): API Gateway HTTP API with explicit contract routes, SQS event source for uploads, EventBridge rate(5 minutes) schedule as the only recovery path for runs cut off by the 15-minute limit. The same image also runs as a plain container (RUN_MODE=container). Strands agent calls run in-process on Bedrock by default (MODEL_BACKEND=bedrock). If the organisers approve AgentCore, MODEL_BACKEND=agentcore calls the AgentService (AgentService/, AgentCore Runtime, ARM64) instead; the stack is only created with cdk -c modelBackend=agentcore. No EC2 or Fargate stack is built.
+Assumptions: Lambda is allowed (DEC-010). API Gateway and EventBridge are used as glue for Lambda and are not named in any decision or the approved service list; confirm with organisers. The API has no authentication yet.
+Why: No servers to run; fits an event-driven pipeline; steps are idempotent and leases make cut-off runs resumable.
+Other options considered (and why not):
+- EC2 containers (claude.md): servers to manage; a long-running consumer is not needed.
+- Whole orchestrator on AgentCore Runtime: sessions are invoked and stopped when idle, which does not fit a queue consumer and sweep.
+Revisit if: organisers refuse API Gateway/EventBridge, or a single step must exceed 15 minutes.
+Related: DEC-006, DEC-008, DEC-009, DEC-010

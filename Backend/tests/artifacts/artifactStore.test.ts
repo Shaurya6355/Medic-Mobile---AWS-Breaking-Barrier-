@@ -30,6 +30,15 @@ describe("MemoryArtifactStore", () => {
     await expect(s.get("zz")).rejects.toMatchObject({ name: "NotFound" });
   });
 
+  it("reports the size of an object without reading it, NotFound when missing", async () => {
+    const s = new MemoryArtifactStore();
+    await s.put("a", new Uint8Array([1, 2, 3]));
+    await s.put("b", "hello");
+    expect(await s.size("a")).toBe(3);
+    expect(await s.size("b")).toBe(5);
+    await expect(s.size("zz")).rejects.toMatchObject({ name: "NotFound" });
+  });
+
   it("does not alias stored bytes", async () => {
     const s = new MemoryArtifactStore();
     const src = new Uint8Array([1]);
@@ -74,6 +83,15 @@ describe("S3ArtifactStore", () => {
     s3.on(HeadObjectCommand, { Key: "no" }).rejects(new S3NotFound({ message: "x", $metadata: {} }));
     expect(await store().exists("yes")).toBe(true);
     expect(await store().exists("no")).toBe(false);
+  });
+
+  it("size uses HeadObject ContentLength; a missing key is NotFound", async () => {
+    s3.on(HeadObjectCommand, { Key: "yes" }).resolves({ ContentLength: 1234 });
+    s3.on(HeadObjectCommand, { Key: "no" }).rejects(new S3NotFound({ message: "x", $metadata: {} }));
+    s3.on(HeadObjectCommand, { Key: "nolen" }).resolves({});
+    expect(await store().size("yes")).toBe(1234);
+    await expect(store().size("no")).rejects.toMatchObject({ name: "NotFound" });
+    await expect(store().size("nolen")).rejects.toThrow(/size/);
   });
 
   it("exists rethrows other errors", async () => {

@@ -10,10 +10,11 @@ import { loadConfig } from "./config.js";
 import { Orchestrator } from "./engine/engine.js";
 import { startResumeSweep } from "./engine/sweep.js";
 import { withDeadline } from "./shutdown.js";
+import { createAgentCoreModelClient } from "./model/agentcore.js";
 import { createStrandsModelClient } from "./model/strands.js";
 import { createExtractStep } from "./steps/extract.js";
 import { createFillLogicStep } from "./steps/fillLogic.js";
-import { createIngestStep, defaultExec } from "./steps/ingest.js";
+import { createIngestStep, createPdfInfoPageCount, defaultExec } from "./steps/ingest.js";
 import { acceptAnyObjectValidator } from "./steps/logicModelValidator.js";
 import { DynamoStore } from "./store/dynamoStore.js";
 import { startQueueConsumer } from "./trigger/queueConsumer.js";
@@ -35,14 +36,24 @@ async function main(): Promise<void> {
   const store = new DynamoStore(doc, cfg.tables);
   const s3 = new S3Client({ region: cfg.region });
   const artifacts = new S3ArtifactStore(s3, cfg.artifactBucket);
-  const model = createStrandsModelClient({ region: cfg.region });
+  const model =
+    cfg.modelBackend === "agentcore"
+      ? createAgentCoreModelClient({ region: cfg.region, runtimeArn: cfg.agentCoreRuntimeArn as string })
+      : createStrandsModelClient({ region: cfg.region });
 
   const orchestrator = new Orchestrator({
     store,
     artifacts,
     model,
     steps: [
-      createIngestStep({ pythonBin: cfg.pythonBin, scriptPath: cfg.ingestScript, exec: defaultExec }),
+      createIngestStep({
+        pythonBin: cfg.pythonBin,
+        scriptPath: cfg.ingestScript,
+        exec: defaultExec,
+        maxPdfBytes: cfg.maxPdfBytes,
+        maxPages: cfg.maxPages,
+        pdfPageCount: createPdfInfoPageCount(),
+      }),
       createExtractStep({ modelId: cfg.modelId, promptPath: cfg.extractPrompt }),
       createFillLogicStep({ validator: acceptAnyObjectValidator }),
     ],
@@ -70,18 +81,24 @@ async function main(): Promise<void> {
       log("version saved", { runId, version: n });
     },
     maxPages: cfg.maxPages,
+    runMode: cfg.runMode,
     logger: false,
   });
 
   const abort = new AbortController();
-  const consumer = startQueueConsumer({
-    sqs: new SQSClient({ region: cfg.region }),
-    queueUrl: cfg.uploadQueueUrl,
-    onUploaded: (runId) => orchestrator.onUploaded(runId),
-    signal: abort.signal,
-    concurrency: cfg.sqsConcurrency,
-    log,
-  });
+  // In agentcore and lambda modes a trigger outside the process calls the API instead,
+  // so there is no queue consumer and no resume sweep.
+  const consumer: Promise<void> =
+    cfg.runMode === "container" && cfg.uploadQueueUrl !== undefined
+      ? startQueueConsumer({
+          sqs: new SQSClient({ region: cfg.region }),
+          queueUrl: cfg.uploadQueueUrl,
+          onUploaded: (runId) => orchestrator.onUploaded(runId),
+          signal: abort.signal,
+          concurrency: cfg.sqsConcurrency,
+          log,
+        })
+      : Promise.resolve();
 
   let stopSweep: (() => void) | undefined;
   let stopping = false;
@@ -108,7 +125,10 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => shutdown("SIGINT"));
 
   await app.listen({ host: cfg.host, port: cfg.port });
-  log("listening", { host: cfg.host, port: cfg.port });
+  log("listening", { host: cfg.host, port: cfg.port, runMode: cfg.runMode });
+
+  // Lambda: no in-process trigger; SQS and the scheduled sweep arrive as POST events.
+  if (cfg.runMode !== "container") return;
 
   try {
     await orchestrator.resumeAll();

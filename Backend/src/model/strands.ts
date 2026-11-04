@@ -2,6 +2,9 @@ import { Agent, BedrockModel, ImageBlock, TextBlock } from "@strands-agents/sdk"
 import { TransientError } from "../engine/step.js";
 import { parseModelJson, type ModelClient, type ModelContent } from "./modelClient.js";
 
+// Per call. Keeps one attempt well inside a 15 minute Lambda invocation.
+export const DEFAULT_BEDROCK_TIMEOUT_MS = 6 * 60 * 1000;
+
 const TRANSIENT_NAMES = new Set([
   "ThrottlingException",
   "ServiceUnavailableException",
@@ -35,10 +38,13 @@ export function toStrandsContent(content: ModelContent[]): (TextBlock | ImageBlo
   );
 }
 
-export function createStrandsModelClient(opts: { region: string }): ModelClient {
+export function createStrandsModelClient(opts: { region: string; timeoutMs?: number }): ModelClient {
   const region = opts.region || "us-west-2";
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_BEDROCK_TIMEOUT_MS;
   return {
     async generateJson(req) {
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(), timeoutMs);
       try {
         const model = new BedrockModel({
           region,
@@ -48,7 +54,16 @@ export function createStrandsModelClient(opts: { region: string }): ModelClient 
         });
         // retryStrategy null: retries are owned by the orchestration engine (TransientError).
         const agent = new Agent({ model, systemPrompt: req.system, printer: false, retryStrategy: null });
-        const result = await agent.invoke(toStrandsContent(req.content));
+        // Strands supports cancelSignal: on abort it stops at its next checkpoint and returns
+        // stopReason "cancelled". The race below is a backstop for a call stuck inside the SDK;
+        // it does not cancel anything by itself.
+        const timedOut = new Promise<never>((_, reject) => {
+          abort.signal.addEventListener("abort", () => reject(new TransientError(`Bedrock call timed out after ${timeoutMs} ms`)));
+        });
+        const call = agent.invoke(toStrandsContent(req.content), { cancelSignal: abort.signal });
+        call.catch(() => undefined);
+        const result = await Promise.race([call, timedOut]);
+        if (result.stopReason === "cancelled") throw new TransientError(`Bedrock call timed out after ${timeoutMs} ms`);
         const raw = result.toString();
         const acc = result.metrics?.accumulatedUsage;
         const usage = {
@@ -63,6 +78,8 @@ export function createStrandsModelClient(opts: { region: string }): ModelClient 
           throw new TransientError(e instanceof Error ? e.message : String(e));
         }
         throw e;
+      } finally {
+        clearTimeout(timer);
       }
     },
   };

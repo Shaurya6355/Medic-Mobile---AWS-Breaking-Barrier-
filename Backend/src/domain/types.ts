@@ -5,6 +5,8 @@ export interface Run {
   state: RunState;
   pages?: number[];
   currentStep?: string;
+  // Set by a manual resume: attempts of `step` numbered up to `attempt` no longer count against the attempt cap.
+  attemptFloor?: { step: string; attempt: number };
   createdAt: number;
   docSha256?: string;
   lease?: { owner: string; expiresAt: number };

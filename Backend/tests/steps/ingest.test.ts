@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryArtifactStore, artifactKey, inputPdfKey, pageImageName } from "../../src/artifacts/artifactStore.js";
 import type { StepContext } from "../../src/engine/step.js";
 import type { ModelClient } from "../../src/model/modelClient.js";
-import { DEFAULT_EXEC_TIMEOUT_MS, createDefaultExec, createIngestStep, defaultExec } from "../../src/steps/ingest.js";
+import { DEFAULT_EXEC_TIMEOUT_MS, createDefaultExec, createIngestStep, defaultExec, parsePdfInfoPages } from "../../src/steps/ingest.js";
 import { MemoryStore } from "../../src/store/memoryStore.js";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
@@ -237,5 +237,66 @@ describe("default exec", () => {
   it("fails a command that outlives its timeout", async () => {
     const exec = createDefaultExec({ timeoutMs: 100 });
     await expect(exec(process.execPath, ["-e", "setTimeout(() => {}, 10000)"])).rejects.toThrow(/Command failed: .*timed out after 100 ms/);
+  });
+});
+
+describe("ingest bounds", () => {
+  it("fails permanently before downloading when the object is over maxPdfBytes", async () => {
+    const calls: { cmd: string; args: string[] }[] = [];
+    const { ctx, artifacts } = await setup();
+    await artifacts.put(inputPdfKey("r1"), new Uint8Array(101));
+    let gets = 0;
+    const get = artifacts.get.bind(artifacts);
+    artifacts.get = async (k) => {
+      gets++;
+      return get(k);
+    };
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(1, calls), maxPdfBytes: 100 });
+    await expect(step.run(ctx)).rejects.toThrow(/101 bytes.*limit of 100/);
+    await expect(step.run(ctx)).rejects.not.toMatchObject({ name: "TransientError" });
+    expect(gets).toBe(0);
+    expect(calls).toHaveLength(0);
+  });
+  it("accepts an object exactly at maxPdfBytes", async () => {
+    const { ctx, artifacts } = await setup();
+    await artifacts.put(inputPdfKey("r1"), new Uint8Array(100));
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(1), maxPdfBytes: 100 });
+    await expect(step.run(ctx)).resolves.toBeDefined();
+  });
+  it("fails permanently when pdfinfo reports more pages than maxPages, before rendering", async () => {
+    const calls: { cmd: string; args: string[] }[] = [];
+    const { ctx } = await setup();
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(1, calls), maxPages: 200, pdfPageCount: async () => 201 });
+    await expect(step.run(ctx)).rejects.toThrow(/201 pages.*limit of 200/);
+    expect(calls).toHaveLength(0);
+  });
+  it("renders when the page count is within maxPages", async () => {
+    const calls: { cmd: string; args: string[] }[] = [];
+    const { ctx } = await setup();
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(2, calls), maxPages: 2, pdfPageCount: async () => 2 });
+    await step.run(ctx);
+    expect(calls).toHaveLength(1);
+  });
+  it("passes the written PDF path to the page counter", async () => {
+    const { ctx } = await setup();
+    let seen = "";
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(1), maxPages: 5, pdfPageCount: async (p) => ((seen = p), 1) });
+    await step.run(ctx);
+    expect(seen).toMatch(/guideline\.pdf$/);
+  });
+  it("a pdfinfo failure fails the step with a clear message", async () => {
+    const { ctx } = await setup();
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(1), maxPages: 5, pdfPageCount: async () => { throw new Error("Command failed: pdfinfo"); } });
+    await expect(step.run(ctx)).rejects.toThrow(/pdfinfo/);
+  });
+});
+
+describe("parsePdfInfoPages", () => {
+  it("reads the Pages line", () => {
+    expect(parsePdfInfoPages("Title: x\nPages:           12\nEncrypted: no\n")).toBe(12);
+  });
+  it("throws when there is no usable Pages line", () => {
+    expect(() => parsePdfInfoPages("Title: x\n")).toThrow(/page count/i);
+    expect(() => parsePdfInfoPages("Pages: 0\n")).toThrow(/page count/i);
   });
 });
