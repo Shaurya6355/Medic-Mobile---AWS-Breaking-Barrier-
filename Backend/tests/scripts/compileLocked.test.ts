@@ -35,4 +35,23 @@ describe("compile job (scripts/compileLocked.ts)", () => {
     expect(existsSync(join(out, "manifest.json"))).toBe(true);
     expect(existsSync(join(out, "project", "tasks.js"))).toBe(true);
   });
+
+  it("records the job as a compile process of that version (DEC-003)", async () => {
+    const { store, artifacts, signoff } = await seed("awaiting_officer", [fullyResolved()]);
+    const sha = shaOf(fullyResolved());
+    await signoff.sign("r1", 1, "program_officer", { role: "program_officer", userId: "o1", modelSha: sha });
+    await signoff.sign("r1", 1, "clinician", { role: "clinician", userId: "c1", modelSha: sha });
+    await runCompileJob({ store, artifacts, runId: "r1", n: 1, settings: demoSettings(), inputs: async () => testInputs(), outDir: join(root, "recorded"), log: () => {}, runCht: false });
+    const compile = (await store.listSteps("r1")).filter((r) => r.step === "compile");
+    expect(compile).toHaveLength(1);
+    expect(compile[0]).toMatchObject({ versionId: "1", status: "succeeded", attempt: 1 });
+    expect(compile[0]?.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("records a refused job too, and rethrows nothing", async () => {
+    const { store, artifacts } = await seed("awaiting_officer", [fullyResolved()]);
+    const res = await runCompileJob({ store, artifacts, runId: "r1", n: 1, settings: demoSettings(), inputs: async () => testInputs(), outDir: join(root, "refused-rec"), log: () => {}, runCht: false });
+    expect(res.status).toBe("refused");
+    expect((await store.listSteps("r1")).filter((r) => r.step === "compile")).toHaveLength(1);
+  });
 });

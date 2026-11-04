@@ -62,6 +62,13 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...base, RUN_MODE: "container" }).runMode).toBe("container");
     const { UPLOAD_QUEUE_URL, ...noQueue } = base;
     void UPLOAD_QUEUE_URL;
+  it("RUN_BUDGET_USD is optional and parsed as a positive number", () => {
+    expect(loadConfig(base).runBudgetUsd).toBeUndefined();
+    expect(loadConfig({ ...base, RUN_BUDGET_USD: "12.5" }).runBudgetUsd).toBe(12.5);
+    for (const bad of ["0", "-1", "abc", "Infinity"]) {
+      expect(() => loadConfig({ ...base, RUN_BUDGET_USD: bad })).toThrow("RUN_BUDGET_USD");
+    }
+  });
     expect(() => loadConfig(noQueue)).toThrow(/UPLOAD_QUEUE_URL/);
   });
   it("agentcore mode does not require UPLOAD_QUEUE_URL", () => {

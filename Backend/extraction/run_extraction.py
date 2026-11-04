@@ -1,11 +1,12 @@
 """Run whole-document extraction on Amazon Bedrock and save outputs.
 Needs: AWS credentials, `pip install boto3`, env MODEL_ID (a us. inference profile id).
-Optional env for cost: PRICE_IN_PER_MTOK, PRICE_OUT_PER_MTOK (USD).
+Optional env for cost: PRICES_JSON (the server's price map, keyed by model id), or the older PRICE_IN_PER_MTOK / PRICE_OUT_PER_MTOK (USD).
 Writes: extraction_output.json, run_metrics.json, raw_response.txt in this folder.
 """
 import json, os, sys, time
 from pathlib import Path
 import boto3
+from usage_cost import cost_usd
 
 here = Path(__file__).parent
 doc = json.loads((here / "input_blocks.json").read_text())
@@ -31,11 +32,11 @@ text = resp["output"]["message"]["content"][0]["text"]
 (here / "raw_response.txt").write_text(text)
 
 u = resp["usage"]
-pin, pout = float(os.environ.get("PRICE_IN_PER_MTOK", 0)), float(os.environ.get("PRICE_OUT_PER_MTOK", 0))
+cost = cost_usd(os.environ, model_id, u["inputTokens"], u["outputTokens"])
 metrics = {"run_id": run_id, "process": "extraction", "model_id": model_id,
            "input_tokens": u["inputTokens"], "output_tokens": u["outputTokens"],
            "latency_seconds": round(latency, 2), "stop_reason": resp["stopReason"],
-           "cost_usd": round(u["inputTokens"] / 1e6 * pin + u["outputTokens"] / 1e6 * pout, 4) if pin or pout else None,
+           "cost_usd": round(cost, 4) if cost is not None else None,
            "pages": doc["page_count"], "doc_sha256": doc["doc_sha256"]}
 (here / "run_metrics.json").write_text(json.dumps(metrics, indent=2))
 

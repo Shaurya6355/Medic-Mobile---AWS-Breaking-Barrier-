@@ -7,6 +7,11 @@ export interface RunStepOptions {
   backoffMs: (attempt: number) => number;
   sleep: (ms: number) => Promise<void>;
   prices: PriceTable;
+  // Optional cap on the cost already recorded for the run (step records plus extraSpentUsd). When reached,
+  // no further attempt starts; the attempt is recorded as failed and not retried.
+  runBudgetUsd?: number;
+  // Spend recorded outside the step records (for example revision model calls), added to the budget check.
+  extraSpentUsd?: (runId: string) => Promise<number>;
   // Number of the first attempt in this call (default 1), so a resumed step
   // does not reuse attempt numbers already stored for it.
   firstAttempt?: number;
@@ -37,6 +42,33 @@ export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions
 
   for (let attempt = first; attempt <= lastAttempt; attempt++) {
     const startedAt = ctx.now();
+    if (opts.runBudgetUsd !== undefined) {
+      const stepSpent = (await store.listSteps(run.runId)).reduce((a, r) => a + (r.costUsd ?? 0), 0);
+      const spent = stepSpent + (opts.extraSpentUsd ? await opts.extraSpentUsd(run.runId) : 0);
+      if (spent >= opts.runBudgetUsd) {
+        const refused: StepRecord = {
+          runId: run.runId,
+          step: step.name,
+          versionId: ctx.versionId,
+          attempt,
+          status: "failed",
+          startedAt,
+          endedAt: startedAt,
+          latencyMs: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          artifactRefs: {},
+          error: `Run budget exceeded: $${spent.toFixed(4)} of $${opts.runBudgetUsd.toFixed(4)}`,
+        };
+        await store.appendStep(refused);
+        await store.appendAudit(run.runId, {
+          at: startedAt,
+          type: "step_failed",
+          detail: { step: step.name, attempt, error: (refused.error ?? "").slice(0, AUDIT_ERROR_CHARS) },
+        });
+        return refused;
+      }
+    }
     const base: StepRecord = {
       runId: run.runId,
       step: step.name,

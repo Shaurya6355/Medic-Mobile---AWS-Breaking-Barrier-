@@ -156,9 +156,10 @@ describe("runStep", () => {
 
   it("ignores a malformed usage property on a thrown error", async () => {
     const { ctx, opts } = await setup();
-    for (const usage of [null, "x", { inputTokens: -1, outputTokens: 1, modelId: "m1" }, { inputTokens: 1, outputTokens: 1 }]) {
+    const usages = [null, "x", { inputTokens: -1, outputTokens: 1, modelId: "m1" }, { inputTokens: 1, outputTokens: 1 }];
+    for (const [i, usage] of usages.entries()) {
       const e = Object.assign(new Error("x"), { usage });
-      const rec = await runStep(stepFrom([async () => { throw e; }], `m${String(usage)}`), ctx, opts);
+      const rec = await runStep(stepFrom([async () => { throw e; }], `m${i}`), ctx, opts);
       expect(rec).toMatchObject({ status: "failed", inputTokens: 0, outputTokens: 0 });
       expect(rec.modelId).toBeUndefined();
       expect(rec.costUsd).toBeUndefined();
@@ -193,5 +194,41 @@ describe("runStep", () => {
     expect(step.calls).toBe(3);
     expect(sleeps).toEqual([100, 200]);
     expect((await store.listSteps("r1")).map((s) => s.attempt)).toEqual([4, 5, 6]);
+  });
+
+  it("refuses to start an attempt when the run's cost is at the budget", async () => {
+    const { store, ctx, opts } = await setup();
+    await store.appendStep({ runId: "r1", step: "earlier", attempt: 1, status: "succeeded", startedAt: 1, inputTokens: 1, outputTokens: 1, costUsd: 2, artifactRefs: {} });
+    const step = stepFrom([ok]);
+    const rec = await runStep(step, ctx, { ...opts, runBudgetUsd: 2 });
+    expect(step.calls).toBe(0);
+    expect(rec).toMatchObject({ step: "s", status: "failed", attempt: 1 });
+    expect(rec.error).toBe("Run budget exceeded: $2.0000 of $2.0000");
+    expect((await store.listSteps("r1")).filter((r) => r.step === "s")).toHaveLength(1);
+  });
+
+  it("runs normally when the run is under the budget or no budget is set", async () => {
+    const { store, ctx, opts } = await setup();
+    await store.appendStep({ runId: "r1", step: "earlier", attempt: 1, status: "succeeded", startedAt: 1, inputTokens: 1, outputTokens: 1, costUsd: 1, artifactRefs: {} });
+    const under = stepFrom([ok], "a");
+    expect((await runStep(under, ctx, { ...opts, runBudgetUsd: 5 })).status).toBe("succeeded");
+    const unset = stepFrom([ok], "b");
+    expect((await runStep(unset, ctx, opts)).status).toBe("succeeded");
+  });
+
+  it("does not retry after a budget refusal", async () => {
+    const { store, ctx, opts, sleeps } = await setup();
+    await store.appendStep({ runId: "r1", step: "earlier", attempt: 1, status: "succeeded", startedAt: 1, inputTokens: 1, outputTokens: 1, costUsd: 9, artifactRefs: {} });
+    await runStep(stepFrom([ok]), ctx, { ...opts, runBudgetUsd: 1 });
+    expect(sleeps).toEqual([]);
+  });
+
+  it("counts extra spend from other sources (revision calls) against the budget", async () => {
+    const { store, ctx, opts } = await setup();
+    await store.appendStep({ runId: "r1", step: "earlier", attempt: 1, status: "succeeded", startedAt: 1, inputTokens: 1, outputTokens: 1, costUsd: 1, artifactRefs: {} });
+    const step = stepFrom([ok]);
+    const rec = await runStep(step, ctx, { ...opts, runBudgetUsd: 2, extraSpentUsd: async (runId) => (runId === "r1" ? 1.5 : 0) });
+    expect(step.calls).toBe(0);
+    expect(rec.error).toBe("Run budget exceeded: $2.5000 of $2.0000");
   });
 });

@@ -2,12 +2,15 @@
 (Llama 4 Scout 17B Instruct) on Amazon Bedrock. Saves outputs here.
 Needs: AWS credentials, `pip install boto3`, env CROSSCHECK_MODEL_ID (a us. inference profile id).
 Settings may also be put in Backend/.env (git-ignored).
-Optional env for cost: PRICE_IN_PER_MTOK, PRICE_OUT_PER_MTOK (USD).
+Optional env for cost: PRICES_JSON (the server's price map, keyed by model id), or the older PRICE_IN_PER_MTOK / PRICE_OUT_PER_MTOK (USD).
 Writes: extraction_output.json, run_metrics.json, raw_response.txt in this folder.
 """
 import json, os, sys, time
 from pathlib import Path
 import boto3
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "extraction"))  # shared cost helper
+from usage_cost import cost_usd
 
 def load_env(path):
     if path.is_file():
@@ -41,11 +44,11 @@ text = "".join(c.get("text", "") for c in resp["output"]["message"]["content"])
 (here / "raw_response.txt").write_text(text)
 
 u = resp["usage"]
-pin, pout = float(os.environ.get("PRICE_IN_PER_MTOK", 0)), float(os.environ.get("PRICE_OUT_PER_MTOK", 0))
+cost = cost_usd(os.environ, model_id, u["inputTokens"], u["outputTokens"])
 metrics = {"run_id": run_id, "process": "extraction", "model_id": model_id,
            "input_tokens": u["inputTokens"], "output_tokens": u["outputTokens"],
            "latency_seconds": round(latency, 2), "stop_reason": resp["stopReason"],
-           "cost_usd": round(u["inputTokens"] / 1e6 * pin + u["outputTokens"] / 1e6 * pout, 4) if pin or pout else None,
+           "cost_usd": round(cost, 4) if cost is not None else None,
            "pages": doc["page_count"], "doc_sha256": doc["doc_sha256"]}
 (here / "run_metrics.json").write_text(json.dumps(metrics, indent=2))
 

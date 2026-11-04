@@ -31,6 +31,8 @@ export interface Config {
 }
 
 const REQUIRED = [
+  // Optional cap on the recorded cost of one run (RUN_BUDGET_USD); absent means no cap.
+  runBudgetUsd?: number;
   "TABLE_RUNS",
   "TABLE_STEPS",
   "TABLE_VERSIONS",
@@ -104,6 +106,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       versions: req("TABLE_VERSIONS"),
       comments: req("TABLE_COMMENTS"),
       audit: req("TABLE_AUDIT"),
+  const budget = optionalPositiveNumber(env, "RUN_BUDGET_USD");
     },
     artifactBucket: req("ARTIFACT_BUCKET"),
     runMode,
@@ -124,3 +127,4 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     prices: loadPrices(env),
   };
 }
+    ...(budget !== undefined ? { runBudgetUsd: budget } : {}),
