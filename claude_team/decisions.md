@@ -258,3 +258,15 @@ Why: v1.json matches the BRD (rule table, order, shown_when, entry constraints, 
 Other options considered (and why not): keep the section-4 schema and convert v1.json into it (two shapes to maintain).
 Revisit if: the compiler needs fields v1.json lacks (form id and title, contact types, task window after due).
 Related: DEC-012, DEC-013, DEC-016
+
+### DEC-018 | Question flow is derived from the rules at compile time; flow mode is a clinical choice
+Status: decided (mode choice open, pending clinician)
+Date: 2026-11-04
+Decided by: human (utg1209) asked for a tree-like flow; mode choice for Medic
+Feature or area: form flow and compiler
+Decision: The compiled form shows one question per screen and, by default (flowMode minimal), asks only the questions that can still change the outcome. The flow is derived deterministically from the signed rule table (Backend/src/logic/flow.ts) and emitted as relevance by the compiler; the signed model vocabulary is unchanged (the flow uses a compile-only is_no atom and a never constant). The compiler refuses to build if the shortened flow ever gives a different outcome than the full answers. flowMode options: full, minimal, danger_signs_always. Skipped questions are saved blank in the CHT report; blank must not be read as no.
+Assumptions: All questions in v1.json are required. The minimal flow never asks danger-sign questions of a child outside the age range (the Q2 hazard made silent); the clinician must choose the mode before any release.
+Why: Fewer questions per child (3.19 on average against 8.92 on the grid) with proven identical outcomes over all 6400 answer combinations.
+Other options considered (and why not): Hand-written shown_when in v1.json (can drift from the rules); asking every question (the previous behaviour).
+Revisit if: the clinician requires all danger-sign questions, or v1.json gains questions that are not required.
+Related: DEC-016, DEC-017
