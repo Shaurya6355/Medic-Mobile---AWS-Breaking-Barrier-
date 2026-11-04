@@ -81,3 +81,19 @@ describe("S3ArtifactStore", () => {
     await expect(store().exists("k")).rejects.toThrow("boom");
   });
 });
+
+import { inputPdfKey, parseInputKey } from "../../src/artifacts/artifactStore.js";
+
+describe("parseInputKey", () => {
+  it("round-trips with inputPdfKey", () => {
+    expect(parseInputKey(inputPdfKey("abc-123"))).toBe("abc-123");
+  });
+  it("rejects other keys", () => {
+    expect(parseInputKey("runs/abc/input/other.pdf")).toBeUndefined();
+    expect(parseInputKey("runs/abc/def/input/guideline.pdf")).toBeUndefined();
+    expect(parseInputKey("runs//input/guideline.pdf")).toBeUndefined();
+    expect(parseInputKey("runs/a_b/input/guideline.pdf")).toBeUndefined();
+    expect(parseInputKey("x/runs/abc/input/guideline.pdf")).toBeUndefined();
+    expect(parseInputKey("runs/abc/input/guideline.pdf/")).toBeUndefined();
+  });
+});

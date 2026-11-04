@@ -1,0 +1,57 @@
+# Orchestrator
+
+Backend service that takes an uploaded clinical guideline PDF through a fixed flow (ingest, extract, fill logic), stores every run, step, version, comment and audit event in DynamoDB and S3, and exposes an HTTP API for the UI to create runs, save edited versions, comment and resume. Uploads are detected through an S3 event notification delivered to SQS.
+
+## Develop
+
+```
+npm ci
+npm test              # vitest run
+npx tsc --noEmit      # typecheck
+npm run build         # emits dist/ (tests excluded)
+npm start             # node dist/index.js
+npm run dev           # tsx watch src/index.ts
+```
+
+## Environment variables
+
+| Name | Required / default | Purpose |
+| --- | --- | --- |
+| TABLE_RUNS | required | DynamoDB table for runs |
+| TABLE_STEPS | required | DynamoDB table for step records |
+| TABLE_VERSIONS | required | DynamoDB table for logic model versions |
+| TABLE_COMMENTS | required | DynamoDB table for comments |
+| TABLE_AUDIT | required | DynamoDB table for the audit log |
+| ARTIFACT_BUCKET | required | S3 bucket for uploads and step artifacts |
+| UPLOAD_QUEUE_URL | required | SQS queue receiving S3 ObjectCreated notifications |
+| MODEL_ID | required | Bedrock inference profile ID (us. prefix) |
+| AWS_REGION | us-west-2 | AWS region for all clients |
+| PORT | 8080 | HTTP port |
+| HOST | 0.0.0.0 | HTTP bind address |
+| LEASE_MS | 900000 | Run lease duration; must exceed the longest single step |
+| MAX_PAGES | 200 | Maximum page number accepted when creating a run |
+| SQS_CONCURRENCY | 4 | Messages processed in parallel |
+| PYTHON_BIN | python3 | Python executable for ingest |
+| INGEST_SCRIPT | extraction/prepare_input.py next to the build | Ingest script path |
+| EXTRACT_PROMPT | extraction/final_prompt.txt next to the build | Extraction system prompt path |
+| PRICES_JSON | none | JSON map of model ID to `{inPerMTok, outPerMTok}` for cost metrics |
+
+Startup fails with a list of the names of any missing required variables.
+
+## HTTP API
+
+Route names and request/response shapes are defined only in `src/contract/` (`routes.ts`, `schemas.ts`). The API covers creating a run (returning a presigned upload URL), reading a run, saving versions, comments, and resuming a run. See that folder for the exact paths.
+
+## Docker
+
+`docker build -t orchestrator .` from this folder. The image installs `poppler-utils` and `python3` for ingest, runs as the non-root `node` user and contains no credentials; supply AWS credentials through the runtime (for example an instance or task role).
+
+## Not verified / known gaps
+
+- Nothing has run against real DynamoDB, S3, SQS or Bedrock. Unit tests use in-memory stores and mocked AWS clients.
+- The DynamoStore contract suite runs only when `DYNAMODB_ENDPOINT` is set.
+- The Dockerfile has not been built in a verified environment unless stated in the task report.
+- The API has NO authentication. Do not expose it publicly.
+- Hosting is undecided. Project rules say EC2 containers; the team prefers Strands on AgentCore. See `docs/superpowers/specs/2026-11-03-orchestrator-design.md` (OI-6, OI-7).
+- The lease can lapse during a single very long step, so `LEASE_MS` must exceed the longest step.
+- The logic model schema is a placeholder (`acceptAnyObjectValidator`); the check steps that run on save are not registered yet.

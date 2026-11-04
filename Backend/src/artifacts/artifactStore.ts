@@ -37,3 +37,15 @@ export class MemoryArtifactStore implements ArtifactStore {
 export function inputPdfKey(runId: string): string {
   return artifactKey(runId, "input", "guideline.pdf");
 }
+
+// Inverse of inputPdfKey: returns the run ID if the key is exactly the input PDF key of some run.
+// The format is defined once, by inputPdfKey; the run ID is a single path segment of [A-Za-z0-9-]+.
+const KEY_MARKER = "MARKER";
+const [KEY_PREFIX = "", KEY_SUFFIX = ""] = inputPdfKey(KEY_MARKER).split(KEY_MARKER);
+
+export function parseInputKey(key: string): string | undefined {
+  if (!key.startsWith(KEY_PREFIX) || !key.endsWith(KEY_SUFFIX)) return undefined;
+  if (key.length <= KEY_PREFIX.length + KEY_SUFFIX.length) return undefined;
+  const runId = key.slice(KEY_PREFIX.length, key.length - KEY_SUFFIX.length);
+  return /^[A-Za-z0-9-]+$/.test(runId) ? runId : undefined;
+}
