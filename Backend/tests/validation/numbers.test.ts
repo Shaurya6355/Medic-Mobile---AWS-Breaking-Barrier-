@@ -47,3 +47,30 @@ describe("groundNumber", () => {
     expect(groundNumber(t, 14, "days").status).toBe("no_unit");
   });
 });
+
+describe("groundNumber hardening (red team 2)", () => {
+  it("B7/B8: the unit must come right after the number, never borrowed from before or two words on", () => {
+    expect(g("for 5 days 2", 2, "days").status).toBe("no_unit");
+    expect(g("2 months up to 12", 12, "months").status).toBe("no_unit");
+    expect(g("14 or more days", 14, "days").status).toBe("no_unit");
+    expect(g("Cough for 14 days or more", 14, "days").status).toBe("grounded");
+  });
+  it("B3/B9: a number word counts only when a unit follows it", () => {
+    expect(g("One or both parents have HIV", 1, undefined).status).toBe("absent");
+    expect(g("twelve months", 12, "months").status).toBe("grounded");
+    expect(g("Give one dose now", 1, "dose").status).toBe("grounded");
+    expect(g("for five days", 5, "days").status).toBe("grounded");
+  });
+  it("B4: page numbers never count", () => {
+    expect(g("Go to page 8", 8, undefined).status).toBe("absent");
+    expect(g("(Go to page 10.)", 10, undefined).status).toBe("absent");
+    expect(g("see pages 9 and 10", 9, undefined).status).toBe("absent");
+  });
+  it("B6: a decimal is one number; its digits after the point are not a number of their own", () => {
+    expect(g("1.5 tablets", 5, "tablets").status).toBe("absent");
+  });
+  it("zero is a number like any other", () => {
+    expect(g("in 0 days", 0, "days").status).toBe("grounded");
+    expect(g("in 3 days", 0, "days").status).toBe("absent");
+  });
+});

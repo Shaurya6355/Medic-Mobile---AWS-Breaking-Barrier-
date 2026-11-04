@@ -192,3 +192,33 @@ describe("evaluate", () => {
     expect(a).toBe(b);
   });
 });
+
+describe("answers named like built-in object properties (red team 1, M92)", () => {
+  // The schema now rejects such ids; the interpreter must still never read inherited properties.
+  const withCtor = (): any => {
+    const raw = JSON.parse(JSON.stringify(rawV1()).split('"unusually_sleepy"').join('"constructor"'));
+    const r = parseModel(rawV1());
+    if (!r.ok) throw new Error("fixture");
+    const mm: any = structuredClone(r.value);
+    const conv = JSON.parse(JSON.stringify(mm).split('"unusually_sleepy"').join('"constructor"'));
+    conv.questions.find((q: any) => q.id === "constructor").shown_when = { field: "cough", op: "is_yes" };
+    void raw;
+    return conv;
+  };
+  it("a question that was not asked counts as not answered, not as the inherited property", () => {
+    const mm = withCtor();
+    const { unusually_sleepy: _u, ...rest } = base;
+    void _u;
+    const e = evaluate(mm, { ...rest }, { allowMissing: true });
+    expect(e.outcome).toBe("no_cough");
+    expect(evalCondition({ field: "constructor", op: "is_yes" }, {}, new Set(["constructor"]))).toBe(false);
+    expect(evalCondition({ field: "toString", op: "is_yes" }, {}, new Set(["toString"]))).toBe(false);
+  });
+  it("an answer object with a prototype is only read for its own keys", () => {
+    const mm = withCtor();
+    const { unusually_sleepy: _u, ...rest } = base;
+    void _u;
+    const answers = Object.assign(Object.create({ constructor: true }), rest);
+    expect(effectiveAnswers(mm, answers, { allowMissing: true })["constructor"]).toBeUndefined();
+  });
+});

@@ -26,6 +26,8 @@ describe("v1.json on the real pair (real booklet blocks, real extraction, propos
       // quote-only: fast_breathing cites only the 50 line (40 and 60 months), the dose tables and the 7 days of the two referrals
       // cite lines that do not carry their numbers
       "blocking:UNGROUNDED_NUMBER": 18,
+      // red team 2: v1's two antibiotic action texts say "250 mg", which their quotes do not carry
+      "blocking:NUMBER_IN_TEXT_UNSUPPORTED": 2,
       "info:BOUNDARY_SHOWN": 6,
       // 7 danger signs the extraction found are not modelled but named as left out of this form (Q4)
       "info:DANGER_SIGN_EXCLUDED_NOT_COUGH": 7,
@@ -45,6 +47,8 @@ describe("v1.json on the real pair (real booklet blocks, real extraction, propos
       // the null window of the 3-day follow-up uses the team default (Q5)
       "warning:TEAM_DEFAULT_WINDOW": 1,
       "warning:UNCITED_PASSAGE": 4,
+      // red team 2: the labels, titles and action texts that are not the booklet's own words, listed once for the clinician
+      "warning:AI_WORDED_TEXT": 1,
     });
   });
 
@@ -58,7 +62,7 @@ describe("v1.json on the real pair (real booklet blocks, real extraction, propos
   it("all cases agree; every outcome has a case; the claim is PROVEN", () => {
     expect(r.claim).toBe("PROVEN");
     const g = r.findings.find((x) => x.code === "GOLDEN_COUNT")!;
-    expect(g.params).toMatchObject({ total: 15, agree: 15, different: 0 });
+    expect(g.params).toMatchObject({ total: 17, agree: 17, different: 0 });
     expect(r.findings.some((x) => x.code === "OUTCOME_WITHOUT_GOLDEN_CASE")).toBe(false);
     expect(r.findings.some((x) => x.code === "CONTEXT_NOT_PROVIDED")).toBe(false);
   });
@@ -70,8 +74,8 @@ describe("v1.json on the real pair (real booklet blocks, real extraction, propos
     expect(r.gates.blockers.officer.map((f) => f.code).sort()).toEqual([
       "GUIDELINE_FILE_MISMATCH", "OPEN_QUESTION", ...Array(18).fill("UNGROUNDED_NUMBER"),
     ].sort());
-    expect(r.gates.blockers.clinician.map((f) => f.code).sort()).toEqual([...Array(5).fill("OPEN_QUESTION"), "SEVERITY_INVERSION", "SEVERITY_INVERSION"].sort());
-    expect(r.gates.blockers.compile).toHaveLength(27);
+    expect(r.gates.blockers.clinician.map((f) => f.code).sort()).toEqual([...Array(5).fill("OPEN_QUESTION"), "SEVERITY_INVERSION", "SEVERITY_INVERSION", "NUMBER_IN_TEXT_UNSUPPORTED", "NUMBER_IN_TEXT_UNSUPPORTED"].sort());
+    expect(r.gates.blockers.compile).toHaveLength(29);
     expect(r.gates.summary).toMatch(/^The program officer cannot sign yet\./);
     expect(r.gates.summary).not.toMatch(JARGON_RE);
   });

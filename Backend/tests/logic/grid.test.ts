@@ -89,3 +89,25 @@ describe("analyzeRules", () => {
     expect(canonicalJson(analyzeRules(m))).toBe(canonicalJson(analyzeRules(m)));
   });
 });
+
+describe("cut-offs outside the entry limits are reported, not dropped silently (red team 1, M50, M53)", () => {
+  it("lists every cut-off that no answer within the limits can reach on both sides", async () => {
+    const { thresholdsOutsideLimits } = await import("../../src/logic/grid.js");
+    expect(thresholdsOutsideLimits(m)).toEqual([]);
+    const mm: any = structuredClone(m);
+    mm.questions.find((q: any) => q.id === "breaths_per_minute").constraint.max = 45;
+    mm.questions.find((q: any) => q.id === "cough_days").constraint.max = 13;
+    const out = thresholdsOutsideLimits(mm);
+    expect(out.map((x) => `${x.question}:${x.value}:${x.where}`).sort()).toEqual([
+      "breaths_per_minute:50:derived:fast_breathing",
+      "cough_days:14:derived:danger_sign",
+    ]);
+    expect(enumerateAnswers(mm).outsideLimits).toEqual(out);
+  });
+  it("a cut-off at the lowest allowed value is constant too (every answer is at least it)", async () => {
+    const { thresholdsOutsideLimits } = await import("../../src/logic/grid.js");
+    const mm: any = structuredClone(m);
+    mm.questions.find((q: any) => q.id === "breaths_per_minute").constraint.min = 40;
+    expect(thresholdsOutsideLimits(mm).map((x) => x.value)).toEqual([40]);
+  });
+});

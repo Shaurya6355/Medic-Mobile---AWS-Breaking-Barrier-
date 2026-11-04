@@ -1,7 +1,7 @@
 import { OFFICER, makeFinding } from "../finding.js";
 import type { CheckContext, Finding } from "../finding.js";
 import { citedItems } from "../describe.js";
-import { clip, normalizeForQuote, quoteMatches } from "../text.js";
+import { clip, looksLikeInstruction, normalizeForQuote, quoteMatches } from "../text.js";
 
 export const CHECK = "sourceCoverage";
 const MAX_EXAMPLES = 3;
@@ -40,7 +40,7 @@ export function sourceCoverage(ctx: CheckContext): Finding[] {
     uncited.set(p.page, [...(uncited.get(p.page) ?? []), one]);
   }
 
-  const out: Finding[] = [];
+  const out: Finding[] = [...plantedInstructions(ex)];
   for (const page of [...uncited.keys()].sort((a, b) => a - b).slice(0, MAX_PAGES)) {
     const list = uncited.get(page) as string[];
     const examples = list.slice(0, MAX_EXAMPLES).map((q) => `"${clip(q, 80)}"`).join("; ");
@@ -58,4 +58,36 @@ export function sourceCoverage(ctx: CheckContext): Finding[] {
     );
   }
   return out;
+}
+
+/**
+ * Extraction text and quotes are data, never instructions. A string that looks like an instruction to a computer
+ * ("ignore previous instructions", "system:") is reported once, blocking, so a person looks at the guideline reading.
+ */
+function plantedInstructions(ex: NonNullable<CheckContext["extraction"]>): Finding[] {
+  const hits: { id: string; text: string }[] = [];
+  const walk = (id: string, x: unknown): void => {
+    if (typeof x === "string") {
+      if (looksLikeInstruction(x)) hits.push({ id, text: x });
+    } else if (Array.isArray(x)) x.forEach((y) => walk(id, y));
+    else if (x !== null && typeof x === "object") for (const v of Object.values(x)) walk(id, v);
+  };
+  for (const [key, list] of Object.entries(ex as Record<string, unknown>)) {
+    if (key === "_run" || !Array.isArray(list)) continue;
+    list.forEach((it, i) => walk(typeof (it as { id?: unknown })?.id === "string" ? String((it as { id: string }).id) : `${key} ${i}`, it));
+  }
+  if (hits.length === 0) return [];
+  const ids = [...new Set(hits.map((h) => h.id))];
+  return [
+    makeFinding({
+      check: CHECK,
+      code: "EXTRACTION_TEXT_LOOKS_LIKE_INSTRUCTION",
+      severity: "blocking",
+      audience: OFFICER,
+      decidedBy: "program_officer",
+      subjects: [{ kind: "document", id: "extraction" }],
+      params: { ids: ids.slice(0, 10).join(", "), example: clip((hits[0] as { text: string }).text, 160), count: hits.length },
+      source: [],
+    }),
+  ];
 }

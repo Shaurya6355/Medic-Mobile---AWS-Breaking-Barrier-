@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CHECKS, runChecks } from "../../src/validation/runChecks.js";
 import { getAnalysis } from "../../src/validation/analysis.js";
-import { matchedCtx, realCtx, v1Copy } from "./helpers.js";
+import { goldenCases, matchedCtx, realCtx, v1Copy } from "./helpers.js";
 
 const REST = ["fieldNames", "followUpConsistency", "clinicalText", "openQuestions", "dangerSignCoverage", "sourceCoverage", "goldenCases", "compileReady", "contextNotice"];
 const LOGIC = ["closedTable", "exclusivity", "reachability", "deadInputs", "useBeforeAsk", "severityOrder", "requiredQuestions", "ageGroups", "boundaryCards"];
@@ -20,6 +20,8 @@ describe("logic checks together on v1", () => {
       [
         "blocking:SEVERITY_INVERSION:R1",
         "blocking:SEVERITY_INVERSION:R1",
+        // R2 and R3 are equally urgent and overlap; no test cases are supplied here to pin which one wins (red team 1, M81)
+        "blocking:URGENT_OVERLAP_UNTESTED:R2",
         "info:BOUNDARY_SHOWN:2",
         "info:BOUNDARY_SHOWN:12",
         "info:BOUNDARY_SHOWN:60",
@@ -32,7 +34,7 @@ describe("logic checks together on v1", () => {
     expect(r.status).toBe("fail");
   });
   it("on the real pair the blocking findings of the file and logic checks are the file mismatch plus the two severity inversions (open question Q2)", () => {
-    const r = runChecks(realCtx());
+    const r = runChecks({ ...realCtx(), goldenCases: goldenCases() });
     expect(r.findings.filter((f) => f.severity === "blocking" && (f.check === "guidelineFile" || LOGIC.includes(f.check))).map((f) => f.code).sort()).toEqual(["GUIDELINE_FILE_MISMATCH", "SEVERITY_INVERSION", "SEVERITY_INVERSION"]);
   });
   it("claims PROVEN in plain words without claiming clinical correctness", () => {

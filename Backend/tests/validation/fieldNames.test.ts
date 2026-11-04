@@ -70,3 +70,15 @@ describe("fieldNames", () => {
     expect(added.some((f) => f.code === "FIELD_RENAMED")).toBe(false);
   });
 });
+
+describe("fieldNames: built-in object property names (red team 1, M73, M92)", () => {
+  it("reserves constructor, prototype and the other names every object already has", async () => {
+    const { fieldNames: fn, RESERVED_FIELD_NAMES: names } = await import("../../src/validation/checks/fieldNames.js");
+    const { matchedCtx: ctx } = await import("./helpers.js");
+    for (const id of ["constructor", "prototype", "hasownproperty", "tostring", "valueof"]) expect(names).toContain(id);
+    const fs = fn(ctx((m) => { m.questions[8].id = "constructor"; }));
+    const f = fs.find((x) => x.code === "RESERVED_FIELD_NAME")!;
+    expect(f.severity).toBe("blocking");
+    expect(f.message).toContain("constructor");
+  });
+});

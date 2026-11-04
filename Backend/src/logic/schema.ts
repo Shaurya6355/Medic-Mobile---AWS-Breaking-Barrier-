@@ -18,9 +18,24 @@ const MAX_SOURCES = 20;
 export const MAX_CONDITION_DEPTH = 32;
 
 const ID = /^[a-z][a-z0-9_]*$/;
-const shortStr = z.string().min(1).max(SHORT);
-const textStr = z.string().min(1).max(TEXT);
-const idStr = z.string().max(64).regex(ID);
+
+/**
+ * Names that every JavaScript object already has (constructor, prototype, toString and so on, in lower case
+ * since ids are lower case). An id with one of these names could be confused with the built-in property
+ * when answers are looked up, so it is refused.
+ */
+export const RESERVED_IDS: readonly string[] = [
+  "constructor", "prototype", "__proto__", "tostring", "tolocalestring", "valueof", "hasownproperty", "isprototypeof",
+  "propertyisenumerable", "__definegetter__", "__definesetter__", "__lookupgetter__", "__lookupsetter__",
+];
+const notReserved = (s: string): boolean => !RESERVED_IDS.includes(s.toLowerCase());
+const reservedMsg = { message: "this name is reserved (every object already has a property with this name)" };
+const notBlank = (s: string): boolean => s.trim().length > 0;
+const blankMsg = { message: "must not be empty or only spaces" };
+
+const shortStr = z.string().min(1).max(SHORT).refine(notBlank, blankMsg);
+const textStr = z.string().min(1).max(TEXT).refine(notBlank, blankMsg);
+const idStr = z.string().max(64).regex(ID).refine(notReserved, reservedMsg);
 
 // ---------- Source ----------
 const SourceSchema = z
@@ -58,7 +73,7 @@ export type Condition =
   | { all: Condition[] }
   | { any: Condition[] };
 
-const Field = z.string().max(64).regex(ID);
+const Field = z.string().max(64).regex(ID).refine(notReserved, reservedMsg);
 
 export const ConditionSchema: z.ZodType<Condition> = z.lazy(() =>
   z.union([

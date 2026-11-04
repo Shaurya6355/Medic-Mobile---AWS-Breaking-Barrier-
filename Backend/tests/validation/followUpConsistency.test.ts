@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { followUpConsistency } from "../../src/validation/checks/followUpConsistency.js";
-import { matchedCtx } from "./helpers.js";
+import { JARGON_RE, matchedCtx, realExtraction } from "./helpers.js";
 
 const run = (mutate?: (m: any) => void) => followUpConsistency(matchedCtx(mutate));
 const codes = (mutate?: (m: any) => void) => run(mutate).map((f) => f.code);
@@ -29,8 +29,8 @@ describe("followUpConsistency", () => {
     expect(codes((m) => { const o = m.outcomes[idx("cough_no_fast_breathing")(m)]; o.actions[0].text = "Refer if worse."; })).toContain("FOLLOWUP_MISSING_OUTCOME");
     expect(codes()).not.toContain("FOLLOWUP_MISSING_OUTCOME");
   });
-  it("a non-referral outcome without follow-up is fine", () => {
-    expect(codes((m) => { m.outcomes[idx("treat_fast_breathing_at_home")(m)].follow_up = null; })).not.toContain("FOLLOWUP_MISSING_OUTCOME");
+  it("a non-referral outcome without follow-up is fine when nothing it cites or says asks for one", () => {
+    expect(codes((m) => { m.outcomes[idx("cough_no_fast_breathing")(m)].follow_up = null; })).toEqual(["FOLLOWUP_RETURN_DAYS_IGNORED", "FOLLOWUP_RETURN_DAYS_IGNORED"]);
   });
   it("a scheduled follow-up with negative days blocks", () => {
     const fs = run((m) => { m.outcomes[idx("treat_fast_breathing_at_home")(m)].follow_up.due_in_days = -2; });
@@ -47,5 +47,49 @@ describe("followUpConsistency", () => {
   });
   it("an on-return follow-up without days raises nothing", () => {
     expect(codes((m) => { m.outcomes[idx("refer_urgent")(m)].follow_up.due_in_days = null; })).toEqual(["FOLLOWUP_RETURN_DAYS_IGNORED"]);
+  });
+});
+
+describe("followUpConsistency: red team 1", () => {
+  it("a result a danger sign leads to is a referral whatever its wording, so it needs a follow-up (M33)", () => {
+    const fs = followUpConsistency({ ...matchedCtx((m) => {
+      const o = m.outcomes[idx("refer_urgent")(m)];
+      o.title = "Danger sign: advise fluids at home";
+      o.actions = structuredClone(m.outcomes[idx("cough_no_fast_breathing")(m)].actions);
+      o.follow_up = null;
+    }), extraction: realExtraction() });
+    expect(fs.map((f) => f.code)).toContain("FOLLOWUP_MISSING_OUTCOME");
+    // without the extraction, the calculated value named as a danger sign is enough to know
+    expect(codes((m) => {
+      const o = m.outcomes[idx("refer_urgent")(m)];
+      o.title = "Danger sign: advise fluids at home";
+      o.actions = structuredClone(m.outcomes[idx("cough_no_fast_breathing")(m)].actions);
+      o.follow_up = null;
+    })).toContain("FOLLOWUP_MISSING_OUTCOME");
+  });
+  it("a result whose title or cited passage says to follow up must have a follow-up (M43)", () => {
+    const fs = run((m) => { m.outcomes[idx("treat_fast_breathing_at_home")(m)].follow_up = null; });
+    const f = fs.find((x) => x.code === "FOLLOWUP_REQUIRED_BY_SOURCE")!;
+    expect(f.severity).toBe("blocking");
+    expect(f.decidedBy).toBe("clinician");
+    expect(f.subjects).toEqual([{ kind: "outcome", id: "treat_fast_breathing_at_home" }]);
+    expect(f.message).toContain("follow up in 3 days");
+    const viaQuote = run((m) => { m.outcomes[idx("cough_no_fast_breathing")(m)].actions[0].source = [{ page: 9, quote: "Follow up child in 3 days." }]; });
+    expect(viaQuote.find((x) => x.code === "FOLLOWUP_REQUIRED_BY_SOURCE")!.message).toContain("page 9");
+  });
+  it("a follow-up after a fixed number of days turned into a follow-up on return blocks (M45)", () => {
+    const fs = run((m) => { const f = m.outcomes[idx("treat_fast_breathing_at_home")(m)].follow_up; f.kind = "on_return"; f.due_in_days = null; });
+    const f = fs.find((x) => x.code === "FOLLOWUP_KIND_MISMATCH")!;
+    expect(f.severity).toBe("blocking");
+    expect(f.message).toContain("Follow up child in 3 days");
+    // "on return at least once a week" is not a fixed number of days
+    expect(codes()).not.toContain("FOLLOWUP_KIND_MISMATCH");
+  });
+  it("a scheduled follow-up due after 0 days blocks (M47)", () => {
+    const fs = run((m) => { m.outcomes[idx("treat_fast_breathing_at_home")(m)].follow_up.due_in_days = 0; });
+    const f = fs.find((x) => x.code === "FOLLOWUP_DUE_SAME_DAY")!;
+    expect(f.severity).toBe("blocking");
+    expect(f.message).toContain("0 days");
+    expect(f.message).not.toMatch(JARGON_RE);
   });
 });

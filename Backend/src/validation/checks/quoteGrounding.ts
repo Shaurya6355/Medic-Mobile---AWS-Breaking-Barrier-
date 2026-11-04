@@ -1,7 +1,7 @@
 import { BOTH, makeFinding } from "../finding.js";
 import type { CheckContext, Finding, SourceDocument } from "../finding.js";
 import { citedItems } from "../describe.js";
-import { clip, normalizeForQuote, quoteMatches } from "../text.js";
+import { clip, matchOnPage, normalizeForQuote } from "../text.js";
 
 export const CHECK = "quoteGrounding";
 
@@ -20,7 +20,11 @@ function closestBlock(doc: SourceDocument, page: number, quote: string): string 
   return best;
 }
 
-/** Every quote, after normalisation, is a substring of the text of the page it cites (all blocks of that page). */
+/**
+ * Every quote, after normalisation, is found inside ONE block of the page it cites (never stitched across blocks),
+ * starting and ending on a word boundary. A quote of fewer than 2 words and 8 characters, or one that leaves out a
+ * "not" (or "no", "without", ...) standing just before it in the booklet, is blocking.
+ */
 export function quoteGrounding(ctx: CheckContext): Finding[] {
   const doc = ctx.document;
   if (doc === undefined) {
@@ -54,8 +58,8 @@ export function quoteGrounding(ctx: CheckContext): Finding[] {
         );
         continue;
       }
-      const text = doc.pageText(s.page);
-      if (text === undefined) {
+      const blocks = doc.pages.get(s.page);
+      if (blocks === undefined) {
         out.push(
           makeFinding({
             ...common,
@@ -68,7 +72,30 @@ export function quoteGrounding(ctx: CheckContext): Finding[] {
         );
         continue;
       }
-      if (!quoteMatches(s.quote, text)) {
+      const m = matchOnPage(s.quote, blocks);
+      if (m === "too_short") {
+        out.push(
+          makeFinding({
+            ...common,
+            code: "QUOTE_TOO_SHORT",
+            severity: "blocking",
+            audience: BOTH,
+            decidedBy: "program_officer",
+            params: { item: it.item, page: String(s.page), quote: clip(s.quote, 240) },
+          }),
+        );
+      } else if (m === "negated") {
+        out.push(
+          makeFinding({
+            ...common,
+            code: "QUOTE_DROPS_NEGATION",
+            severity: "blocking",
+            audience: ["clinician", "program_officer"],
+            decidedBy: "clinician",
+            params: { item: it.item, page: String(s.page), quote: clip(s.quote, 240), blockText: clip(closestBlock(doc, s.page, s.quote), 240) },
+          }),
+        );
+      } else if (m === "absent") {
         out.push(
           makeFinding({
             ...common,

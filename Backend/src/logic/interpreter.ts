@@ -46,7 +46,8 @@ export function evalCondition(
 ): boolean {
   if ("field" in c) {
     if (!known.has(c.field)) throw new EvalError(`${path}: unknown field "${c.field}"`);
-    const v = values[c.field];
+    // Own keys only: an inherited property (constructor, toString) is never an answer.
+    const v = Object.hasOwn(values, c.field) ? values[c.field] : undefined;
     if (reads) reads[c.field] = v === undefined ? "absent" : v;
     if (v === undefined) return false;
     if (c.op === "is_yes") return v === true;
@@ -137,10 +138,11 @@ export function effectiveAnswers(model: Model, answers: Answers, opts: Effective
   for (const k of Object.keys(answers)) {
     if (!p.questionIds.has(k)) issues.push(`${k}: unknown question`);
   }
-  const effective: Answers = {};
+  // Null prototype: nothing is inherited, so a missing answer is reported as missing.
+  const effective: Answers = Object.create(null) as Answers;
   const missing: string[] = [];
   for (const q of model.questions) {
-    const supplied = answers[q.id];
+    const supplied = Object.hasOwn(answers, q.id) ? answers[q.id] : undefined;
     if (supplied !== undefined) {
       const t = typeIssue(q, supplied);
       if (t) {
@@ -167,7 +169,7 @@ export function effectiveAnswers(model: Model, answers: Answers, opts: Effective
 
 function computeDerived(model: Model, effective: Answers): { derived: Record<string, boolean>; values: Answers } {
   const p = prepare(model);
-  const values: Answers = { ...effective };
+  const values: Answers = Object.assign(Object.create(null) as Answers, effective);
   const derived: Record<string, boolean> = {};
   for (const d of p.derivedOrder) {
     const r = evalCondition(d.definition, values, p.known, `derived.${d.id}.definition`);

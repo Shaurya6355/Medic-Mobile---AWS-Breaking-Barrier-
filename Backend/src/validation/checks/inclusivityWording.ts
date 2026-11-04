@@ -12,22 +12,24 @@ export const CHECK = "inclusivityWording";
  * "less than N") both put N on the HIGH side. A wording that puts N on the LOW side says the opposite.
  */
 type Side = "high" | "low";
-type Hit = { side: Side; assumed: boolean; phrase: string; kind: "strictly_more" | "or_less" | "other" };
+/** Which way the wording points: "N or more" and "more than N" hold above N (at_least); "less than N", "up to N" below (less_than). */
+type Dir = "at_least" | "less_than";
+type Hit = { side: Side; dir: Dir; assumed: boolean; phrase: string; kind: "strictly_more" | "or_less" | "other" };
 
 /** Lookup table: wording just before the number. */
-const BEFORE: readonly { re: RegExp; side: Side; assumed?: boolean; kind?: Hit["kind"] }[] = [
-  { re: /\b(?:at least|from|a minimum of|minimum of|minimum|no less than|not less than)\s*$/, side: "high" },
-  { re: /\b(?:more than|over|above|greater than|older than|exceeding|exceeds|beyond)\s*$/, side: "low", kind: "strictly_more" },
-  { re: /\b(?:less than|under|below|fewer than|younger than)\s*$/, side: "high" },
-  { re: /\bup to\s*$/, side: "high", assumed: true },
-  { re: /\b(?:at most|no more than|not more than|a maximum of|maximum of|maximum)\s*$/, side: "low", kind: "or_less" },
+const BEFORE: readonly { re: RegExp; side: Side; dir: Dir; assumed?: boolean; kind?: Hit["kind"] }[] = [
+  { re: /\b(?:at least|from|a minimum of|minimum of|minimum|no less than|not less than)\s*$/, side: "high", dir: "at_least" },
+  { re: /\b(?:more than|over|above|greater than|older than|exceeding|exceeds|beyond)\s*$/, side: "low", dir: "at_least", kind: "strictly_more" },
+  { re: /\b(?:less than|under|below|fewer than|younger than)\s*$/, side: "high", dir: "less_than" },
+  { re: /\bup to\s*$/, side: "high", dir: "less_than", assumed: true },
+  { re: /\b(?:at most|no more than|not more than|a maximum of|maximum of|maximum)\s*$/, side: "low", dir: "less_than", kind: "or_less" },
 ];
 /** Lookup table: wording just after the number (and its unit). */
-const AFTER: readonly { re: RegExp; side: Side; kind?: Hit["kind"] }[] = [
-  { re: /^\s*\+/, side: "high" },
-  { re: /^\s*(?:[a-z/]+\s+){0,2}?(?:or|and)\s+(?:more|above|over|older|greater|higher)\b/, side: "high" },
-  { re: /^\s*(?:[a-z/]+\s+){0,2}?(?:or|and)\s+(?:less|fewer|under|below|younger|lower)\b/, side: "low", kind: "or_less" },
-  { re: /^\s*(?:[a-z/]+\s+){0,2}?up to\s+\d/, side: "high" },
+const AFTER: readonly { re: RegExp; side: Side; dir: Dir; kind?: Hit["kind"] }[] = [
+  { re: /^\s*\+/, side: "high", dir: "at_least" },
+  { re: /^\s*(?:[a-z/]+\s+){0,2}?(?:or|and)\s+(?:more|above|over|older|greater|higher)\b/, side: "high", dir: "at_least" },
+  { re: /^\s*(?:[a-z/]+\s+){0,2}?(?:or|and)\s+(?:less|fewer|under|below|younger|lower)\b/, side: "low", dir: "less_than", kind: "or_less" },
+  { re: /^\s*(?:[a-z/]+\s+){0,2}?up to\s+\d/, side: "high", dir: "at_least" },
 ];
 const UNIT_AFTER = /^\s*(months?|years?|days?|weeks?|breaths?|tablets?)\b/;
 
@@ -47,7 +49,7 @@ function hitsFor(text: string, value: number, months: boolean): Hit[] {
     const before = t.slice(Math.max(0, idx - 30), idx);
     for (const b of BEFORE) {
       const hit = before.match(b.re);
-      if (hit) out.push({ side: b.side, assumed: b.assumed === true, kind: b.kind ?? "other", phrase: `${hit[0].trim()} ${numText}` });
+      if (hit) out.push({ side: b.side, dir: b.dir, assumed: b.assumed === true, kind: b.kind ?? "other", phrase: `${hit[0].trim()} ${numText}` });
     }
     const afterWindow = rest.slice(0, 48).split(/[\d,;:.()]/)[0] ?? "";
     for (const a of AFTER) {
@@ -55,7 +57,7 @@ function hitsFor(text: string, value: number, months: boolean): Hit[] {
       const hit = (upTo ? rest : afterWindow).match(a.re);
       if (!hit) continue;
       const words = upTo ? `${numText} up to` : `${m[0]} ${hit[0].trim()}`;
-      out.push({ side: a.side, assumed: false, kind: a.kind ?? "other", phrase: words.replace(/\s+/g, " ").trim() });
+      out.push({ side: a.side, dir: a.dir, assumed: false, kind: a.kind ?? "other", phrase: words.replace(/\s+/g, " ").trim() });
     }
   }
   return out;
@@ -99,6 +101,32 @@ export function inclusivityWording(ctx: CheckContext): Finding[] {
       const conflict = hits.find((h) => h.side === "low");
       const assumedHit = hits.find((h) => h.assumed);
       const common = { check: CHECK, audience: ["clinician", "program_officer"] as ("clinician" | "program_officer")[], decidedBy: "clinician" as const, subjects };
+      // Direction: "N or more" with "less than N" (or the other way) turns the cut-off round. One agreeing phrase is enough.
+      // "N up to M" is left out: where two age bands meet, the item cites both bands, and "up to 12 months" and
+      // "12 months up to 5 years" sit next to each other for "less than 12" and "12 or more" alike.
+      const firm = hits.filter((h) => !/\bup to\b/.test(h.phrase));
+      const against = firm.find((h) => h.dir !== c.op);
+      if (against !== undefined && !firm.some((h) => h.dir === c.op)) {
+        out.push(
+          makeFinding({
+            ...common,
+            code: "DIRECTION_MISMATCH",
+            severity: "blocking",
+            params: {
+              item: it.item,
+              question: label,
+              number: c.value,
+              unit,
+              sourcePhrase: against.phrase,
+              bookletSide: against.dir === "at_least" ? `${c.value}${unit} and above` : `below ${c.value}${unit}`,
+              usage: `${phrase(c.op, String(c.value))}${unit}`,
+              page: String(against.page),
+              quote: against.quote,
+            },
+            source: [{ page: against.page, quote: against.quote }],
+          }),
+        );
+      }
       if (!confirmedHigh && conflict !== undefined) {
         out.push(
           makeFinding({

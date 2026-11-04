@@ -5,6 +5,8 @@ import type { Condition, Model } from "./schema.js";
 export interface Enumeration {
   points: Answers[];
   exact: boolean;
+  /** Cut-offs that no answer within the entry limits reaches on both sides (see thresholdsOutsideLimits). */
+  outsideLimits: OutsideLimit[];
   /** Upper bound on the full grid size (product of candidate counts); equals points.length when exact. */
   estimated: number;
   reasons: string[];
@@ -23,6 +25,45 @@ function thresholds(c: Condition, out: Map<string, Set<number>>): void {
   }
 }
 
+export interface OutsideLimit {
+  question: string;
+  value: number;
+  /** "question:<id>", "derived:<id>" or "rule:<id>": where the cut-off is used. */
+  where: string;
+}
+
+/**
+ * Cut-offs on a whole-number question that its entry limits make constant: a test "at least t" or "less than t"
+ * only separates answers when both t-1 and t can be entered, i.e. min < ceil(t) <= max. Otherwise the test has
+ * the same value for every answer, so a group the cut-off is meant to pick out (fast breathing at 50 or more
+ * when at most 45 can be entered) can never be recorded. Sorted by where, question and value; each once.
+ */
+export function thresholdsOutsideLimits(model: Model): OutsideLimit[] {
+  const limits = new Map(model.questions.filter((q) => q.constraint !== undefined).map((q) => [q.id, q.constraint!]));
+  const out = new Map<string, OutsideLimit>();
+  const visit = (c: Condition, where: string): void => {
+    const stack: Condition[] = [c];
+    while (stack.length) {
+      const x = stack.pop() as Condition;
+      if (!("field" in x)) {
+        stack.push(...("all" in x ? x.all : x.any));
+        continue;
+      }
+      if (x.op === "is_yes") continue;
+      const lim = limits.get(x.field);
+      if (lim === undefined) continue;
+      const b = Math.ceil(x.value);
+      if (b > lim.min && b <= lim.max) continue;
+      const key = `${where}|${x.field}|${x.value}`;
+      if (!out.has(key)) out.set(key, { question: x.field, value: x.value, where });
+    }
+  };
+  for (const q of model.questions) if (q.shown_when) visit(q.shown_when, `question:${q.id}`);
+  for (const d of model.derived) visit(d.definition, `derived:${d.id}`);
+  for (const r of model.rules) if (r.when !== "otherwise") visit(r.when, `rule:${r.id}`);
+  return [...out.values()].sort((a, b) => (a.where < b.where ? -1 : a.where > b.where ? 1 : a.question < b.question ? -1 : a.question > b.question ? 1 : a.value - b.value));
+}
+
 /**
  * Candidate values per integer question.
  *
@@ -31,7 +72,9 @@ function thresholds(c: Condition, out: Map<string, Set<number>>): void {
  * intervals on which every atom is constant. Every interval contains t or t-1 for some
  * threshold t, or is an unbounded end (represented by the constraint min or max, or by the
  * extreme t / t-1 when there is no constraint). Values clipped out of the constraint range are
- * not valid inputs, so dropping them loses no region. Fractional thresholds are handled too:
+ * not valid inputs, so dropping them loses no region of valid answers; but a cut-off that falls outside the limits
+ * means a group the draft tests for cannot be entered, so those cut-offs are returned by thresholdsOutsideLimits
+ * and in Enumeration.outsideLimits for the checks to report (never dropped silently). Fractional thresholds are handled too:
  * the integers ceil(t) and ceil(t)-1 are the boundary values, so we use those.
  */
 function candidates(model: Model): Map<string, number[]> {
@@ -97,15 +140,17 @@ export function enumerateAnswers(model: Model, opts: { maxPoints?: number } = {}
   };
   walk(0, {});
 
+  const outsideLimits = thresholdsOutsideLimits(model);
   if (truncated) {
     return {
       points,
       exact: false,
+      outsideLimits,
       estimated,
       reasons: [`full grid exceeds maxPoints (${maxPoints}); only the first ${maxPoints} points were enumerated`],
     };
   }
-  return { points, exact: true, estimated: points.length, reasons: [] };
+  return { points, exact: true, outsideLimits, estimated: points.length, reasons: [] };
 }
 
 export interface SeverityInversion {

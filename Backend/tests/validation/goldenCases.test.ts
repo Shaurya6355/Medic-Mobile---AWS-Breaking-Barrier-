@@ -14,10 +14,10 @@ describe("goldenCases", () => {
     expect(fs.filter((f) => f.code === "GOLDEN_MISMATCH" || f.code === "GOLDEN_INVALID")).toEqual([]);
     const count = fs.find((f) => f.code === "GOLDEN_COUNT")!;
     expect(count.severity).toBe("info");
-    expect(count.params["total"]).toBe(15);
-    expect(count.params["agree"]).toBe(15);
+    expect(count.params["total"]).toBe(17);
+    expect(count.params["agree"]).toBe(17);
     expect(fs.filter((f) => f.code === "GOLDEN_PENDING_CLINICIAN")).toHaveLength(1);
-    expect(fs.find((f) => f.code === "GOLDEN_PENDING_CLINICIAN")!.params["count"]).toBe(15);
+    expect(fs.find((f) => f.code === "GOLDEN_PENDING_CLINICIAN")!.params["count"]).toBe(17);
   });
   it("outcomes no case leads to are warned about", () => {
     const fs = run().filter((f) => f.code === "OUTCOME_WITHOUT_GOLDEN_CASE");

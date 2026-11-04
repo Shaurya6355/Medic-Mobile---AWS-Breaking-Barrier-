@@ -92,16 +92,53 @@ describe("schemaReferences on v1.json", () => {
     expect(run((m) => { m.open_questions[0].affects = ["R3", "refer_urgent", "age_months", "danger_sign"]; })).toEqual([]);
   });
 
-  it("warns when the rule for out-of-range ages does not match the scope", () => {
+  it("blocks when the rule for out-of-range ages does not match the scope (red team 1, M28, M66)", () => {
     const fs = run((m) => { m.scope.age_months_min = 3; });
     expect(fs.map((f) => f.code)).toEqual(["SCOPE_RULE_MISMATCH"]);
-    expect(fs[0]!.severity).toBe("warning");
+    expect(fs[0]!.severity).toBe("blocking");
+    expect(fs[0]!.decidedBy).toBe("clinician");
     expect(fs[0]!.message).toContain("2 months");
     expect(codes((m) => { m.rules[0].when.any[1].value = 59; })).toEqual(["SCOPE_RULE_MISMATCH"]);
+    // R1 "less than 1 month" leaves 1-month-olds in the cough flow
+    expect(run((m) => { m.rules[0].when.any[0].value = 1; }).map((f) => [f.code, f.severity])).toEqual([["SCOPE_RULE_MISMATCH", "blocking"]]);
+    // -0 removes the lower bound altogether
+    expect(codes((m) => { m.rules[0].when.any[0].value = -0; })).toEqual(["SCOPE_RULE_MISMATCH"]);
   });
 
-  it("does not warn about scope when there is no age-only rule", () => {
-    expect(run((m) => { m.rules[0].when = { field: "cough", op: "is_yes" }; })).toEqual([]);
+  it("checks the rule against every cut-off it uses, not only the edges of the range", () => {
+    const fs = run((m) => { m.rules[0].when.any.push({ all: [{ field: "age_months", op: "at_least", value: 30 }, { field: "age_months", op: "less_than", value: 31 }] }); });
+    expect(fs.map((f) => f.code)).toEqual(["SCOPE_RULE_MISMATCH"]);
+    expect(fs[0]!.message).toContain("30 months");
+  });
+
+  it("several age-only rules together may cover the ages outside the range", () => {
+    expect(run((m) => {
+      m.rules[0].when = { field: "age_months", op: "less_than", value: 2 };
+      m.rules.splice(1, 0, { id: "R1b", priority: 7, when: { field: "age_months", op: "at_least", value: 60 }, outcome: "refer_outside_age_range", origin: "team" });
+      m.rules.sort((a: any, b: any) => a.priority - b.priority);
+      m.rules.find((r: any) => r.when === "otherwise").priority = 8;
+      m.rules.sort((a: any, b: any) => a.priority - b.priority);
+    })).toEqual([]);
+  });
+
+  it("a rule through a calculated value that reads only the age counts as the out-of-range rule", () => {
+    expect(run((m) => {
+      m.derived.push({ id: "outside_age", label: "Outside the covered ages", definition: m.rules[0].when, origin: "team" });
+      m.rules[0].when = { field: "outside_age", op: "is_yes" };
+    })).toEqual([]);
+  });
+
+  it("blocks when no rule handles children outside the covered ages and such ages can be entered (red team 1, M27b)", () => {
+    const fs = run((m) => { m.rules[0].when = { field: "cough", op: "is_yes" }; });
+    expect(fs.map((f) => f.code)).toEqual(["SCOPE_RULE_MISSING"]);
+    expect(fs[0]!.severity).toBe("blocking");
+    expect(fs[0]!.message).toContain("2 up to 60 months");
+    // when the entry limits only allow the covered ages, no such rule is needed
+    expect(run((m) => {
+      m.rules[0].when = { field: "cough", op: "is_yes" };
+      m.questions[0].constraint.min = 2;
+      m.questions[0].constraint.max = 59;
+    })).toEqual([]);
   });
 
   it("is deterministic and de-duplicated", () => {

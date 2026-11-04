@@ -1,4 +1,5 @@
 import type { Model } from "../../logic/schema.js";
+import { RESERVED_IDS } from "../../logic/schema.js";
 import { makeFinding } from "../finding.js";
 import type { CheckContext, Finding, Subject } from "../finding.js";
 import { describeDerived, describeQuestion, derivedSubject, questionSubject } from "../describe.js";
@@ -16,16 +17,18 @@ export const RESERVED_FIELD_NAMES: readonly string[] = [
   // the platform's report data
   "_id", "_rev", "name", "meta", "data", "instanceid", "form", "type", "content_type", "fields", "reported_date", "from",
   "place_id", "place_uuid", "place_name", "contact_id", "xmlns", "instancename", "deprecatedid",
+  // names every JavaScript object already has (the logic model schema refuses them too)
+  ...RESERVED_IDS,
 ];
 
-const WHY_RESERVED: Record<string, string> = {
+const WHY_RESERVED: Record<string, string> = Object.assign(Object.create(null) as Record<string, string>, {
   outcome: "it holds the result the assessment arrives at",
   results: "it is the screen that shows the result",
   inputs: "it holds the link between the report and the child",
   source: "it records where the form was opened from",
   source_id: "it records where the form was opened from",
   contact: "it holds the link between the report and the child",
-};
+}, Object.fromEntries(RESERVED_IDS.map((id) => [id, "every object in the software already has a property with this name, so answers could be mixed up with it"])));
 
 type Named = { id: string; item: string; subject: Subject };
 

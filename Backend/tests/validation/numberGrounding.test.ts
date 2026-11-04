@@ -70,14 +70,18 @@ describe("numberGrounding on v1.json and the real booklet", () => {
     expect(f!.message).toContain("0 to 777");
   });
 
-  it("reports numbers of a team-owned rule without source as TEAM_VALUE, not UNGROUNDED_NUMBER", () => {
-    const fs = run((m) => { m.rules[0].when.any[0].value = 3; });
-    expect(blocking((m) => { m.rules[0].when.any[0].value = 3; })).toEqual([]);
-    const t = fs.find((f) => f.code === "TEAM_VALUE")!;
+  it("reports numbers of a team-owned rule without source as TEAM_VALUE when they are the covered age range", () => {
+    const t = run().find((f) => f.code === "TEAM_VALUE" && f.subjects.some((s) => s.id === "R1"))!;
     expect(t.severity).toBe("info");
-    expect(t.subjects).toContainEqual({ kind: "rule", id: "R1" });
-    expect(t.message).toContain("3 months");
     expect(t.message).toContain("clinician");
+  });
+
+  it("red team 2 (M10): a team-owned rule with a cut-off of its own blocks until a clinician answers an open question naming it", () => {
+    const fs = blocking((m) => { m.rules[0].when.any[0].value = 3; });
+    expect(fs.map((f) => f.code)).toEqual(["TEAM_THRESHOLD_UNCONFIRMED"]);
+    expect(fs[0]!.subjects).toContainEqual({ kind: "rule", id: "R1" });
+    expect(fs[0]!.message).toContain("3 months");
+    expect(fs[0]!.message).toContain("clinician");
   });
 
   it("flags a changed number in a derived definition (50 -> 55)", () => {
@@ -120,7 +124,7 @@ describe("numberGrounding on v1.json and the real booklet", () => {
   });
 
   it("flags scope ages that the cited page does not support", () => {
-    const fs = blocking((m) => { m.scope.age_months_min = 3; });
+    const fs = blocking((m) => { m.scope.age_months_min = 3; }).filter((f) => f.code === "UNGROUNDED_NUMBER");
     expect(fs).toHaveLength(1);
     expect(fs[0]!.subjects).toEqual([{ kind: "scope", id: "scope" }]);
   });
@@ -151,7 +155,7 @@ describe("numberGrounding on v1.json and the real booklet", () => {
     expect(blocking(mutate)).toHaveLength(1);
     const fs = blocking((m) => {
       mutate(m);
-      m.derived[0].source.push({ page: 8, quote: "55 breaths or more per minute is not in the booklet" });
+      m.derived[0].source.push({ page: 8, quote: "In a child age 2 months up to 12 months, 55 breaths or more per minute (not in the booklet)" });
     });
     // the added quote itself carries the number, so the number is now backed by a cited quote
     expect(fs).toEqual([]);
@@ -189,6 +193,9 @@ describe("numbersInText", () => {
     expect(numbersInText("10 tablets")).toEqual([{ value: 10, unit: "tablets" }]);
     expect(numbersInText("1/2 tablet")).toEqual([{ value: 0.5, unit: "tablet" }]);
     expect(numbersInText("2.5 ml")).toEqual([{ value: 2.5, unit: "ml" }]);
-    expect(numbersInText("one tablet")).toEqual([]);
+    // red team 2 (M39): a dose in words is a number too, but only with a unit right after it
+    expect(numbersInText("one tablet")).toEqual([{ value: 1, unit: "tablet" }]);
+    expect(numbersInText("one or both")).toEqual([]);
+    expect(numbersInText("(Go to page 10.)")).toEqual([]);
   });
 });

@@ -3,6 +3,7 @@ import { makeFinding } from "../finding.js";
 import type { CheckContext, Finding, Subject } from "../finding.js";
 import {
   actionSubject,
+  describeOutcome,
   describeAction,
   describeDerived,
   describeFollowUp,
@@ -11,13 +12,15 @@ import {
   describeScope,
   derivedSubject,
   followUpSubject,
+  outcomeSubject,
   pagesText,
   questionSubject,
   ruleSubject,
   scopeSubject,
 } from "../describe.js";
-import { groundNumber, tokenize } from "../numbers.js";
-import { clip, normalizeForQuote } from "../text.js";
+import { TIME_UNITS, canonUnits, groundNumber, tokenize, unitWord } from "../numbers.js";
+import type { Grounding } from "../numbers.js";
+import { clip, normalizeForQuote, wordTokens } from "../text.js";
 
 const CHECK = "numberGrounding";
 const CLINICIAN_FIRST: ("clinician" | "program_officer")[] = ["clinician", "program_officer"];
@@ -37,9 +40,31 @@ type Use = {
   /** Origin "team" and no source: the number claims no guideline backing. */
   team: boolean;
   sources: readonly Source[];
+  /** Numbers of one group (one age band with its cut-off or dose) must all be written in the same passage. */
+  group?: string;
+  /** Words naming what the number is about; the quote that carries the number must also have one of them. */
+  concept?: readonly string[];
+  /** Plain words for the concept, for the message. */
+  conceptText?: string;
 };
 
 export type Cmp = { field: string; op: "at_least" | "less_than"; value: number };
+
+/** The numeric comparison leaves of a condition, as the objects themselves (in order). */
+function numericLeaves(root: Condition): { field: string; op: "at_least" | "less_than"; value: number }[] {
+  const out: { field: string; op: "at_least" | "less_than"; value: number }[] = [];
+  const stack: Condition[] = [root];
+  while (stack.length > 0) {
+    const c = stack.pop() as Condition;
+    if ("field" in c) {
+      if (c.op !== "is_yes") out.push(c as { field: string; op: "at_least" | "less_than"; value: number });
+    } else {
+      const kids = "all" in c ? c.all : c.any;
+      for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i] as Condition);
+    }
+  }
+  return out;
+}
 
 /** Numeric literals compared in a condition. */
 export function numericComparisons(root: Condition): Cmp[] {
@@ -57,20 +82,73 @@ export function numericComparisons(root: Condition): Cmp[] {
   return out;
 }
 
-/** Numbers written in a short dose text such as "1 tablet", "10 tablets" or "1/2 tablet". */
+const NUMBER_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+};
+
+/**
+ * Numbers written in a short text such as "1 tablet", "10 tablets", "1/2 tablet" or "two tablets", with the word right
+ * after each. A number word counts only with a unit right after it; a page number ("page 10") is not a number.
+ */
 export function numbersInText(text: string): { value: number; unit?: string }[] {
   const out: { value: number; unit?: string }[] = [];
-  for (const m of text.matchAll(/(\d+)\s*\/\s*(\d+)|(\d+(?:\.\d+)?)(?:\s*([a-zA-Z]+))?/g)) {
+  const toks = [...text.matchAll(/(\d+)\s*\/\s*(\d+)|\d+(?:\.\d+)?|\p{L}+/gu)];
+  let pageMode = false;
+  toks.forEach((m, i) => {
+    const next = toks[i + 1]?.[0];
+    const nextWord = next !== undefined && /^\p{L}/u.test(next) ? next : undefined;
+    const unit = nextWord !== undefined ? { unit: nextWord } : {};
     if (m[1] !== undefined && m[2] !== undefined) {
-      if (Number(m[2]) === 0) continue;
-      const after = text.slice((m.index ?? 0) + m[0].length).match(/^\s*([a-zA-Z]+)/);
-      out.push({ value: Number(m[1]) / Number(m[2]), ...(after?.[1] !== undefined ? { unit: after[1] } : {}) });
-    } else if (m[3] !== undefined) {
-      out.push({ value: Number(m[3]), ...(m[4] !== undefined ? { unit: m[4] } : {}) });
+      if (Number(m[2]) !== 0 && !pageMode) out.push({ value: Number(m[1]) / Number(m[2]), ...unit });
+    } else if (/^\d/.test(m[0])) {
+      if (!pageMode) out.push({ value: Number(m[0]), ...unit });
+    } else {
+      const w = m[0].toLowerCase();
+      const n = NUMBER_WORDS[w];
+      if (n !== undefined && nextWord !== undefined && unitWord(nextWord) !== undefined) out.push({ value: n, ...unit });
+      if (w === "page" || w === "pages" || w === "p" || w === "pg") pageMode = true;
+      else if (w !== "and") pageMode = false;
     }
-  }
+  });
   return out;
 }
+
+const STOP = new Set([
+  "the", "for", "and", "how", "many", "much", "what", "when", "has", "had", "have", "does", "did", "is", "are", "was", "child", "child's",
+  "look", "ask", "any", "with", "from", "this", "that", "per", "in", "of", "to", "or", "a", "an", "there", "his", "her", "their", "enter", "number",
+  "yes", "not", "been", "since", "long",
+]);
+
+/** Words naming what a question is about (its id and label), without filler words and units of time. */
+function conceptOf(q: { id: string; label: string } | undefined): string[] {
+  if (q === undefined) return [];
+  const words = [...q.id.split(/[^a-z]+/i), ...wordTokens(q.label)].map((w) => w.toLowerCase().replace(/'s$/, ""));
+  const out = new Set<string>();
+  for (const w of words) {
+    if (w.length < 3 || STOP.has(w) || /^\d/.test(w)) continue;
+    const u = unitWord(w);
+    if (u !== undefined && TIME_UNITS.has(u)) continue;
+    out.add(w);
+  }
+  return [...out];
+}
+
+const FOLLOW_UP_CONCEPT = ["follow", "return", "visit", "review", "back", "again", "reassess"];
+const AGE_CONCEPT = ["age", "aged", "old"];
+
+/** Does the quote mention one of the concept words (a word starting with it, or it starting with the word, 4 letters or more)? */
+function mentions(quote: string, concept: readonly string[] | undefined): boolean {
+  if (concept === undefined || concept.length === 0) return true;
+  const words = wordTokens(quote);
+  return concept.some((c) => words.some((w) => w === c || (c.length >= 4 && w.length >= 4 && (w.startsWith(c) || c.startsWith(w)))));
+}
+
+/** One age band per piece: a quote is cut before each "age" so that each band and the numbers after it stay together. */
+function pieces(quote: string): string[] {
+  return quote.split(/(?=\bage[ds]?\b)/i).filter((x) => x.trim() !== "");
+}
+
+const passes = (g: Grounding): boolean => g.status === "grounded" || g.status === "converted";
 
 export const phrase = (op: Cmp["op"], v: string): string => (op === "at_least" ? `${v} or more` : `less than ${v}`);
 
@@ -80,6 +158,8 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
   const isTeam = (origin: "guideline" | "team", sources: readonly Source[] | undefined): boolean =>
     origin === "team" && (sources === undefined || sources.length === 0);
 
+  const ageField = model.questions.find((q) => /month/.test(q.unit ?? "") && /\bage|^age|age_/i.test(`${q.id} ${q.label}`))?.id;
+  let groupNo = 0;
   const addCondition = (
     owner: string,
     subject: Subject,
@@ -88,11 +168,28 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
     origin: "guideline" | "team",
     sources: readonly Source[] | undefined,
   ): void => {
-    for (const c of numericComparisons(when)) {
+    // An "all" group that compares the age with numbers and also another number is one age band: its numbers go together.
+    const groupOf = new Map<Cmp, string>();
+    const stack: Condition[] = [when];
+    while (stack.length > 0) {
+      const c = stack.pop() as Condition;
+      if ("field" in c) continue;
+      const kids = "all" in c ? c.all : c.any;
+      for (const k of kids) stack.push(k);
+      if (!("all" in c)) continue;
+      const leaves = kids.filter((k): k is Extract<Condition, { field: string }> => "field" in k && k.op !== "is_yes");
+      if (leaves.length >= 2 && ageField !== undefined && leaves.some((l) => l.field === ageField)) {
+        const key = `${owner}#${++groupNo}`;
+        for (const l of leaves) groupOf.set(l as unknown as Cmp, key);
+      }
+    }
+    for (const c of numericLeaves(when)) {
       const q = questions.get(c.field);
       const unit = q?.unit;
       const subjects: Subject[] = [subject];
       if (q !== undefined) subjects.push(questionSubject(q));
+      const concept = c.field === ageField ? AGE_CONCEPT : conceptOf(q);
+      const group = groupOf.get(c as unknown as Cmp);
       uses.push({
         owner,
         subjects,
@@ -102,6 +199,9 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
         usage: `${phrase(c.op, `${c.value}${unit !== undefined ? " " + unit.replace(/_/g, " ") : ""}`)} for "${clip(q?.label ?? c.field, 60)}"`,
         team: isTeam(origin, sources),
         sources: sources ?? [],
+        concept,
+        conceptText: `"${clip(q?.label ?? c.field, 60)}"`,
+        ...(group !== undefined ? { group } : {}),
       });
     }
   };
@@ -117,6 +217,9 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
       usage: `${word} ${v} months`,
       team: false,
       sources: model.scope.source,
+      group: "scope",
+      concept: AGE_CONCEPT,
+      conceptText: "the child's age",
     });
   }
 
@@ -141,6 +244,8 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
           usage: `${word} ${v}`,
           team: isTeam(q.origin, q.source),
           sources: q.source ?? [],
+          concept: conceptOf(q),
+          conceptText: `"${clip(q.label, 60)}"`,
         });
       }
     }
@@ -156,11 +261,11 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
       const item = describeAction(o, i);
       const team = isTeam(a.origin, a.source);
       const sources = a.source ?? [];
-      for (const d of a.dose_by_age ?? []) {
+      (a.dose_by_age ?? []).forEach((d, di) => {
         const range = `${d.age_months_min} up to ${d.age_months_below} months`;
+        const group = `${subject.id}#dose${di}`;
         for (const v of [d.age_months_min, d.age_months_below]) {
-          if (v === 0) continue;
-          uses.push({ owner: subject.id, subjects: [subject], item, value: v, unit: "months", usage: `an age limit of ${v} months in the dose table (${range})`, team, sources });
+          uses.push({ owner: subject.id, subjects: [subject], item, value: v, unit: "months", usage: `an age limit of ${v} months in the dose table (${range})`, team, sources, group });
         }
         for (const [what, text] of [["a dose", d.dose], ["a total", d.total]] as const) {
           if (text === undefined) continue;
@@ -174,10 +279,11 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
               usage: `${what} of ${text} for age ${range}`,
               team,
               sources,
+              group,
             });
           }
         }
-      }
+      });
     });
     const f = o.follow_up;
     if (f !== null) {
@@ -185,10 +291,11 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
       const item = describeFollowUp(o);
       const team = isTeam(f.origin, f.source);
       const sources = f.source ?? [];
-      if (f.due_in_days !== null && f.due_in_days !== 0) {
-        uses.push({ owner: o.id, subjects: [subject], item, value: f.due_in_days, unit: "days", usage: `a follow-up due after ${f.due_in_days} days`, team, sources });
+      const fc = { concept: FOLLOW_UP_CONCEPT, conceptText: "a follow-up or return visit" };
+      if (f.due_in_days !== null) {
+        uses.push({ owner: o.id, subjects: [subject], item, value: f.due_in_days, unit: "days", usage: `a follow-up due after ${f.due_in_days} days`, team, sources, ...fc });
       }
-      if (f.task_window_days_after_due !== null && f.task_window_days_after_due !== 0) {
+      if (f.task_window_days_after_due !== null) {
         uses.push({
           owner: o.id,
           subjects: [subject],
@@ -198,6 +305,7 @@ function collectUses(model: Model): { uses: Use[]; limits: string[]; limitSubjec
           usage: `a follow-up task that stays open for ${f.task_window_days_after_due} days after it is due`,
           team,
           sources,
+          ...fc,
         });
       }
     }
@@ -237,7 +345,9 @@ export function numberGrounding(ctx: CheckContext): Finding[] {
   // Team-owned numbers: no guideline source is claimed, so the clinician confirms them.
   const teamByOwner = new Map<string, Use[]>();
   for (const u of uses) if (u.team) teamByOwner.set(u.owner, [...(teamByOwner.get(u.owner) ?? []), u]);
-  for (const list of teamByOwner.values()) {
+  const unconfirmed = new Set(unconfirmedTeamDrivers(model));
+  for (const [owner, list] of teamByOwner) {
+    if (unconfirmed.has(owner)) continue;
     const first = list[0] as Use;
     const subjects = [...new Map(list.flatMap((u) => u.subjects).map((s) => [s.kind + s.id, s])).values()];
     out.push(
@@ -255,6 +365,7 @@ export function numberGrounding(ctx: CheckContext): Finding[] {
   }
 
   let needsDocument = false;
+  const grounded = new Set<Use>();
   for (const u of uses) {
     if (u.team) continue;
     if (doc === undefined) {
@@ -262,9 +373,34 @@ export function numberGrounding(ctx: CheckContext): Finding[] {
       continue;
     }
     const pages = [...new Set(u.sources.map((s) => s.page))];
-    // Quote-only: the number must be written in a quote the item itself cites, not elsewhere on the page.
-    const segments: string[] = u.sources.map((s) => s.quote);
-    const g = groundNumber(tokenize(segments, u.freq === true), u.value, u.unit);
+    // Quote-only: the number must be written in a quote the item itself cites, not elsewhere on the page,
+    // and that quote must be about the same thing (no borrowing "7 days" from a passage about fever).
+    const perQuote = u.sources.map((s) => groundNumber(tokenize([s.quote], u.freq === true), u.value, u.unit));
+    const okIdx = perQuote.flatMap((g, i) => (passes(g) && mentions((u.sources[i] as Source).quote, u.concept) ? [i] : []));
+    let g: Grounding;
+    if (okIdx.length > 0) {
+      const direct = okIdx.find((i) => perQuote[i]?.status === "grounded");
+      g = direct !== undefined ? { status: "grounded" } : (perQuote[okIdx[0] as number] as Grounding);
+      grounded.add(u);
+    } else if (perQuote.some(passes)) {
+      const i = perQuote.findIndex(passes);
+      const s = u.sources[i] as Source;
+      out.push(
+        makeFinding({
+          check: CHECK,
+          code: "NUMBER_CONTEXT_MISMATCH",
+          severity: "blocking",
+          audience: CLINICIAN_FIRST,
+          decidedBy: "clinician",
+          subjects: u.subjects,
+          params: { item: u.item, number: u.value, usage: u.usage, concept: u.conceptText ?? "", page: String(s.page), quote: clip(s.quote, 200) },
+          source: u.sources.map((x) => ({ page: x.page, quote: x.quote })),
+        }),
+      );
+      continue;
+    } else {
+      g = groundNumber(tokenize(u.sources.map((s) => s.quote), u.freq === true), u.value, u.unit);
+    }
     if (g.status === "grounded") continue;
 
     const first = u.sources[0];
@@ -347,6 +483,9 @@ export function numberGrounding(ctx: CheckContext): Finding[] {
       }
     }
   }
+  if (doc !== undefined) out.push(...pairing(uses, grounded));
+  out.push(...teamThresholds(model, teamByOwner));
+  out.push(...textNumbers(model));
   if (needsDocument) {
     out.push(
       makeFinding({
@@ -363,4 +502,172 @@ export function numberGrounding(ctx: CheckContext): Finding[] {
   }
   const seen = new Set<string>();
   return out.filter((f) => !seen.has(f.id) && seen.add(f.id));
+}
+
+/**
+ * Numbers that belong together (an age band and its cut-off, an age band and its dose and total) must be written
+ * in the same passage, cut at each "age": both 50 and 40 being in the quote does not say which band each goes with.
+ */
+function pairing(uses: readonly Use[], grounded: ReadonlySet<Use>): Finding[] {
+  const groups = new Map<string, Use[]>();
+  for (const u of uses) if (u.group !== undefined && !u.team) groups.set(u.group, [...(groups.get(u.group) ?? []), u]);
+  const out: Finding[] = [];
+  for (const list of groups.values()) {
+    if (list.length < 2 || !list.every((u) => grounded.has(u))) continue;
+    const first = list[0] as Use;
+    let common: Set<string> | undefined;
+    for (const u of list) {
+      const keys = new Set<string>();
+      u.sources.forEach((s, qi) => pieces(s.quote).forEach((piece, pi) => {
+        if (passes(groundNumber(tokenize([piece], u.freq === true), u.value, u.unit))) keys.add(`${qi}:${pi}`);
+      }));
+      common = common === undefined ? keys : new Set([...common].filter((k) => keys.has(k)));
+    }
+    if (common !== undefined && common.size > 0) continue;
+    const subjects = [...new Map(list.flatMap((u) => u.subjects).map((x) => [x.kind + x.id, x])).values()];
+    const src = first.sources[0];
+    out.push(
+      makeFinding({
+        check: CHECK,
+        code: "NUMBER_PAIRING_MISMATCH",
+        severity: "blocking",
+        audience: CLINICIAN_FIRST,
+        decidedBy: "clinician",
+        subjects,
+        params: {
+          item: first.item,
+          usage: [...new Set(list.map((u) => u.usage))].join("; "),
+          numbers: [...new Set(list.map((u) => String(u.value)))].join(", "),
+          page: pagesText(first.sources.map((x) => x.page)),
+          quote: clip(src?.quote ?? "", 200),
+        },
+        source: first.sources.map((x) => ({ page: x.page, quote: x.quote })),
+      }),
+    );
+  }
+  return out;
+}
+
+/** Ids of calculated values (directly or through other calculated values) that rules read. */
+function drivingDerived(model: Model): Set<string> {
+  const derived = new Map(model.derived.map((d) => [d.id, d]));
+  const seen = new Set<string>();
+  const stack: Condition[] = model.rules.flatMap((r) => (r.when === "otherwise" ? [] : [r.when]));
+  while (stack.length > 0) {
+    const c = stack.pop() as Condition;
+    if ("field" in c) {
+      const d = derived.get(c.field);
+      if (d !== undefined && !seen.has(d.id)) {
+        seen.add(d.id);
+        stack.push(d.definition);
+      }
+    } else stack.push(...("all" in c ? c.all : c.any));
+  }
+  return seen;
+}
+
+/**
+ * A clinician has answered an open question that names the item AND writes each of the team's numbers in its question
+ * or answer, so an answer to some other question about the item (an age band, say) cannot confirm them by accident.
+ */
+function clinicianConfirmed(model: Model, id: string, numbers: readonly number[]): boolean {
+  return model.open_questions.some((q) => {
+    if (q.route_to !== "clinician" || q.status !== "resolved" || (q.resolution ?? "").trim() === "" || !q.affects.includes(id)) return false;
+    const said = new Set(numbersInText(`${q.question} ${q.resolution ?? ""}`).map((n) => n.value));
+    return numbers.every((n) => said.has(n));
+  });
+}
+
+/**
+ * Team-origin rules and calculated values that decide a result, compare numbers, cite nothing and are not confirmed by a
+ * clinician. A comparison of the age with the covered age range itself (whose numbers are checked on the scope) does not count.
+ */
+function unconfirmedTeamDrivers(model: Model): string[] {
+  const driving = drivingDerived(model);
+  const ageField = model.questions.find((q) => /month/.test(q.unit ?? "") && /\bage|^age|age_/i.test(`${q.id} ${q.label}`))?.id;
+  const scopeAges = new Set([model.scope.age_months_min, model.scope.age_months_below]);
+  const ownNumbers = (when: Condition): number[] => [...new Set(numericComparisons(when).filter((c) => !(c.field === ageField && scopeAges.has(c.value))).map((c) => c.value))];
+  const items: { id: string; origin: string; source?: readonly Source[] | undefined; when: Condition }[] = [
+    ...model.derived.filter((d) => driving.has(d.id)).map((d) => ({ id: d.id, origin: d.origin, source: d.source, when: d.definition })),
+    ...model.rules.flatMap((r) => (r.when === "otherwise" ? [] : [{ id: r.id, origin: r.origin, source: r.source, when: r.when }])),
+  ];
+  return items
+    .filter((it) => {
+      if (it.origin !== "team" || (it.source ?? []).length > 0) return false;
+      const own = ownNumbers(it.when);
+      return own.length > 0 && !clinicianConfirmed(model, it.id, own);
+    })
+    .map((it) => it.id);
+}
+
+/** M10: cut-offs the team set itself on an item that decides the result block until a clinician confirms them in an open question. */
+function teamThresholds(model: Model, teamByOwner: ReadonlyMap<string, Use[]>): Finding[] {
+  const out: Finding[] = [];
+  for (const id of unconfirmedTeamDrivers(model)) {
+    const list = teamByOwner.get(id) ?? [];
+    const d = model.derived.find((x) => x.id === id);
+    const r = model.rules.find((x) => x.id === id);
+    const subject: Subject = d !== undefined ? derivedSubject(d) : ruleSubject(r as Model["rules"][number]);
+    const item = d !== undefined ? describeDerived(d) : describeRule(model, r as Model["rules"][number]);
+    const subjects = [...new Map([subject, ...list.flatMap((u) => u.subjects)].map((x) => [x.kind + x.id, x])).values()];
+    out.push(
+      makeFinding({
+        check: CHECK,
+        code: "TEAM_THRESHOLD_UNCONFIRMED",
+        severity: "blocking",
+        audience: CLINICIAN_FIRST,
+        decidedBy: "clinician",
+        subjects,
+        params: { item, id, usage: [...new Set(list.map((u) => u.usage))].join("; ") },
+        source: [],
+      }),
+    );
+  }
+  return out;
+}
+
+/**
+ * Numbers in words the health worker reads (question labels, labels of calculated values, result titles, action texts)
+ * must be in a quote of that item; for a result, its own quotes and those of its actions and follow-up count.
+ */
+function textNumbers(model: Model): Finding[] {
+  type T = { subject: Subject; item: string; text: string; sources: readonly Source[] };
+  const texts: T[] = [];
+  for (const q of model.questions) texts.push({ subject: questionSubject(q), item: describeQuestion(q), text: q.label, sources: q.source ?? [] });
+  for (const d of model.derived) texts.push({ subject: derivedSubject(d), item: describeDerived(d), text: d.label, sources: d.source ?? [] });
+  for (const o of model.outcomes) {
+    const all = [...(o.source ?? []), ...o.actions.flatMap((a) => a.source ?? []), ...(o.follow_up?.source ?? [])];
+    texts.push({ subject: outcomeSubject(o), item: describeOutcome(o), text: o.title, sources: all });
+    o.actions.forEach((a, i) => texts.push({ subject: actionSubject(o, i), item: describeAction(o, i), text: a.text, sources: a.source ?? [] }));
+  }
+  const out: Finding[] = [];
+  for (const t of texts) {
+    const toks = tokenize(t.sources.map((s) => s.quote), true);
+    const bad: string[] = [];
+    for (const n of numbersInText(t.text)) {
+      const unit = n.unit !== undefined && canonUnits(n.unit).size > 0 ? n.unit : undefined;
+      if (!passes(groundNumber(toks, n.value, unit))) bad.push(unit !== undefined ? `${n.value} ${n.unit}` : String(n.value));
+    }
+    if (bad.length === 0) continue;
+    const first = t.sources[0];
+    out.push(
+      makeFinding({
+        check: CHECK,
+        code: "NUMBER_IN_TEXT_UNSUPPORTED",
+        severity: "blocking",
+        audience: CLINICIAN_FIRST,
+        decidedBy: "clinician",
+        subjects: [t.subject],
+        params: {
+          item: t.item,
+          text: clip(t.text, 200),
+          numbers: [...new Set(bad)].join(", "),
+          page: pagesText(t.sources.map((s) => s.page)),
+          quote: clip(first?.quote ?? "", 200),
+        },
+        source: t.sources.map((s) => ({ page: s.page, quote: s.quote })),
+      }),
+    );
+  }
+  return out;
 }

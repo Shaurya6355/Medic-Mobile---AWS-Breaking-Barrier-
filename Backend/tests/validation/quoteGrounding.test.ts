@@ -107,8 +107,8 @@ describe("quoteGrounding normalisation against page text", () => {
     expect(codes(oneSource(7, "not able to drink or feed anything"))).toEqual([]);
     expect(codes(oneSource(7, "NO DANGER SIGN"))).toEqual([]);
   });
-  it("resolves a quote that spans two blocks of the same page", () => {
-    expect(codes(oneSource(7, "Child age 2 months up to 5 years If cough, count breaths"))).toEqual([]);
+  it("A3/A22: never stitches a quote across two blocks of the same page", () => {
+    expect(codes(oneSource(7, "Child age 2 months up to 5 years If cough, count breaths"))).toContain("HALLUCINATED_CITATION");
   });
   it("does not let a quote borrow text from another page", () => {
     expect(codes(oneSource(8, "Child age 2 months up to 5 years")).length).toBeGreaterThan(0);
@@ -118,5 +118,28 @@ describe("quoteGrounding normalisation against page text", () => {
     for (const p of raw.pages) for (const b of p.blocks) b.text = b.text.replace(/2 months up to 5 years/g, "2 months up to 6 years");
     const ctx = { model: realCtx().model, document: loadSourceDocument(raw) };
     expect(quoteGrounding(ctx).length).toBeGreaterThan(0);
+  });
+});
+
+describe("quoteGrounding hardening (red team 2)", () => {
+  it("A2/A21: a trivial quote (a page number, one short word) is blocking QUOTE_TOO_SHORT", () => {
+    const fs = quoteGrounding(realCtx((m) => { m.questions[0].source[0] = { page: 8, quote: "8" }; }));
+    expect(fs.map((f) => f.code)).toEqual(["QUOTE_TOO_SHORT"]);
+    expect(fs[0]!.severity).toBe("blocking");
+    expect(fs[0]!.message).toContain('"8"');
+    expect(codes({ model: realCtx((m) => { m.questions[0].source[0] = { page: 8, quote: "the" }; }).model, document: realCtx().document! })).toEqual(["QUOTE_TOO_SHORT"]);
+  });
+  it("A6: a quote that leaves out the 'not' in front of it is blocking QUOTE_DROPS_NEGATION", () => {
+    const fs = quoteGrounding(realCtx((m) => { m.questions[0].source[0] = { page: 6, quote: "able to drink or feed anything" }; }));
+    expect(fs.map((f) => f.code)).toEqual(["QUOTE_DROPS_NEGATION"]);
+    expect(fs[0]!.severity).toBe("blocking");
+    expect(fs[0]!.decidedBy).toBe("clinician");
+    expect(fs[0]!.message).toMatch(/not/i);
+  });
+  it("A7: a quote cut in the middle of a number is not found", () => {
+    expect(quoteGrounding(realCtx((m) => { m.derived[0].source[0] = { page: 8, quote: "0 breaths or more per minute" }; })).map((f) => f.code)).toEqual(["HALLUCINATED_CITATION"]);
+  });
+  it("A22: a quote joined from two blocks of the real page 7 is not found", () => {
+    expect(quoteGrounding(realCtx((m) => { m.questions[0].source[0] = { page: 7, quote: "Write a referral note.\n Arrange transportation" }; })).map((f) => f.code)).toEqual(["HALLUCINATED_CITATION"]);
   });
 });

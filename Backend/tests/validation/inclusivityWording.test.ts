@@ -87,3 +87,33 @@ describe("inclusivityWording phrases", () => {
     expect(run().map((f) => f.id)).toEqual(run().map((f) => f.id));
   });
 });
+
+describe("inclusivityWording: direction of the comparison (red team 2: B22, B23, C5, C6)", () => {
+  it.each([
+    ["Cough for 14 days or more", "less_than"],
+    ["Cough of at least 14 days", "less_than"],
+    ["Cough for more than 14 days", "less_than"],
+    ["Cough less than 14 days", "at_least"],
+    ["Cough under 14 days", "at_least"],
+    ["Cough below 14 days", "at_least"],
+  ] as const)("'%s' with %s 14 is a blocking DIRECTION_MISMATCH", (q, op) => {
+    const f = run(danger(op, q)).find((x) => x.code === "DIRECTION_MISMATCH")!;
+    expect(f).toBeDefined();
+    expect(f.severity).toBe("blocking");
+    expect(f.decidedBy).toBe("clinician");
+    expect(f.message).toContain("14");
+  });
+  it.each([
+    ["Cough for 14 days or more", "at_least"],
+    ["Cough less than 14 days", "less_than"],
+  ] as const)("'%s' with %s 14 agrees", (q, op) => {
+    expect(codes(danger(op, q))).not.toContain("DIRECTION_MISMATCH");
+  });
+  it("C5/B23: fast breathing turned into fewer than 50 breaths is blocking", () => {
+    const fs = run((m) => { m.derived[0].definition.all[1].any[0].all[2].op = "less_than"; });
+    expect(fs.map((f) => f.code)).toContain("DIRECTION_MISMATCH");
+  });
+  it("age bands 'N up to M' agree with at least N and less than M; v1 has no direction finding", () => {
+    expect(codes()).not.toContain("DIRECTION_MISMATCH");
+  });
+});

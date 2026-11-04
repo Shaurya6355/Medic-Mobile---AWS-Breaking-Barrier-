@@ -151,3 +151,25 @@ describe("parseModel rejects structural errors", () => {
     expect(issuesOf(cyc).join()).toContain("nesting");
   });
 });
+
+describe("parseModel rejects reserved names and blank text (red team 1, M72 to M92)", () => {
+  const mutate = (fn: (m: any) => void): string[] => {
+    const raw = rawV1();
+    fn(raw);
+    return issuesOf(raw);
+  };
+  it("rejects ids that are built-in object property names", () => {
+    for (const id of ["constructor", "prototype", "tostring", "valueof", "hasownproperty"]) {
+      expect(mutate((m) => { m.questions[8].id = id; }).join(), id).toMatch(/reserved/);
+      expect(mutate((m) => { m.derived[0].id = id; }).join(), id).toMatch(/reserved/);
+      expect(mutate((m) => { m.outcomes[5].id = id; }).join(), id).toMatch(/reserved/);
+      expect(mutate((m) => { m.rules[4].when = { field: id, op: "is_yes" }; }).join(), id).toMatch(/reserved/);
+    }
+  });
+  it("rejects a title, label or action text made only of spaces", () => {
+    expect(mutate((m) => { m.outcomes[0].title = "   "; }).join()).toMatch(/outcomes\[0\]\.title/);
+    expect(mutate((m) => { m.questions[0].label = " \n "; }).join()).toMatch(/questions\[0\]\.label/);
+    expect(mutate((m) => { m.outcomes[0].actions[0].text = "\t"; }).join()).toMatch(/actions\[0\]\.text/);
+    expect(mutate((m) => { m.derived[0].label = " "; }).join()).toMatch(/derived\[0\]\.label/);
+  });
+});

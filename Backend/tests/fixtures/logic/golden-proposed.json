@@ -256,5 +256,39 @@
     "expected_outcome": "refer_outside_age_range",
     "expected_rule": "R1",
     "note": "pending clinician decision Q2, a lower-severity rule fires first (R1 severity 2 fires before R3 refer_urgent severity 1)."
+  },
+  {
+    "id": "g16",
+    "description": "6 months, convulsions and 55 breaths (danger sign with fast breathing in an infant)",
+    "answers": {
+      "age_months": 6,
+      "cough": true,
+      "convulsions": true,
+      "not_able_to_drink_or_feed": false,
+      "vomits_everything": false,
+      "chest_indrawing": false,
+      "unusually_sleepy": false,
+      "cough_days": 3,
+      "breaths_per_minute": 55
+    },
+    "expected_outcome": "refer_urgent_with_antibiotic",
+    "expected_rule": "R2",
+    "note": "Proposed from v1.json and the booklet content in it, not clinically confirmed, awaiting Medic. Pins that an infant with a danger sign and fast breathing gets the first dose of antibiotic before referral (page 7), where R2 and R3 are equally urgent (red team 1, M81)."
+  },
+  {
+    "id": "g17",
+    "description": "KNOWN HAZARD: 1 month old with chest indrawing",
+    "answers": {
+      "age_months": 1,
+      "cough": false,
+      "convulsions": false,
+      "not_able_to_drink_or_feed": false,
+      "vomits_everything": false,
+      "chest_indrawing": true,
+      "unusually_sleepy": false
+    },
+    "expected_outcome": "refer_outside_age_range",
+    "expected_rule": "R1",
+    "note": "pending clinician decision Q2, the rule for children outside the covered ages fires before R2 (refer with antibiotic); pins which result such a child gets when both are equally urgent."
   }
 ]

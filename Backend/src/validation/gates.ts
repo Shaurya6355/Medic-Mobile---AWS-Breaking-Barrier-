@@ -21,6 +21,12 @@ export type Gates = {
 
 const LABELS: Record<string, readonly [string, string]> = {
   OPEN_QUESTION: ["unanswered open question", "unanswered open questions"],
+  OPEN_QUESTION_NO_RESOLUTION: ["open question marked answered with no answer written", "open questions marked answered with no answer written"],
+  OPEN_QUESTION_TRIVIAL_RESOLUTION: ["open question whose answer says nothing", "open questions whose answers say nothing"],
+  OPEN_QUESTION_REMOVED: ["open question removed instead of answered", "open questions removed instead of answered"],
+  OPEN_QUESTION_REROUTED: ["open question sent to someone else", "open questions sent to someone else"],
+  OPEN_QUESTION_WRONG_RESOLVER: ["open question answered by the wrong person", "open questions answered by the wrong person"],
+  OPEN_QUESTION_CLINICIAN_NOT_RECORDED: ["clinician answer without the clinician's name and change note", "clinician answers without the clinician's name and change note"],
   GUIDELINE_FILE_MISMATCH: ["different copy of the guideline than the one uploaded", "different copies of the guideline than the one uploaded"],
   SEVERITY_INVERSION: ["urgent result hidden by a less urgent one", "urgent results hidden by less urgent ones"],
   UNGROUNDED_NUMBER: ["number not backed by a quote of the booklet", "numbers not backed by a quote of the booklet"],

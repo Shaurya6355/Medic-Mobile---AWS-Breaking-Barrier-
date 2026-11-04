@@ -2,6 +2,10 @@ import { makeFinding } from "../finding.js";
 import type { CheckContext, Finding } from "../finding.js";
 import { describeOutcome, describeQuestion, describeRule, derivedSubject, outcomeSubject, questionSubject, ruleSubject } from "../describe.js";
 import { citation, provenAnalysis } from "./common.js";
+import { thresholdsOutsideLimits } from "../../logic/grid.js";
+import type { Model } from "../../logic/schema.js";
+import type { Subject } from "../finding.js";
+import { describeDerived } from "../describe.js";
 
 export const CHECK = "reachability";
 
@@ -11,13 +15,16 @@ export const CHECK = "reachability";
  *  - every result is given for at least one combination, else UNREACHABLE_OUTCOME. This also covers the
  *    follow-up of the result: a follow-up is only set up through its result, so if the result can come up, so can it;
  *  - every question with a condition for being asked is asked for at least one combination;
- *  - every calculated value is yes for some combination and no for another, else DERIVED_CONSTANT.
+ *  - every calculated value is yes for some combination and no for another, else DERIVED_CONSTANT;
+ *  - every cut-off on a whole-number question can be reached from both sides within the entry limits, else
+ *    ENTRY_LIMIT_HIDES_CUTOFF (blocking): with breaths limited to 45, "50 breaths or more" can never be recorded.
+ *    This part does not need the combinations, so it runs even when they could not all be gone through.
  */
 export function reachability(ctx: CheckContext): Finding[] {
+  const out: Finding[] = entryLimits(ctx.model);
   const a = provenAnalysis(ctx);
-  if (a?.rules === undefined) return [];
+  if (a?.rules === undefined) return out;
   const model = ctx.model;
-  const out: Finding[] = [];
   for (const r of model.rules) {
     if (r.when === "otherwise") continue;
     const stat = a.rules.perRule[r.id];
@@ -81,6 +88,60 @@ export function reachability(ctx: CheckContext): Finding[] {
         decidedBy: "clinician",
         subjects: [derivedSubject(d)],
         params: { item: d.label, always: seen.yes > 0 ? "yes" : "no", ...c.params },
+        source: c.source,
+      }),
+    );
+  }
+  return out;
+}
+
+function entryLimits(model: Model): Finding[] {
+  const out: Finding[] = [];
+  for (const x of thresholdsOutsideLimits(model)) {
+    const q = model.questions.find((y) => y.id === x.question);
+    if (q?.constraint === undefined) continue;
+    const [kind, id] = x.where.split(":") as [string, string];
+    let subject: Subject;
+    let item: string;
+    let src: Parameters<typeof citation>[0];
+    if (kind === "derived") {
+      const d = model.derived.find((y) => y.id === id)!;
+      subject = derivedSubject(d);
+      item = describeDerived(d);
+      src = d;
+    } else if (kind === "rule") {
+      const r = model.rules.find((y) => y.id === id)!;
+      subject = ruleSubject(r);
+      item = describeRule(model, r);
+      src = r;
+    } else {
+      const w = model.questions.find((y) => y.id === id)!;
+      subject = questionSubject(w);
+      item = `the condition for asking ${describeQuestion(w)}`;
+      src = w;
+    }
+    const c = citation(src);
+    const above = Math.ceil(x.value) > q.constraint.max;
+    out.push(
+      makeFinding({
+        check: CHECK,
+        code: "ENTRY_LIMIT_HIDES_CUTOFF",
+        severity: "blocking",
+        audience: ["clinician", "program_officer"],
+        decidedBy: "clinician",
+        subjects: subject.kind === "question" && subject.id === q.id ? [subject] : [subject, questionSubject(q)],
+        params: {
+          item,
+          question: q.label,
+          value: x.value,
+          unit: q.unit === undefined ? "" : ` ${q.unit.replace(/_/g, " ")}`,
+          min: q.constraint.min,
+          max: q.constraint.max,
+          effect: above
+            ? "no child can be recorded at or above the cut-off and the children it is meant to pick out can never be found"
+            : "every child that can be entered is already at or above the cut-off, so it never separates children",
+          ...c.params,
+        },
         source: c.source,
       }),
     );

@@ -71,6 +71,14 @@ const TEMPLATES: Record<string, Template> = {
         : "The program officer decides: fix the citation, or, if the item itself may be invented, send it to the clinician."
     }`,
 
+  QUOTE_TOO_SHORT: (p) =>
+    `The source given for ${s(p, "item")} is only "${s(p, "quote")}" (${pageText(p)}). So few words could be found almost anywhere in the booklet and prove nothing. The program officer replaces it with the full booklet passage that supports the item.`,
+
+  QUOTE_DROPS_NEGATION: (p, a) =>
+    `The words given as the source for ${s(p, "item")} leave out a "not" (or "no", "without") that stands just before them in the booklet, so the quote says the opposite of the booklet. The booklet (${pageText(p)}) says: "${s(p, "blockText")}". The draft quotes: "${s(p, "quote")}". ${
+      a === "clinician" ? "The clinician checks whether the item itself has the meaning reversed." : "The clinician checks whether the item itself has the meaning reversed; the program officer then corrects the quote."
+    }`,
+
   SOURCE_PAGE_MISSING: (p) =>
     `${cap(s(p, "item"))} cites ${pageText(p)} of the booklet, but the uploaded booklet has no such page. The booklet cannot be used to check this item. The program officer corrects the citation.`,
 
@@ -97,6 +105,62 @@ const TEMPLATES: Record<string, Template> = {
   SCOPE_RULE_MISMATCH: (p) =>
     `${cap(s(p, "item"))} is meant for children outside the covered ages (${s(p, "lo")} up to ${s(p, "hi")} months), but it does not match that range: ${s(p, "problem")}. The booklet is not involved. The program officer asks the clinician which is right, the covered ages or the rule.`,
 
+  // ---------- red team 1 (logic checks) ----------
+
+  SCOPE_RULE_MISSING: (p) =>
+    `The draft covers children aged ${s(p, "lo")} up to ${s(p, "hi")} months, and a younger or older child can be entered (for example ${s(p, "example")} months), but no rule handles children outside that range. Such a child would go through this form as if it applied to them. The booklet is not involved. The clinician decides what such a child should get; the program officer then adds the rule.`,
+
+  AGE_QUESTION_MISSING: (p) =>
+    `The draft covers an age range, but ${s(p, "problem")}, so the age groups, the dose tables and the rule for children outside the range cannot be checked. The booklet is not involved. The program officer makes the age question a whole-number question measured in "months".`,
+
+  AGE_LIMITS_EXCLUDE_SCOPE: (p) =>
+    `The draft covers children aged ${s(p, "lo")} up to ${s(p, "hi")} months, but the question "${s(p, "question")}" only accepts ${s(p, "min")} to ${s(p, "max")} months, so some children the booklet covers cannot be entered at all. The booklet is not involved. The program officer widens the entry limits, or asks the clinician whether the covered ages are wrong.`,
+
+  ENTRY_LIMIT_HIDES_CUTOFF: (p) =>
+    `${cap(s(p, "item"))} uses the cut-off ${s(p, "value")}${s(p, "unit")} for "${s(p, "question")}", but a health worker may only enter ${s(p, "min")} to ${s(p, "max")}${s(p, "unit")}, so ${s(p, "effect")}. ${bookletOpt(p)} The clinician decides whether the cut-off or the entry limits are wrong; the program officer then corrects them.`,
+
+  DOSE_TABLE_MISSING: (p) =>
+    `${cap(s(p, "item"))} gives a medicine whose dose the booklet sets by age, but the draft has no dose for each age group, so the health worker is not told how much to give. ${booklet(p)} The clinician confirms the doses; the program officer then adds the dose for each age group.`,
+
+  DANGER_SIGN_NOT_URGENT: (p) =>
+    `The booklet lists "${s(p, "sign")}" as a danger sign, so a child with it must be referred urgently. But ${s(p, "child")} gets "${s(p, "outcome")}", which is not the most urgent result ("${s(p, "urgent")}"). ${booklet(p)} The clinician decides how the rules must change; the program officer then makes the change.`,
+
+  DANGER_SIGN_CANNOT_BE_RECORDED: (p) =>
+    `The booklet lists "${s(p, "sign")}" as a danger sign, but no child within the covered ages and the entry limits can be recorded with it in this draft (through "${s(p, "question")}"), so it can never lead to a referral. ${booklet(p)} The clinician decides how it should be asked; the program officer then corrects the question or its limits.`,
+
+  DANGER_SIGN_ASKED_ONLY_SOMETIMES: (p) =>
+    `The question "${s(p, "question")}" asks about the danger sign "${s(p, "sign")}", but it is only asked when ${s(p, "guard")}. A child for whom it is not asked is treated as not having the sign. ${booklet(p)} Danger signs must be looked for in every child. The clinician confirms; the program officer then makes the question always asked.`,
+
+  DANGER_SIGN_QUESTION_UNKNOWN: (p) =>
+    `The draft cites the danger sign "${s(p, "sign")}", but no question can be found that asks about it, so it cannot be checked that the sign leads to an urgent referral. ${booklet(p)} The program officer adds the booklet passage to the question that asks about this sign, or asks the clinician whether the sign is missing.`,
+
+  DANGER_SIGN_OUTCOME_NO_REFERRAL: (p) =>
+    `A child with the danger sign "${s(p, "sign")}" gets the result "${s(p, "outcome")}", but none of its instructions tells the health worker to refer the child. ${booklet(p)} The clinician decides what the result must say; the program officer then adds the referral instruction from the booklet.`,
+
+  DANGER_SIGN_EXCLUDED_COUGH_RELEVANT: (p) =>
+    `The danger sign "${s(p, "sign")}" is listed as left out of this form, but the reading of the booklet marked it as related to cough, so a child with cough and this sign would not be referred.${s(p, "openQuestion") === "" ? "" : ` See the open question ${s(p, "openQuestion")}.`} ${booklet(p)} The clinician decides whether it must be asked; the program officer then adds it, or records why it is safe to leave out.`,
+
+  SEVERITY_DANGER_NOT_TOP: (p) =>
+    `The result "${s(p, "outcome")}" is what a child with a danger sign gets, but it is ranked ${s(p, "severity")} on the urgency scale, below the most urgent rank used in the draft (${s(p, "top")}; 1 is the most urgent). A referral for a danger sign must be among the most urgent results. The booklet is not involved. The clinician decides the ranking; the program officer then corrects it.`,
+
+  SEVERITY_NOT_SEPARATED: (p) =>
+    `The result "${s(p, "milder")}" is ranked ${s(p, "milderSeverity")} on the urgency scale, as urgent as or more urgent than "${s(p, "outcome")}" (ranked ${s(p, "severity")}), which is what a child with a danger sign gets (1 is the most urgent). The checks that look for urgent results hidden by less urgent ones cannot tell them apart. The booklet is not involved. The clinician decides the ranking; the program officer then corrects it.`,
+
+  SEVERITY_ALL_EQUAL: (p) =>
+    `All ${s(p, "count")} results of the draft are ranked ${s(p, "severity")} on the urgency scale, so nothing in the draft says which results are more urgent, and the checks for urgent results hidden by less urgent ones cannot work. The booklet is not involved. The clinician ranks the results; the program officer then records the ranking.`,
+
+  URGENT_OVERLAP_UNTESTED: (p) =>
+    `Two results that are equally urgent can both apply to the same child: for example ${s(p, "child")} gets "${s(p, "firstOutcome")}" from ${s(p, "firstRule")}, although ${s(p, "overriddenRule")} would give "${s(p, "overriddenOutcome")}". The urgency ranking cannot tell which is right, and no test case checks it. The booklet is not involved. The clinician adds a test case for such a child with the result they expect.`,
+
+  FOLLOWUP_REQUIRED_BY_SOURCE: (p) =>
+    `${cap(s(p, "item"))} has no follow-up, yet ${s(p, "where")} says to follow up the child ("${s(p, "says")}"). Nobody would be reminded to check on the child. ${bookletOpt(p)} The clinician confirms the follow-up; the program officer then adds it.`,
+
+  FOLLOWUP_KIND_MISMATCH: (p) =>
+    `${cap(s(p, "item"))} is set up as a follow-up for when the child comes back, but ${s(p, "where")} says to follow up after a fixed number of days ("${s(p, "says")}"). No reminder would be created, so the child might not be checked on. ${bookletOpt(p)} The clinician decides; the program officer then makes it a follow-up after that number of days.`,
+
+  FOLLOWUP_DUE_SAME_DAY: (p) =>
+    `${cap(s(p, "item"))} is due after 0 days, the same day as the visit, so the reminder would come up straight away instead of on the day the child should be checked again. ${bookletOpt(p)} The clinician decides the right number of days.`,
+
   UNGROUNDED_NUMBER: (p, a) => {
     if (s(p, "pageQuote") !== "") {
       return `${cap(s(p, "item"))} uses the number ${s(p, "number")}, but it is not written in any of the quotes given for this item. ${booklet(p)} The draft has ${s(p, "usage")}. The cited ${pageText(p)} does carry the number: "${s(p, "pageQuote")}". ${
@@ -117,6 +181,26 @@ const TEMPLATES: Record<string, Template> = {
   UNIT_MISMATCH: (p, a) =>
     `${cap(s(p, "item"))} uses ${s(p, "usage")}, but the booklet gives that number with a different unit (${s(p, "textUnits")}). ${booklet(p)} The draft has ${s(p, "usage")}. ${
       a === "clinician" ? ASK_CLINICIAN : `${ASK_CLINICIAN} The program officer first checks that the right passage is cited.`
+    }`,
+
+  NUMBER_CONTEXT_MISMATCH: (p, a) =>
+    `${cap(s(p, "item"))} uses ${s(p, "usage")}. The number ${s(p, "number")} is in a quote given for it, but that passage is about something else: it does not mention ${s(p, "concept")}. ${booklet(p)} A number may only be taken from a passage about the same thing. ${
+      a === "clinician" ? ASK_CLINICIAN : `${ASK_CLINICIAN} The program officer first checks that the right passage is cited.`
+    }`,
+
+  NUMBER_PAIRING_MISMATCH: (p, a) =>
+    `${cap(s(p, "item"))} uses ${s(p, "usage")}. Each of these numbers (${s(p, "numbers")}) is in the booklet, but not together in the same passage for the same age band, so a number may have been moved to the wrong age band. ${booklet(p)} ${
+      a === "clinician" ? "The clinician checks which number goes with which age band." : "The program officer asks the clinician which number goes with which age band."
+    }`,
+
+  NUMBER_IN_TEXT_UNSUPPORTED: (p, a) =>
+    `The words shown to the health worker for ${s(p, "item")} ("${s(p, "text")}") contain ${s(p, "numbers")}, which none of the quotes given for it carries. ${booklet(p)} A dose, a cut-off or a number of days in the wording must come from the booklet. ${
+      a === "clinician" ? "The clinician corrects the wording or confirms the number." : "The program officer asks the clinician to correct the wording or confirm the number."
+    }`,
+
+  TEAM_THRESHOLD_UNCONFIRMED: (p, a) =>
+    `${cap(s(p, "item"))} decides a result with numbers the team chose, with no booklet source: ${s(p, "usage")}. Numbers like these could replace the booklet's cut-offs unseen, so the item stays blocked until a clinician has answered an open question about it (one that names "${s(p, "id")}" and writes each of these numbers). ${
+      a === "clinician" ? "The clinician confirms or corrects the numbers and records the answer." : "The program officer adds an open question for the clinician about these numbers."
     }`,
 
   NUMBER_UNIT_CONVERTED: (p) =>
@@ -221,6 +305,23 @@ const TEMPLATES: Record<string, Template> = {
   OPEN_QUESTION_NO_RESOLUTION: (p) =>
     `Open question ${s(p, "id")} ("${s(p, "question")}") is marked as answered, but no answer is written down, so nobody can see what was decided. The ${s(p, "route") === "clinician" ? "clinician" : "program officer"} writes the answer in, or reopens the question.`,
 
+  // ---------- open-question answers and who gave them (DEC-020) ----------
+
+  OPEN_QUESTION_TRIVIAL_RESOLUTION: (p) =>
+    `Open question ${s(p, "id")} ("${s(p, "question")}") is marked as answered, but the answer written down ("${s(p, "resolution")}") does not say what was decided. The ${s(p, "route") === "clinician" ? "clinician" : "program officer"} writes the answer in full sentences, or reopens the question.`,
+
+  OPEN_QUESTION_REMOVED: (p) =>
+    `Open question ${s(p, "id")} ("${s(p, "question")}") was in an earlier version of this draft and is gone from this one. Taking a question out does not answer it. The ${s(p, "route") === "clinician" ? "clinician" : "program officer"} puts it back and answers it.`,
+
+  OPEN_QUESTION_REROUTED: (p) =>
+    `Open question ${s(p, "id")} ("${s(p, "question")}") was first sent to the ${s(p, "route") === "clinician" ? "clinician" : "program officer"} and is now marked for the ${s(p, "now") === "clinician" ? "clinician" : "program officer"}. Who answers a question cannot be changed by editing the draft. The ${s(p, "route") === "clinician" ? "clinician" : "program officer"} answers it.`,
+
+  OPEN_QUESTION_WRONG_RESOLVER: (p) =>
+    `Open question ${s(p, "id")} ("${s(p, "question")}") is for the ${s(p, "route") === "clinician" ? "clinician" : "program officer"}, but its answer was written in version ${s(p, "version")}, which was saved ${s(p, "savedAs") === "" ? "without saying who saved it" : `by the ${s(p, "savedAs") === "clinician" ? "clinician" : "program officer"}`}. The ${s(p, "route") === "clinician" ? "clinician" : "program officer"} writes the answer in their own version.`,
+
+  OPEN_QUESTION_CLINICIAN_NOT_RECORDED: (p) =>
+    `Open question ${s(p, "id")} ("${s(p, "question")}") was answered in version ${s(p, "version")}, but that version does not record the clinician's name and a note saying what was changed. The clinician saves the answer again with their name and a short change note.`,
+
   RESERVED_FIELD_NAME: (p) =>
     `The name "${s(p, "name")}" given to ${s(p, "item")} is one that the form builder or the health platform keeps for itself (${s(p, "because")}), so the form could break or mix up data. The booklet is not involved. The program officer chooses another name for it.`,
 
@@ -252,6 +353,21 @@ const TEMPLATES: Record<string, Template> = {
   TEAM_TEXT_TO_CONFIRM: (p) =>
     `${cap(s(p, "item"))} contains wording the team wrote itself, not taken from the booklet: ${s(p, "texts")}. The booklet was not used to check it. This is for information; the clinician confirms that the wording is right.`,
 
+  TEXT_NEGATION_MISMATCH: (p, a) =>
+    `The words shown to the health worker for ${s(p, "item")} ("${s(p, "text")}") ${s(p, "says")}, but the booklet passage cited for it ${s(p, "booklet")}, so the wording may say the opposite of the booklet. ${booklet(p)} ${
+      a === "clinician" ? "The clinician decides which wording is right." : "The program officer asks the clinician which wording is right."
+    }`,
+
+  TEXT_OFF_TOPIC: (p, a) =>
+    `The words shown to the health worker for ${s(p, "item")} ("${s(p, "text")}") share no telling word with the booklet passage cited for it, so they may be about something else. ${booklet(p)} ${
+      a === "clinician" ? "The clinician decides whether the wording matches the booklet." : "The program officer asks the clinician whether the wording matches the booklet, or corrects the citation."
+    }`,
+
+  AI_WORDED_TEXT: (p) =>
+    `${s(p, "count")} ${p["count"] === 1 ? "piece" : "pieces"} of wording shown to the health worker ${p["count"] === 1 ? "is" : "are"} not the booklet's own words; the AI or the team wrote ${p["count"] === 1 ? "it" : "them"}: ${s(p, "texts")}${
+      Number(p["more"] ?? 0) > 0 ? `, and ${s(p, "more")} more` : ""
+    }. The booklet was used to check numbers and "not" in them, but not their meaning. The clinician reads each one and confirms that it says what the booklet says.`,
+
   DANGER_SIGN_NOT_MODELLED: (p) =>
     `The booklet lists the danger sign "${s(p, "sign")}", but the draft neither asks about it nor says it is left out. ${booklet(p)} ${
       p["coughRelevant"] === true ? "The reading of the booklet marked it as related to cough." : "The reading of the booklet marked it as not related to cough, but the draft does not say so."
@@ -264,11 +380,17 @@ const TEMPLATES: Record<string, Template> = {
         : "The reading of the booklet marked it as not related to cough, and the draft lists it as left out."
     } ${booklet(p)} A child with cough who also has this sign would not be sent for referral by this form.${s(p, "openQuestion") === "" ? "" : ` See the open question ${s(p, "openQuestion")}.`} This is for information; the clinician confirms that it is safe to leave it out.`,
 
+  EXTRACTION_TEXT_LOOKS_LIKE_INSTRUCTION: (p) =>
+    `The reading of the booklet contains text that looks like an instruction to the computer rather than guideline content (in ${s(p, "ids")}), for example: "${s(p, "example")}". It was treated as plain text and not followed, but it should not be there. The program officer checks the reading of the booklet and has it done again if it was tampered with.`,
+
   UNCITED_PASSAGE: (p) =>
     `On ${pageText(p)} of the booklet, ${s(p, "count")} passage${p["count"] === 1 ? " that contains" : "s that contain"} numbers or instructions ${p["count"] === 1 ? "is" : "are"} not used by any item of the draft, for example: ${s(p, "examples")}. They may belong to another pathway, or the draft may have left something out. The program officer marks each as out of scope, or sends it to the clinician.`,
 
   INCLUSIVITY_MISMATCH: (p) =>
     `${cap(s(p, "item"))}: the booklet says "${s(p, "sourcePhrase")}", which ${s(p, "meaning")}, but the draft counts ${s(p, "usage")}. ${booklet(p)} A child with exactly ${s(p, "number")}${s(p, "unit")} would be handled differently from what the booklet says. The clinician decides which is right; the program officer then corrects the draft.`,
+
+  DIRECTION_MISMATCH: (p) =>
+    `${cap(s(p, "item"))}: the booklet says "${s(p, "sourcePhrase")}", which is about children ${s(p, "bookletSide")}, but the draft counts the opposite side, ${s(p, "usage")}. ${booklet(p)} Children on one side of ${s(p, "number")}${s(p, "unit")} would be handled as if they were on the other. The clinician decides which is right; the program officer then corrects the draft.`,
 
   INCLUSIVITY_ASSUMED: (p) =>
     `${cap(s(p, "item"))}: the booklet says "${s(p, "sourcePhrase")}". The draft reads this as: ${s(p, "reading")}. ${booklet(p)} That reading is the team's, the booklet does not spell it out.${s(p, "openQuestion") === "" ? "" : ` See the open question ${s(p, "openQuestion")} for a child of exactly that value.`} This is for information; the clinician confirms the reading.`,

@@ -35,3 +35,5 @@ export { gates, findingsFor } from "./gates.js";
 export type { Gates, FindingGroup, RoleFinding, GateInput } from "./gates.js";
 export { loadExtraction, loadGoldenCases } from "./context.js";
 export type { Extraction, GoldenCase } from "./context.js";
+export { loadGoldenCasesFile, withCheckInputs } from "./checkInputs.js";
+export type { OptionalInputs } from "./checkInputs.js";

@@ -1,6 +1,5 @@
 import { parseModel, collectFieldRefs } from "../../logic/schema.js";
 import type { Condition, Model } from "../../logic/schema.js";
-import { evalCondition } from "../../logic/interpreter.js";
 import { OFFICER, makeFinding } from "../finding.js";
 import type { CheckContext, Finding, FindingParams, Subject } from "../finding.js";
 import {
@@ -14,6 +13,7 @@ import {
   ruleSubject,
 } from "../describe.js";
 import { clip } from "../text.js";
+import { ageCutoffs, ageOnlyRules, holdsForAge, monthsQuestionId } from "./ageBands.js";
 
 const CHECK = "schemaReferences";
 
@@ -157,44 +157,70 @@ function references(model: Model): Finding[] {
     }
   }
 
-  scopeCheck(model, add);
+  scopeCheck(model, out);
 
   const seen = new Set<string>();
   return out.filter((f) => !seen.has(f.id) && seen.add(f.id));
 }
 
 /**
- * If a rule exists whose condition reads only the child's age, it is the rule that handles children outside the
- * covered age range. It should then be true exactly for ages below the lowest covered age or at/above the upper limit.
+ * Children outside the covered ages. When the entry limits of the age question let such an age be entered, the
+ * rules that decide on the age alone (directly or through calculated values that read only the age) must together
+ * apply exactly to the ages below the lowest covered age or at/above the upper limit: every out-of-range age, and no
+ * covered age. Checked at every cut-off on the age the draft uses and at both edges of the range. No such rule at all
+ * blocks too (SCOPE_RULE_MISSING): an out-of-range child would otherwise go through the pathway as if it applied.
+ * The age question is the whole-number question in months; without one, ageGroups reports AGE_QUESTION_MISSING.
  */
-function scopeCheck(model: Model, add: (code: string, subjects: Subject[], params: FindingParams, severity?: "blocking" | "warning" | "info") => void): void {
-  const ages = model.questions.filter((q) => q.unit === "months" && q.answer_type === "integer");
-  const age = ages.length === 1 ? ages[0] : undefined;
-  if (age === undefined) return;
+function scopeCheck(model: Model, out: Finding[]): void {
+  const ageId = monthsQuestionId(model);
+  const age = model.questions.find((q) => q.id === ageId);
+  if (age === undefined || ageId === undefined) return;
   const { age_months_min: lo, age_months_below: hi } = model.scope;
-  const candidates = [0, lo - 1, lo, lo + 1, hi - 1, hi, hi + 1].filter((a) => a >= 0);
-  for (const r of model.rules) {
-    if (r.when === "otherwise") continue;
-    const refs = collectFieldRefs(r.when);
-    if (refs.length !== 1 || refs[0] !== age.id) continue;
-    const known = new Set([age.id]);
-    const wrong = candidates.filter((a) => evalCondition(r.when as Condition, { [age.id]: a }, known) !== (a < lo || a >= hi));
-    if (wrong.length > 0) {
-      const a = Math.min(...wrong);
-      const inside = a >= lo && a < hi;
-      add(
-        "SCOPE_RULE_MISMATCH",
-        [ruleSubject(r), { kind: "scope", id: "scope" }],
-        {
+  const cmin = age.constraint?.min ?? 0;
+  const cmax = age.constraint?.max ?? Infinity;
+  const enterable = (a: number): boolean => a >= cmin && a <= cmax && a >= 0;
+  const outside = (a: number): boolean => a < lo || a >= hi;
+  const ages = new Set<number>([cmin, lo - 1, lo, lo + 1, hi - 1, hi, hi + 1]);
+  if (Number.isFinite(cmax)) ages.add(cmax);
+  for (const t of ageCutoffs(model, ageId)) {
+    ages.add(t - 1);
+    ages.add(t);
+  }
+  const candidates = [...ages].filter(enterable).sort((a, b) => a - b);
+  const rules = ageOnlyRules(model, ageId);
+  const common = { check: CHECK, severity: "blocking" as const, audience: ["clinician", "program_officer"] as ("clinician" | "program_officer")[], decidedBy: "clinician" as const, source: [] };
+  if (rules.length === 0) {
+    const firstOutside = candidates.find(outside);
+    if (firstOutside === undefined) return;
+    out.push(
+      makeFinding({
+        ...common,
+        code: "SCOPE_RULE_MISSING",
+        subjects: [{ kind: "scope", id: "scope" }],
+        params: { lo, hi, example: firstOutside },
+      }),
+    );
+    return;
+  }
+  for (const a of candidates) {
+    const holding = rules.filter((r) => holdsForAge(model, r.when as Condition, ageId, a));
+    if ((holding.length > 0) === outside(a)) continue;
+    const r = (holding[0] ?? rules[0]) as Model["rules"][number];
+    out.push(
+      makeFinding({
+        ...common,
+        code: "SCOPE_RULE_MISMATCH",
+        subjects: [ruleSubject(r), { kind: "scope", id: "scope" }],
+        params: {
           item: describeRule(model, r),
           lo,
           hi,
-          problem: inside
-            ? `a child of ${a} months is inside the covered range but this rule would apply to them`
-            : `a child of ${a} months is outside the covered range but this rule would not apply to them`,
+          problem: outside(a)
+            ? `a child of ${a} months is outside the covered range but this rule would not apply to them`
+            : `a child of ${a} months is inside the covered range but this rule would apply to them`,
         },
-        "warning",
-      );
-    }
+      }),
+    );
+    return;
   }
 }

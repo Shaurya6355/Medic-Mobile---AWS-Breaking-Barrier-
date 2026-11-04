@@ -59,3 +59,33 @@ export function loadGoldenCases(json: unknown): GoldenCase[] {
   }
   return cases;
 }
+
+/**
+ * One saved version of the logic model as the open-question check sees it (DEC-020): the model, who
+ * saved it and in which role. The sign-off service passes the whole chain from version 1 up to the one
+ * being checked (oldest first, the checked version last) as `history` next to the CheckContext.
+ * AUTH SEAM (DEC-015): author and authorRole come from the save request until Cognito is built.
+ */
+export type VersionHistoryEntry = {
+  n: number;
+  model: import("../logic/schema.js").Model;
+  /** The person who saved the version (Version.author). */
+  author: string;
+  /** The role they saved it in; absent when not recorded. */
+  authorRole?: "program_officer" | "clinician";
+};
+
+/** CheckContext plus the version chain; runChecks passes the context through to every check unchanged. */
+export type HistoryContext = { history?: readonly VersionHistoryEntry[] };
+
+/**
+ * True when a written answer or change note says something: at least 15 characters and three words
+ * of two or more letters. "x", "ok", "accepted" or a run of one letter are not answers.
+ */
+export function isMeaningfulText(text: string | undefined): boolean {
+  if (text === undefined) return false;
+  const t = text.trim();
+  if (t.length < 15) return false;
+  const words = (t.match(/\p{L}{2,}/gu) ?? []).filter((w) => !/^(\p{L})\1+$/u.test(w));
+  return new Set(words.map((w) => w.toLowerCase())).size >= 3;
+}

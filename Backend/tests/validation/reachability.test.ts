@@ -34,7 +34,8 @@ describe("reachability", () => {
         m.rules.find((r: any) => r.id === "R2").when = { all: [{ field: "danger_sign", op: "is_yes" }, { field: "age_months", op: "at_least", value: 500 }] };
       }),
     );
-    expect(codesOf(fs).sort()).toEqual(["UNREACHABLE_OUTCOME", "UNREACHABLE_RULE"]);
+    // 500 months is above the age entry limit (120), which is reported as well
+    expect(codesOf(fs).sort()).toEqual(["ENTRY_LIMIT_HIDES_CUTOFF", "UNREACHABLE_OUTCOME", "UNREACHABLE_RULE"]);
     const rule = fs.find((f) => f.code === "UNREACHABLE_RULE")!;
     expect(rule.severity).toBe("blocking");
     expect(rule.subjects).toContainEqual({ kind: "rule", id: "R2" });
@@ -64,9 +65,10 @@ describe("reachability", () => {
         m.questions.find((q: any) => q.id === "cough_days").shown_when = { all: [{ field: "cough", op: "is_yes" }, { field: "age_months", op: "at_least", value: 500 }] };
       }),
     );
-    expect(codesOf(fs)).toEqual(["QUESTION_NEVER_SHOWN"]);
-    expect(fs[0]!.severity).toBe("blocking");
-    expect(fs[0]!.subjects).toContainEqual({ kind: "question", id: "cough_days" });
+    expect(codesOf(fs).sort()).toEqual(["ENTRY_LIMIT_HIDES_CUTOFF", "QUESTION_NEVER_SHOWN"]);
+    const f = fs.find((x) => x.code === "QUESTION_NEVER_SHOWN")!;
+    expect(f.severity).toBe("blocking");
+    expect(f.subjects).toContainEqual({ kind: "question", id: "cough_days" });
   });
   it("warns about a calculated value that is always yes or always no", () => {
     const fs = reachability(
@@ -74,8 +76,30 @@ describe("reachability", () => {
         m.derived.push({ id: "always_on", label: "Always on", definition: { field: "age_months", op: "at_least", value: 0 }, origin: "team" });
       }),
     );
-    expect(codesOf(fs)).toEqual(["DERIVED_CONSTANT"]);
-    expect(fs[0]!.severity).toBe("warning");
-    expect(fs[0]!.params["always"]).toBe("yes");
+    // "at least 0" with an entry limit starting at 0 never separates children, which also blocks
+    expect(codesOf(fs).sort()).toEqual(["DERIVED_CONSTANT", "ENTRY_LIMIT_HIDES_CUTOFF"]);
+    const f = fs.find((x) => x.code === "DERIVED_CONSTANT")!;
+    expect(f.severity).toBe("warning");
+    expect(f.params["always"]).toBe("yes");
+  });
+});
+
+describe("entry limits that hide a cut-off (red team 1, M50, M53)", () => {
+  it("blocks a cut-off that the entry limits make impossible to reach, naming the question and the limits", () => {
+    const fs = reachability(matchedCtx((m) => { m.questions.find((q: any) => q.id === "breaths_per_minute").constraint.max = 45; }));
+    const f = fs.find((x) => x.code === "ENTRY_LIMIT_HIDES_CUTOFF")!;
+    expect(f.severity).toBe("blocking");
+    expect(f.decidedBy).toBe("clinician");
+    expect(f.subjects).toContainEqual({ kind: "question", id: "breaths_per_minute" });
+    expect(f.subjects).toContainEqual({ kind: "derived", id: "fast_breathing" });
+    expect(f.message).toContain("50");
+    expect(f.message).toContain("10 to 45");
+    expect(f.message).not.toMatch(JARGON_RE);
+  });
+  it("blocks the chronic-cough cut-off hidden by a 13-day limit", () => {
+    expect(codesOf(reachability(matchedCtx((m) => { m.questions.find((q: any) => q.id === "cough_days").constraint.max = 13; })))).toContain("ENTRY_LIMIT_HIDES_CUTOFF");
+  });
+  it("is silent for v1", () => {
+    expect(codesOf(reachability(matchedCtx()))).not.toContain("ENTRY_LIMIT_HIDES_CUTOFF");
   });
 });

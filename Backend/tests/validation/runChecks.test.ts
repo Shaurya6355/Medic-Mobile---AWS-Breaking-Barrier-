@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeFinding } from "../../src/validation/finding.js";
 import { DEFAULT_CHECKS, runChecks } from "../../src/validation/runChecks.js";
-import { matchedCtx, realCtx } from "./helpers.js";
+import { goldenCases, matchedCtx, realCtx } from "./helpers.js";
 
 const f = (tag: string, severity: "blocking" | "warning" | "info", check: string, id: string) =>
   makeFinding({
@@ -17,12 +17,14 @@ const f = (tag: string, severity: "blocking" | "warning" | "info", check: string
 
 describe("runChecks", () => {
   it("v1 against the real booklet with a matching file blocks on the open questions, the two severity inversions and the numbers its quotes do not carry", () => {
-    const r = runChecks(matchedCtx());
+    // with the proposed test cases, which pin the overlap of the two equally urgent referrals (red team 1, URGENT_OVERLAP_UNTESTED)
+    const r = runChecks({ ...matchedCtx(), goldenCases: goldenCases() });
     expect(r.status).toBe("fail");
     const codes = r.findings.filter((x) => x.severity === "blocking").map((x) => x.code);
     expect(codes.filter((c) => c === "SEVERITY_INVERSION")).toHaveLength(2);
     expect(codes.filter((c) => c === "OPEN_QUESTION")).toHaveLength(6);
-    expect(new Set(codes)).toEqual(new Set(["SEVERITY_INVERSION", "OPEN_QUESTION", "UNGROUNDED_NUMBER"]));
+    // red team 2: NUMBER_IN_TEXT_UNSUPPORTED for the "250 mg" in v1's antibiotic action texts, which their quotes do not carry
+    expect(new Set(codes)).toEqual(new Set(["SEVERITY_INVERSION", "OPEN_QUESTION", "UNGROUNDED_NUMBER", "NUMBER_IN_TEXT_UNSUPPORTED"]));
     expect(r.ranChecks.slice(0, 5)).toEqual(["schemaReferences", "guidelineFile", "quoteGrounding", "numberGrounding", "inclusivityWording"]);
   });
   it("with the file and quote checks alone, v1 against the real booklet passes", () => {

@@ -8,7 +8,9 @@ const idx = (id: string) => (m: any) => m.outcomes.findIndex((o: any) => o.id ==
 
 describe("clinicalText", () => {
   it("v1.json: only the team's own wording is listed for the clinician to confirm", () => {
-    const fs = run();
+    // red team 2: AI-worded labels and titles are listed too, as one warning (see clinicalText.redteam2.test.ts)
+    expect(run().filter((f) => f.code === "AI_WORDED_TEXT").map((f) => f.severity)).toEqual(["warning"]);
+    const fs = run().filter((f) => f.code !== "AI_WORDED_TEXT");
     expect(fs.map((f) => f.code)).toEqual(["TEAM_TEXT_TO_CONFIRM", "TEAM_TEXT_TO_CONFIRM"]);
     expect(fs.map((f) => f.subjects[0]!.id).sort()).toEqual(["cough_no_fast_breathing", "no_cough"]);
     for (const f of fs) {
