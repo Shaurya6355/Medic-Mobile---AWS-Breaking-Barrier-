@@ -39,7 +39,7 @@ describe("buildForm with the minimal flow (default)", () => {
   it("is_no steps are emitted as = 'no' on the row and on its group", () => {
     const r = rowOf(f.survey, "not_able_to_drink_or_feed", "select_one yes_no");
     expect(r.relevant).toBe(
-      "((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${convulsions} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14))))",
+      "(${convulsions} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14))))",
     );
     expect(rowOf(f.survey, "q_not_able_to_drink_or_feed").relevant).toBe(r.relevant);
     expect(r.relevant).not.toContain("not(");
@@ -51,15 +51,18 @@ describe("buildForm with the minimal flow (default)", () => {
     expect(rowOf(f.survey, "age_months", "integer").relevant).toBeUndefined();
   });
   it("authored shown_when AND the flow condition: cough_days keeps the authored cough = yes", () => {
-    expect(rowOf(f.survey, "cough_days", "integer").relevant).toBe(
-      "((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes')",
-    );
+    // the flow adds nothing here: cough_days is only reachable when cough is yes, which is the authored condition
+    expect(rowOf(f.survey, "cough_days", "integer").relevant).toBe("${cough} = 'yes'");
   });
   it("the sourcemap marks question rows that carry a flow condition", () => {
     const q = f.sourcemap.filter((e) => e.kind === "question");
     expect(q.find((e) => e.item === "age_months")?.flowCondition).toBeUndefined();
-    expect(q.find((e) => e.item === "cough")?.flowCondition).toBe("minimal");
-    expect(q.filter((e) => e.flowCondition !== undefined).map((e) => e.item)).toEqual(v1().questions.map((x) => x.id).filter((id) => id !== "age_months"));
+    // under the final model cough is asked of every child too (an out-of-range child still gets the danger signs)
+    expect(q.find((e) => e.item === "cough")?.flowCondition).toBeUndefined();
+    expect(q.find((e) => e.item === "convulsions")?.flowCondition).toBe("minimal");
+    expect(q.filter((e) => e.flowCondition !== undefined).map((e) => e.item)).toEqual(
+      v1().questions.map((x) => x.id).filter((id) => id !== "age_months" && id !== "cough"),
+    );
   });
   it("flowMode full keeps only the authored shown_when (as before)", () => {
     const full = buildForm(v1(), demoSettings({ flowMode: "full" }), "v");
@@ -118,18 +121,18 @@ describe("refusals", () => {
     expect(p.summary).toMatchObject({
       mode: "minimal",
       derivationVersion: FLOW_DERIVATION_VERSION,
-      nodes: 105,
-      leaves: 54,
-      questionsAlwaysAsked: ["age_months"],
+      nodes: 153,
+      leaves: 78,
+      questionsAlwaysAsked: ["age_months", "cough"],
       neverAsked: [],
       points: 6400,
       treeMismatches: 0,
       compiledMismatches: 0,
       sequenceDifferences: 0,
     });
-    expect(p.summary.avgQuestions).toBeCloseTo(3.19, 2);
+    expect(p.summary.avgQuestions).toBeCloseTo(4.675, 2);
     expect(p.summary.avgQuestionsFullForm).toBeCloseTo(8.92, 2);
-    expect(p.summary.questionsSometimesSkipped).toHaveLength(8);
+    expect(p.summary.questionsSometimesSkipped).toHaveLength(7);
     const full = prepareFlow(v1(), "full");
     expect(full.flow).toBeNull();
     expect(full.summary).toMatchObject({ mode: "full", derivationVersion: FLOW_DERIVATION_VERSION, nodes: null });
@@ -159,6 +162,6 @@ describe("compileSnapshot records the flow", () => {
   it("the default compile uses the minimal flow", async () => {
     const m = await compileSnapshot(v1(), { projectDir: fresh(), buildKind: "preview", settings: demoSettings() });
     expect(m.flow.mode).toBe("minimal");
-    expect(m.flow.avgQuestions).toBeCloseTo(3.19, 2);
+    expect(m.flow.avgQuestions).toBeCloseTo(4.675, 2);
   });
 });

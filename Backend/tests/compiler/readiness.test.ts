@@ -18,6 +18,7 @@ describe("checkCompileReady", () => {
   it("lists on_return follow-ups as not compiled, with the fixed reason", () => {
     const r = checkCompileReady(v1(), demoSettings());
     expect(r.notCompiled).toEqual([
+      { item: "outcomes.refer_urgent_outside_age_range.follow_up", reason: "needs a return date (no trigger defined)" },
       { item: "outcomes.refer_outside_age_range.follow_up", reason: "needs a return date (no trigger defined)" },
       { item: "outcomes.refer_urgent_with_antibiotic.follow_up", reason: "needs a return date (no trigger defined)" },
       { item: "outcomes.refer_urgent.follow_up", reason: "needs a return date (no trigger defined)" },
