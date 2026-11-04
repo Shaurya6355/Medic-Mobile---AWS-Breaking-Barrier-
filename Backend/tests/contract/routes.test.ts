@@ -32,6 +32,9 @@ describe("CreateRunRequest", () => {
   it("rejects page 0", () => {
     expect(CreateRunRequest.safeParse({ filename: "a.pdf", pages: [0] }).success).toBe(false);
   });
+  it("rejects an empty pages array", () => {
+    expect(CreateRunRequest.safeParse({ filename: "a.pdf", pages: [] }).success).toBe(false);
+  });
   it("rejects duplicate pages", () => {
     expect(CreateRunRequest.safeParse({ filename: "a.pdf", pages: [1, 1] }).success).toBe(false);
   });

@@ -14,6 +14,7 @@ export type RunState = z.infer<typeof RunState>;
 export const CreateRunRequest = z.object({
   pages: z
     .array(z.number().int().positive())
+    .min(1, { message: "pages must not be empty; omit pages to use every page" })
     .refine((p) => new Set(p).size === p.length, { message: "pages must not contain duplicates" })
     .optional(),
   filename: z.string().min(1),

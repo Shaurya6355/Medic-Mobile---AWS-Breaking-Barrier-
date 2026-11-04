@@ -54,13 +54,49 @@ describe("POST runs", () => {
     expect((await store.getRun(runId))?.state).toBe("created");
   });
 
-  it.each([[[0]], [[1, 1]], [[51]]])("rejects pages %j and creates no run", async (pages) => {
+  it.each([[[0]], [[1, 1]], [[51]], [[]]])("rejects pages %j and creates no run", async (pages) => {
     const { server, store, orchestrator } = setup();
     const res = await server.inject({ method: "POST", url: routes.runs(), payload: { pages, filename: "g.pdf" } });
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe("invalid_request");
     expect(orchestrator.createRun).not.toHaveBeenCalled();
     expect(await store.listRuns()).toEqual([]);
+  });
+
+  it("omitting pages still creates a run", async () => {
+    const { server } = setup();
+    const res = await server.inject({ method: "POST", url: routes.runs(), payload: { filename: "g.pdf" } });
+    expect(res.statusCode).toBe(201);
+  });
+
+  it("empty pages message says to omit pages and carries issues", async () => {
+    const { server } = setup();
+    const res = await server.inject({ method: "POST", url: routes.runs(), payload: { pages: [], filename: "g.pdf" } });
+    expect(res.json().issues.join(" ")).toContain("omit pages");
+  });
+
+  it("returns 413 above the body limit", async () => {
+    const { server } = setup();
+    const res = await server.inject({
+      method: "POST",
+      url: routes.runs(),
+      headers: { "content-type": "application/json" },
+      payload: JSON.stringify({ filename: "x".repeat(5 * 1024 * 1024 + 10) }),
+    });
+    expect(res.statusCode).toBe(413);
+    expect(res.json()).toEqual({ error: "payload_too_large" });
+  });
+
+  it("returns 415 for an unsupported content type", async () => {
+    const { server } = setup();
+    const res = await server.inject({
+      method: "POST",
+      url: routes.runs(),
+      headers: { "content-type": "application/xml" },
+      payload: "hello",
+    });
+    expect(res.statusCode).toBe(415);
+    expect(res.json()).toEqual({ error: "unsupported_media_type" });
   });
 
   it("rejects malformed JSON with 400", async () => {
@@ -134,6 +170,7 @@ describe("versions", () => {
     await seedRun(store, artifacts);
     const res = await server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 0, body: {}, author: "u" } });
     expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: "conflict" });
   });
 
   it("save on a run with no versions is 409 no_base_version; unknown run 404", async () => {

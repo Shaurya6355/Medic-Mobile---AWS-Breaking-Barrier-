@@ -55,11 +55,16 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ logger: deps.logger ?? false, bodyLimit: BODY_LIMIT });
 
   app.setErrorHandler((err: Error, req, reply) => {
-    if (err instanceof Conflict) return reply.code(409).send({ error: "conflict", message: err.message });
+    if (err instanceof Conflict) {
+      req.log.debug({ detail: err.message }, "conflict");
+      return reply.code(409).send({ error: "conflict" });
+    }
     if (err instanceof NotFound) return reply.code(404).send({ error: "not_found" });
     const status = (err as { statusCode?: number }).statusCode;
     if (typeof status === "number" && status >= 400 && status < 500) {
-      return reply.code(400).send({ error: "invalid_request", issues: [] });
+      if (status === 413) return reply.code(413).send({ error: "payload_too_large" });
+      if (status === 415) return reply.code(415).send({ error: "unsupported_media_type" });
+      return reply.code(status).send({ error: "invalid_request", issues: [] });
     }
     req.log.error({ errName: err.name }, "unhandled error");
     return reply.code(500).send({ error: "internal" });
@@ -123,10 +128,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const req_ = parseBody(SaveVersionRequest, req.body, reply);
     if (!req_) return reply;
     if (req_.parentVersion !== latest.n) {
-      return reply.code(409).send({
-        error: "conflict",
-        message: `parentVersion ${req_.parentVersion} is not the latest version ${latest.n}`,
-      });
+      req.log.debug({ parentVersion: req_.parentVersion, latest: latest.n }, "stale parentVersion");
+      return reply.code(409).send({ error: "conflict" });
     }
     const result = validator.validate(req_.body);
     if (!result.ok) return reply.code(422).send({ error: "invalid_logic_model", issues: result.issues });
