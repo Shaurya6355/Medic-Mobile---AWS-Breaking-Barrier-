@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { InvalidUserId, normaliseUserId } from "../signoff/identity.js";
 
 export const RunState = z.enum([
   "created",
@@ -7,9 +8,63 @@ export const RunState = z.enum([
   "filling_logic",
   "in_review",
   "checking",
+  "awaiting_officer",
+  "awaiting_clinician",
+  "locked",
   "failed",
 ]);
 export type RunState = z.infer<typeof RunState>;
+
+// Sign-off (BRD AR-01 to AR-10, DEC-019). The two roles that sign a version, officer first.
+export const SignerRole = z.enum(["program_officer", "clinician"]);
+export type SignerRole = z.infer<typeof SignerRole>;
+
+// A signer's id, normalised (NFKC, invisible characters removed, trimmed, lower case) and restricted
+// to [a-z0-9._@-], so "Alice", " alice" and fullwidth "ａｌｉｃｅ" are one person (signoff/identity.ts, DEC-020).
+// AUTH SEAM (DEC-015, not built): bind this to the Cognito token's `sub` instead of the body.
+export const UserId = z
+  .string()
+  .max(512)
+  .transform((raw, ctx) => {
+    try {
+      return normaliseUserId(raw);
+    } catch (e) {
+      ctx.addIssue({ code: "custom", message: e instanceof InvalidUserId ? e.message : "invalid userId" });
+      return z.NEVER;
+    }
+  });
+
+// AUTH SEAM (DEC-015, not built): role and userId are passed in the body for now. When Cognito is
+// added they come from the verified token instead, and these two fields are dropped from the body.
+export const SignRequest = z
+  .object({
+    role: SignerRole,
+    userId: UserId,
+    // The modelSha the signer reviewed (from the findings or status response). A different sha means
+    // the content changed since they looked: the signature is refused (AR-07).
+    modelSha: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+export type SignRequest = z.input<typeof SignRequest>;
+
+// The clinician rejects a version with a comment on the rule (BRD AR-06), optionally marking the needed
+// change urgent (RR-02). The version stays in the history and can never be signed or released; the
+// officer's fix is a new version. AUTH SEAM as for SignRequest.
+export const RejectRequest = z
+  .object({
+    role: z.literal("clinician"),
+    userId: UserId,
+    modelSha: z.string().regex(/^[0-9a-f]{64}$/),
+    comment: z.string().trim().min(15).max(5000),
+    // The rule or item the comment is about, for example "rules.R3".
+    itemRef: z.string().min(1).max(500).optional(),
+    urgent: z.boolean().default(false),
+  })
+  .strict();
+export type RejectRequest = z.input<typeof RejectRequest>;
+
+export const FindingsQuery = z.object({ audience: SignerRole.optional() }).strict();
+export type FindingsQuery = z.infer<typeof FindingsQuery>;
 
 export const CreateRunRequest = z.object({
   pages: z
@@ -31,6 +86,9 @@ export const SaveVersionRequest = z.object({
   parentVersion: z.number().int().nonnegative(),
   body: z.unknown(),
   author: z.string().min(1).max(200),
+  // The role the author saves in (DEC-020): an open question counts as answered only in a version saved
+  // by the role it is routed to. AUTH SEAM (DEC-015): from the token's group once Cognito is built.
+  authorRole: SignerRole.optional(),
 });
 export type SaveVersionRequest = z.infer<typeof SaveVersionRequest>;
 

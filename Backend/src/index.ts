@@ -12,10 +12,12 @@ import { startResumeSweep } from "./engine/sweep.js";
 import { withDeadline } from "./shutdown.js";
 import { createAgentCoreModelClient } from "./model/agentcore.js";
 import { createStrandsModelClient } from "./model/strands.js";
+import { Signoff } from "./signoff/signoff.js";
+import { createChecksStep } from "./steps/checks.js";
 import { createExtractStep } from "./steps/extract.js";
 import { createFillLogicStep } from "./steps/fillLogic.js";
 import { createIngestStep, createPdfInfoPageCount, defaultExec } from "./steps/ingest.js";
-import { acceptAnyObjectValidator } from "./steps/logicModelValidator.js";
+import { parseModelValidator } from "./steps/logicModelValidator.js";
 import { DynamoStore } from "./store/dynamoStore.js";
 import { startQueueConsumer } from "./trigger/queueConsumer.js";
 
@@ -55,8 +57,11 @@ async function main(): Promise<void> {
         pdfPageCount: createPdfInfoPageCount(),
       }),
       createExtractStep({ modelId: cfg.modelId, promptPath: cfg.extractPrompt }),
-      createFillLogicStep({ validator: acceptAnyObjectValidator }),
+      createFillLogicStep({ validator: parseModelValidator, modelId: cfg.fillModelId, promptPath: cfg.fillPrompt }),
+      // Automatic checks on version 1 (BR-11); the run then waits for the program officer (DEC-019).
+      createChecksStep(),
     ],
+    finalState: "awaiting_officer",
     owner: randomUUID(),
     leaseMs: cfg.leaseMs,
     runnerOpts: {
@@ -67,19 +72,26 @@ async function main(): Promise<void> {
     },
   });
 
+  // Findings, status and signatures. Compile is not here: it runs on the build host (DEC-014),
+  // see scripts/compileLocked.ts.
+  const signoff = new Signoff({ store, artifacts });
+
   const app = buildServer({
     orchestrator,
     store,
     artifacts,
-    validator: acceptAnyObjectValidator,
+    // Versions saved through the API must parse as a logic model, the same check the AI draft passes.
+    validator: parseModelValidator,
     presign: (key) =>
       getSignedUrl(s3, new PutObjectCommand({ Bucket: cfg.artifactBucket, Key: key, ContentType: "application/pdf" }), {
         expiresIn: PRESIGN_EXPIRES_SECONDS,
       }),
-    // The check steps (validation etc.) will be registered here once they exist.
+    // Every saved version is checked and goes back to the program officer (AR-01, AR-02, GR-03).
     onVersionSaved: async (runId, n) => {
       log("version saved", { runId, version: n });
+      await signoff.onVersionSaved(runId, n);
     },
+    signoff,
     maxPages: cfg.maxPages,
     runMode: cfg.runMode,
     logger: false,

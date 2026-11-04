@@ -9,10 +9,10 @@ AWS CDK v2 (TypeScript) for the data layer (`OrchestratorDataStack`) and the Lam
 - Five DynamoDB tables, on-demand, point-in-time recovery, RETAIN, generated names:
   - runs: `runId` (S)
   - steps: `runId` (S) + `sk` (S)
-  - versions: `runId` (S) + `n` (N)
+  - versions: `runId` (S) + `n` (N). Sign-off (DEC-019) adds non-key attributes to the version items (`signatures` list, `status`, `lockedAt`), written only by a conditional transaction; no key or index change, so no table change. DEC-020 adds more non-key attributes the same way (`bodySha256`, `authorRole`, `rejection`, `status` "rejected", `settingsSha` on each signature); the rejection is one more ConditionCheck + Update transaction, covered by the existing policy.
   - comments: `runId` (S) + `sk` (S)
   - audit: `runId` (S) + `sk` (S)
-- Managed policy (CDK-generated name; logical id `OrchestratorAppPolicy`), scoped to exactly those resources: DynamoDB Get/Put/Update/Query/Scan on the tables; `s3:GetObject` and `s3:PutObject` on bucket objects plus `s3:ListBucket` on the bucket (so a missing key is a 404, not a 403); SQS Receive/Delete on the upload queue. The stack exposes it as `appPolicy` and as the `APPPOLICYARN` output so a future compute role can attach it.
+- Managed policy (CDK-generated name; logical id `OrchestratorAppPolicy`), scoped to exactly those resources: DynamoDB Get/Put/Update/ConditionCheck/Query/Scan on the tables (`dynamodb:ConditionCheckItem` is needed by the signature transaction, which checks that the version is still the latest); `s3:GetObject` and `s3:PutObject` on bucket objects plus `s3:ListBucket` on the bucket (so a missing key is a 404, not a 403); SQS Receive/Delete on the upload queue. The stack exposes it as `appPolicy` and as the `APPPOLICYARN` output so a future compute role can attach it.
 - Second managed policy (logical id `BedrockInvokePolicy`, exposed as `bedrockPolicy`): `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on the `us.` inference profile and on `arn:aws:bedrock:*::foundation-model/<base id>`. It is separate so the Lambda role only gets it when `modelBackend=bedrock`; with `agentcore` the Lambda has no Bedrock invoke permission, only `InvokeAgentRuntime`.
 
 ## Context
@@ -66,7 +66,7 @@ Created by `lib/lambda-stack.ts`, wired after the data stack in `bin/app.ts`:
 - Docker-image Lambda built from `../Backend` with Docker target `lambda`, ARM_64 (asset platform `linux/arm64`), 2048 MB memory, 2048 MB ephemeral storage, 15 minute timeout, log group with 2 week retention. The data stack's `OrchestratorAppPolicy` is attached to the function role.
 - SQS event source mapping from the upload queue: batch size 1, `ReportBatchItemFailures`, max concurrency 5. The queue visibility timeout (5400 s) is 6x the function timeout (15 min), per AWS guidance; recovery of a cut-off run is the 5 minute schedule, so the longer redelivery wait is acceptable. Duplicate delivery is harmless (the engine ignores a start for a run no longer `created`; the DynamoDB lease stops double advancement).
 - EventBridge rule `rate(5 minutes)` with constant input `{"source":"aws.events","detail-type":"Scheduled Event"}` (the Backend `LambdaScheduledEvent` shape). It runs `resumeAll`, the recovery path for cut-off runs in lambda mode. `POST /runs/{id}/resume` is a fast `202` (the work is picked up asynchronously), so it does not hold an API request open; the route list is unchanged and still equals the contract.
-- HTTP API (API Gateway v2, payload format 2.0, `$default` stage with burst 50 / rate 25, CORS from `uiOrigins`) with one explicit route per public contract route: POST/GET `/runs`, GET `/runs/{id}`, GET/POST `/runs/{id}/versions`, GET `/runs/{id}/versions/{n}`, GET/POST `/runs/{id}/versions/{n}/comments`, POST `/runs/{id}/resume`. There is no catch-all, and `/events`, `/invocations` and `/ping` are deliberately not routed (`/events` is the unauthenticated pass-through for non-HTTP events). `test/lambda-stack.test.ts` compares the route list with `Backend/src/contract/routes.ts`.
+- HTTP API (API Gateway v2, payload format 2.0, `$default` stage with burst 50 / rate 25, CORS from `uiOrigins`) with one explicit route per public contract route: POST/GET `/runs`, GET `/runs/{id}`, GET/POST `/runs/{id}/versions`, GET `/runs/{id}/versions/{n}`, GET/POST `/runs/{id}/versions/{n}/comments`, GET `/runs/{id}/versions/{n}/findings`, GET `/runs/{id}/versions/{n}/status`, POST `/runs/{id}/versions/{n}/signatures/{role}` (sign-off, DEC-019), POST `/runs/{id}/versions/{n}/reject` (the clinician's rejection with a comment, AR-06, DEC-020), POST `/runs/{id}/resume`. There is no catch-all, and `/events`, `/invocations` and `/ping` are deliberately not routed (`/events` is the unauthenticated pass-through for non-HTTP events). `test/lambda-stack.test.ts` compares the route list with `Backend/src/contract/routes.ts`.
 - Outputs: `APIURL`, `FUNCTIONNAME`. Tag `project=no-code-cht-config`.
 
 A Fargate or EC2 host is NOT used; the app runs only as this Lambda.
@@ -84,6 +84,8 @@ Extra context keys: `prices` (object or JSON string; becomes `PRICES_JSON`). `ui
 | LEASE_MS | `960000` (above the 900 s timeout) |
 | TMPDIR | `/tmp` (ingest writes page images with `os.tmpdir()`) |
 | PRICES_JSON | optional, context `prices` |
+| FILL_PROMPT / FILL_MODEL_ID | not set: the image bundles `extraction/fill_prompt.txt` and fill_logic uses MODEL_ID, which is the only model the Bedrock policy allows. Setting FILL_MODEL_ID to another model needs that policy widened here first |
+| GOLDEN_CASES_PATH / COMPILE_SETTINGS_PATH | not set (DEC-020): the checks first read `runs/<id>/inputs/golden_cases.json` and `compile_settings.json` from the artifact bucket, then these files, then the repository defaults (`tests/fixtures/logic/golden-proposed.json`, `compile-demo/settings.demo.json`). The image does not bundle the defaults, so in Lambda the findings say plainly that the test-case and form-readiness checks did not run until a run's inputs are uploaded; "none" switches one off |
 | AWS_REGION | set by the Lambda runtime |
 | UPLOAD_QUEUE_URL | not set (not used in lambda mode) |
 
@@ -102,11 +104,13 @@ CI (`.github/workflows/ci.yml`) runs Infra `tsc`, tests and `cdk synth` with a d
 - The HTTP API is public and has no authentication. Every run triggers paid model calls (Bedrock or AgentCore), so anyone with the URL can spend money.
 - The SQS event source `maxConcurrency` of 5 limits how many runs execute in parallel, and the stage throttle (burst 50 / rate 25) limits request rate. Neither is a spending cap.
 - Before sharing the URL, add an authorizer (or put a WAF in front) and create an AWS Budget alarm for the account.
+- The signature route trusts the `role` and `userId` in the request body (auth seam, DEC-015 not built). Anyone with the URL can sign as either role, so separation of duties is NOT enforced against a malicious caller until Cognito and a JWT authorizer are added here.
 - Reserved Lambda concurrency is deliberately not set: new sandbox accounts can have very low concurrency quotas, and reserving capacity could make the deploy fail or starve other functions.
 
 ## Deliberately missing
 
-- API authentication (the Lambda stack's API is open).
+- API authentication (the Lambda stack's API is open). Cognito with the groups program_officer, clinician and it plus a JWT authorizer (DEC-015) belongs here when built; the Backend then reads role and user from the token.
+- The build host for compile (DEC-014). Compile is not a Lambda step: `Backend/scripts/compileLocked.ts` builds a locked version and runs cht-conf (Python, later Chromium for the test harness) as a job. It needs the same table and bucket env vars and the app policy (Get/Query on versions, Get/Put on bucket objects, Put on audit). An EC2 container host (or similar) will run it; nothing for it exists in this CDK app yet.
 - Networking (VPC, endpoints, security groups).
 - CloudWatch alarms and dashboards, notably on the DLQ depth.
 

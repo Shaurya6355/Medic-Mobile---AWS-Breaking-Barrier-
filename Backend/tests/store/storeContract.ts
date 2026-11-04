@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Store } from "../../src/store/store.js";
 import { AlreadyExists, Conflict } from "../../src/store/store.js";
-import type { Run, StepRecord, Version } from "../../src/domain/types.js";
+import type { Rejection, Run, Signature, StepRecord, Version } from "../../src/domain/types.js";
 
 const run = (runId: string, over: Partial<Run> = {}): Run => ({
   runId,
@@ -28,6 +28,17 @@ const ver = (runId: string, n: number, parent: number | null): Version => ({
   author: "ai",
   createdAt: 1,
   artifactKey: `k/${n}`,
+});
+
+const SHA = "c".repeat(64);
+const sig = (n: number, role: Signature["role"], userId: string, over: Partial<Signature> = {}): Signature => ({
+  runId: "r1",
+  n,
+  modelSha: SHA,
+  role,
+  userId,
+  signedAt: role === "program_officer" ? 100 : 200,
+  ...over,
 });
 
 export function runStoreContract(name: string, makeStore: () => Store | Promise<Store>): void {
@@ -206,6 +217,158 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
       await s.appendStep({ ...step("r1", "extract", 1), error: "boom" });
       await s.updateStep("r1", "extract", 1, { error: undefined });
       expect((await s.listSteps("r1"))[0]!.error).toBeUndefined();
+    });
+    // ---------- sign-off (BRD AR-02, AR-03, AR-05, AR-07; DEC-019) ----------
+    const twoVersions = async (): Promise<Store> => {
+      const s = await makeStore();
+      await s.createRun(run("r1"));
+      await s.addVersion(ver("r1", 1, null));
+      await s.addVersion(ver("r1", 2, 1));
+      return s;
+    };
+
+    it("a new version starts with zero signatures and as a draft (AR-02)", async () => {
+      const s = await twoVersions();
+      const v = (await s.getVersion("r1", 2))!;
+      expect(v.signatures ?? []).toEqual([]);
+      expect(v.status ?? "draft").toBe("draft");
+    });
+
+    it("records the officer then the clinician and locks the version (AR-03, AR-05)", async () => {
+      const s = await twoVersions();
+      const afterOfficer = await s.addSignature(sig(2, "program_officer", "o1"));
+      expect(afterOfficer.signatures).toEqual([sig(2, "program_officer", "o1")]);
+      expect(afterOfficer.status ?? "draft").toBe("draft");
+      const afterClinician = await s.addSignature(sig(2, "clinician", "c1"));
+      expect(afterClinician.status).toBe("locked");
+      expect(afterClinician.lockedAt).toBe(200);
+      expect(afterClinician.signatures).toEqual([sig(2, "program_officer", "o1"), sig(2, "clinician", "c1")]);
+      expect(await s.getVersion("r1", 2)).toEqual(afterClinician);
+      // The body pointer is never rewritten (AR-01).
+      expect(afterClinician.artifactKey).toBe("k/2");
+    });
+
+    it("refuses a clinician signature before the officer's (AR-03)", async () => {
+      const s = await twoVersions();
+      await expect(s.addSignature(sig(2, "clinician", "c1"))).rejects.toBeInstanceOf(Conflict);
+      expect((await s.getVersion("r1", 2))!.signatures ?? []).toEqual([]);
+    });
+
+    it("refuses a second officer signature", async () => {
+      const s = await twoVersions();
+      await s.addSignature(sig(2, "program_officer", "o1"));
+      await expect(s.addSignature(sig(2, "program_officer", "o2"))).rejects.toBeInstanceOf(Conflict);
+    });
+
+    it("refuses the same person signing both roles (separation of duties)", async () => {
+      const s = await twoVersions();
+      await s.addSignature(sig(2, "program_officer", "same"));
+      await expect(s.addSignature(sig(2, "clinician", "same"))).rejects.toBeInstanceOf(Conflict);
+      expect((await s.getVersion("r1", 2))!.status ?? "draft").toBe("draft");
+    });
+
+    it("refuses a clinician signature on other content than the officer signed (AR-07)", async () => {
+      const s = await twoVersions();
+      await s.addSignature(sig(2, "program_officer", "o1"));
+      await expect(s.addSignature(sig(2, "clinician", "c1", { modelSha: "d".repeat(64) }))).rejects.toBeInstanceOf(Conflict);
+    });
+
+    it("refuses any signature on a locked version", async () => {
+      const s = await twoVersions();
+      await s.addSignature(sig(2, "program_officer", "o1"));
+      await s.addSignature(sig(2, "clinician", "c1"));
+      await expect(s.addSignature(sig(2, "clinician", "c2"))).rejects.toBeInstanceOf(Conflict);
+      await expect(s.addSignature(sig(2, "program_officer", "o2"))).rejects.toBeInstanceOf(Conflict);
+    });
+
+    it("refuses a signature on a version that is not the latest (an edit starts over, AR-04)", async () => {
+      const s = await twoVersions();
+      await expect(s.addSignature(sig(1, "program_officer", "o1"))).rejects.toBeInstanceOf(Conflict);
+    });
+
+    it("refuses a signature on a version that does not exist", async () => {
+      const s = await twoVersions();
+      await expect(s.addSignature(sig(7, "program_officer", "o1"))).rejects.toBeInstanceOf(Conflict);
+    });
+
+    it("a locked version stays locked after a newer version is added (AR-09)", async () => {
+      const s = await twoVersions();
+      await s.addSignature(sig(2, "program_officer", "o1"));
+      await s.addSignature(sig(2, "clinician", "c1"));
+      await s.addVersion(ver("r1", 3, 2));
+      expect((await s.getVersion("r1", 2))!.status).toBe("locked");
+      expect((await s.getVersion("r1", 3))!.signatures ?? []).toEqual([]);
+    });
+
+    // ---------- DEC-020: normalised identity, settings binding, rejection (AR-06) ----------
+    it("separation of duties compares normalised userIds (case, spaces, zero-width, fullwidth)", async () => {
+      for (const variant of ["Alice", " alice ", "alice\u200b", "\uff41\uff4c\uff49\uff43\uff45", "ALICE\ufeff"]) {
+        const s = await twoVersions();
+        await s.addSignature(sig(2, "program_officer", "alice"));
+        await expect(s.addSignature(sig(2, "clinician", variant)), JSON.stringify(variant)).rejects.toBeInstanceOf(Conflict);
+      }
+    });
+
+    it("stores the normalised userId", async () => {
+      const s = await twoVersions();
+      const v = await s.addSignature(sig(2, "program_officer", " Officer.One "));
+      expect(v.signatures![0]!.userId).toBe("officer.one");
+    });
+
+    it("refuses a clinician signature given with other compile settings than the officer's", async () => {
+      const s = await twoVersions();
+      await s.addSignature(sig(2, "program_officer", "o1", { settingsSha: "1".repeat(64) }));
+      await expect(s.addSignature(sig(2, "clinician", "c1", { settingsSha: "2".repeat(64) }))).rejects.toBeInstanceOf(Conflict);
+      const v = await s.addSignature(sig(2, "clinician", "c1", { settingsSha: "1".repeat(64) }));
+      expect(v.status).toBe("locked");
+    });
+
+    const rejection = (over: Partial<Rejection> = {}): Rejection => ({
+      role: "clinician",
+      userId: "c1",
+      modelSha: SHA,
+      comment: "R3 must refer a child with chest indrawing urgently.",
+      itemRef: "rules.R3",
+      urgent: true,
+      rejectedAt: 300,
+      ...over,
+    });
+
+    it("rejectVersion marks the latest officer-signed version rejected and keeps its signatures (AR-06, AR-10)", async () => {
+      const s = await twoVersions();
+      await s.addSignature(sig(2, "program_officer", "o1"));
+      const v = await s.rejectVersion("r1", 2, rejection());
+      expect(v.status).toBe("rejected");
+      expect(v.rejection).toEqual(rejection());
+      expect(v.signatures).toEqual([sig(2, "program_officer", "o1")]);
+      expect(await s.getVersion("r1", 2)).toEqual(v);
+    });
+
+    it("a rejected version can never be signed or rejected again", async () => {
+      const s = await twoVersions();
+      await s.addSignature(sig(2, "program_officer", "o1"));
+      await s.rejectVersion("r1", 2, rejection());
+      await expect(s.addSignature(sig(2, "clinician", "c1"))).rejects.toBeInstanceOf(Conflict);
+      await expect(s.rejectVersion("r1", 2, rejection())).rejects.toBeInstanceOf(Conflict);
+    });
+
+    it("rejectVersion refuses: no officer signature, other content, the officer themselves, locked, not latest", async () => {
+      const s = await twoVersions();
+      await expect(s.rejectVersion("r1", 2, rejection())).rejects.toBeInstanceOf(Conflict);
+      await s.addSignature(sig(2, "program_officer", "o1"));
+      await expect(s.rejectVersion("r1", 2, rejection({ modelSha: "d".repeat(64) }))).rejects.toBeInstanceOf(Conflict);
+      await expect(s.rejectVersion("r1", 2, rejection({ userId: " O1" }))).rejects.toBeInstanceOf(Conflict);
+      await expect(s.rejectVersion("r1", 1, rejection())).rejects.toBeInstanceOf(Conflict);
+      await s.addSignature(sig(2, "clinician", "c1"));
+      await expect(s.rejectVersion("r1", 2, rejection())).rejects.toBeInstanceOf(Conflict);
+    });
+
+    it("concurrent clinician signatures: exactly one succeeds", async () => {
+      const s = await twoVersions();
+      await s.addSignature(sig(2, "program_officer", "o1"));
+      const results = await Promise.allSettled([s.addSignature(sig(2, "clinician", "c1")), s.addSignature(sig(2, "clinician", "c2"))]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      expect((await s.getVersion("r1", 2))!.signatures).toHaveLength(2);
     });
   });
 }

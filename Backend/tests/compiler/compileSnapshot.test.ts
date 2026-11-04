@@ -7,6 +7,7 @@ import { modelSha } from "../../src/logic/index.js";
 import { ApprovalError, compileSnapshot } from "../../src/compiler/compileSnapshot.js";
 import { CompileError } from "../../src/compiler/types.js";
 import { readSheets } from "../../src/compiler/xlsx.js";
+import type { Signature } from "../../src/domain/types.js";
 import { demoSettings, v1 } from "./helpers.js";
 
 const root = mkdtempSync(join(tmpdir(), "compile-snapshot-"));
@@ -157,29 +158,55 @@ describe("compileSnapshot refusals", () => {
     ).rejects.toBeInstanceOf(ApprovalError);
   });
 
-  it("release with a non-matching approval throws, nothing written", async () => {
+  // DEC-020: a release never accepts lock evidence built by the caller (red team 3, A5). Every forged
+  // shape below used to be the only thing standing between a caller and a release build.
+  const lockFor = (s: string, over: { status?: "draft" | "locked"; sigs?: Signature[] } = {}) => {
+    const sigs: Signature[] = over.sigs ?? [
+      { runId: "r1", n: 1, modelSha: s, role: "program_officer", userId: "officer-1", signedAt: 1 },
+      { runId: "r1", n: 1, modelSha: s, role: "clinician", userId: "clinician-1", signedAt: 2 },
+    ];
+    return { snapshotSha: s, version: { runId: "r1", n: 1, status: over.status ?? ("locked" as const), signatures: sigs } };
+  };
+  const release = (dir: string, approval: unknown) =>
+    compileSnapshot(v1(), { projectDir: dir, buildKind: "release", settings: demoSettings(), approval: approval as never });
+
+  it("refuses every caller-built approval, even a perfectly formed lock, and writes nothing", async () => {
+    for (const approval of [lockFor(modelSha(v1())), lockFor("0".repeat(64)), { snapshotSha: modelSha(v1()) }, lockFor(modelSha(v1()), { status: "draft" })]) {
+      const dir = fresh();
+      await expect(release(dir, approval)).rejects.toThrow(/caller-built lock evidence is not accepted/);
+      expect(existsSync(dir) ? readdirSync(dir) : []).toEqual([]);
+    }
+  });
+
+  it("a release names where the version is stored; an unlocked stored version is refused", async () => {
+    const { seed, testInputs } = await import("../signoff/helpers.js");
+    const { fullyResolved } = await import("../signoff/helpers.js");
+    const s = await seed("awaiting_officer", [fullyResolved()]);
     const dir = fresh();
     await expect(
-      compileSnapshot(v1(), {
+      compileSnapshot(fullyResolved(), {
         projectDir: dir,
         buildKind: "release",
         settings: demoSettings(),
-        approval: { snapshotSha: "0".repeat(64) },
+        release: { store: s.store, artifacts: s.artifacts, runId: "r1", n: 1, inputs: async () => testInputs() },
       }),
-    ).rejects.toBeInstanceOf(ApprovalError);
+    ).rejects.toThrow(/not locked/);
     expect(existsSync(dir) ? readdirSync(dir) : []).toEqual([]);
   });
 
-  it("release with the matching approval compiles without the preview stamp", async () => {
+  it("a release of a model other than the stored locked one is refused", async () => {
+    const { seed, testInputs, fullyResolved, shaOf } = await import("../signoff/helpers.js");
+    const m = fullyResolved();
+    const sha = shaOf(m);
+    const s = await seed("awaiting_officer", [m]);
+    await s.signoff.sign("r1", 1, "program_officer", { role: "program_officer", userId: "o", modelSha: sha });
+    await s.signoff.sign("r1", 1, "clinician", { role: "clinician", userId: "c", modelSha: sha });
+    const src = { store: s.store, artifacts: s.artifacts, runId: "r1", n: 1, inputs: async () => testInputs() };
+    await expect(compileSnapshot(v1(), { projectDir: fresh(), buildKind: "release", settings: demoSettings(), release: src })).rejects.toThrow(/is not the locked version/);
     const dir = fresh();
-    const m = await compileSnapshot(v1(), {
-      projectDir: dir,
-      buildKind: "release",
-      settings: demoSettings(),
-      approval: { snapshotSha: modelSha(v1()) },
-    });
-    expect(m.buildKind).toBe("release");
-    expect(m.version).toBe(`release-${m.modelSha.slice(0, 8)}`);
+    const built = await compileSnapshot(m, { projectDir: dir, buildKind: "release", settings: demoSettings(), release: src });
+    expect(built.buildKind).toBe("release");
+    expect(built.version).toBe(`release-${sha.slice(0, 8)}`);
     expect(readFileSync(join(dir, "README.md"), "utf8")).not.toContain("preview build");
   });
 });

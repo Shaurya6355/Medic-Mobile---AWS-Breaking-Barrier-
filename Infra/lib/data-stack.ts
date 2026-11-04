@@ -110,7 +110,8 @@ export class OrchestratorDataStack extends Stack {
 
     // Application policy, scoped to the resources above. Actions mirror the SDK commands the
     // Backend issues: Get/Put/Update/Query/Scan/TransactWrite on DynamoDB (TransactWriteItems is
-    // authorised through the per-item Put/Update actions), Get/Put/Head on S3 (HeadObject needs
+    // authorised through the per-item Put/Update/ConditionCheck actions; ConditionCheckItem is for the
+    // sign-off write, which checks the versions table's latest pointer, DEC-019), Get/Put/Head on S3 (HeadObject needs
     // s3:GetObject; s3:ListBucket is added so a missing key returns 404 instead of 403), Receive/Delete
     // on SQS (Bedrock Converse, authorised by bedrock:InvokeModel, is in the separate bedrockPolicy).
     this.appPolicy = new iam.ManagedPolicy(this, "OrchestratorAppPolicy", {
@@ -122,6 +123,7 @@ export class OrchestratorDataStack extends Stack {
             "dynamodb:GetItem",
             "dynamodb:PutItem",
             "dynamodb:UpdateItem",
+            "dynamodb:ConditionCheckItem",
             "dynamodb:Query",
             "dynamodb:Scan",
           ],

@@ -26,6 +26,19 @@ import {
   type Sourcemap,
 } from "./types.js";
 import { writeFormXlsx } from "./xlsx.js";
+import type { ArtifactStore } from "../artifacts/artifactStore.js";
+import type { CheckInputsProvider } from "../signoff/checkInputs.js";
+import { Signoff, SignoffError, type LockedVersion } from "../signoff/signoff.js";
+import type { Store } from "../store/store.js";
+
+export interface ReleaseSource {
+  store: Store;
+  artifacts: ArtifactStore;
+  runId: string;
+  n: number;
+  inputs?: CheckInputsProvider;
+  now?: () => number;
+}
 
 export const PREVIEW_README_LINE = "preview build, not approved, not deployable";
 
@@ -40,8 +53,15 @@ export interface CompileOptions {
   projectDir: string;
   buildKind: BuildKind;
   settings: CompileSettings;
-  /** Required for buildKind "release": must equal modelSha(model). */
-  approval?: { snapshotSha: string };
+  /**
+   * Required for buildKind "release" (BRD AR-05, AR-07, AR-08, AR-09; DEC-019, DEC-020): WHERE the version
+   * is stored, never evidence built by the caller. The release path reads the version from the store and
+   * runs Signoff.verifyLocked (newest locked version, both signatures with these settings, stored bytes as
+   * saved, checks run now). `model` must be that exact content. Use compileLockedVersion (./compileLocked.ts).
+   */
+  release?: ReleaseSource;
+  /** No longer accepted: caller-built lock evidence (DEC-020). A release with it is refused. */
+  approval?: never;
   /** Guards on the derived flow's size; exceeding them refuses the compile. Defaults: deriveFlow's. */
   flowLimits?: FlowLimits;
 }
@@ -130,18 +150,50 @@ function flowSection(f: FlowSummary): string[] {
   ];
 }
 
+/**
+ * The release path (DEC-020): verifies the stored version with Signoff.verifyLocked (which runs the checks with
+ * these settings) and only then builds it. Throws ApprovalError when anything does not hold.
+ */
+export async function releaseBuild(
+  src: ReleaseSource,
+  opts: Omit<CompileOptions, "buildKind" | "release" | "approval">,
+  expectSha?: string,
+): Promise<{ manifest: Manifest; locked: LockedVersion }> {
+  let locked: LockedVersion;
+  try {
+    locked = await new Signoff({
+      store: src.store,
+      artifacts: src.artifacts,
+      ...(src.now !== undefined ? { now: src.now } : {}),
+      ...(src.inputs !== undefined ? { inputs: src.inputs } : {}),
+    }).verifyLocked(src.runId, src.n, { settings: opts.settings });
+  } catch (e) {
+    if (e instanceof SignoffError) throw new ApprovalError(`release build refused for run ${src.runId} version ${src.n}: ${e.message}`);
+    throw e;
+  }
+  if (expectSha !== undefined && expectSha !== locked.sha) {
+    throw new ApprovalError(`release build refused: the model given (${expectSha.slice(0, 12)}) is not the locked version ${src.n} (${locked.sha.slice(0, 12)})`);
+  }
+  const manifest = await build(locked.model, { ...opts, buildKind: "release" });
+  return { manifest, locked };
+}
+
 export async function compileSnapshot(model: Model, opts: CompileOptions): Promise<Manifest> {
+  if (opts.buildKind === "release") {
+    if ((opts as { approval?: unknown }).approval !== undefined) {
+      throw new ApprovalError("release build refused: caller-built lock evidence is not accepted; release builds read the version from the store (compileLockedVersion)");
+    }
+    if (opts.release === undefined) throw new ApprovalError("release build refused: a release is built only from the stored, locked version (compileLockedVersion)");
+    const { release, ...rest } = opts;
+    return (await releaseBuild(release, rest, computeModelSha(model))).manifest;
+  }
+  if (opts.buildKind !== "preview") throw new Error(`unknown buildKind ${String(opts.buildKind)}`);
+  return build(model, opts);
+}
+
+async function build(model: Model, opts: Omit<CompileOptions, "release" | "approval">): Promise<Manifest> {
   const { projectDir, buildKind, settings } = opts;
   const sha = computeModelSha(model);
-
-  if (buildKind === "release") {
-    if (opts.approval === undefined) throw new ApprovalError("release build needs opts.approval.snapshotSha");
-    if (opts.approval.snapshotSha !== sha) {
-      throw new ApprovalError(`approval snapshotSha ${opts.approval.snapshotSha} does not match modelSha ${sha}`);
-    }
-  } else if (buildKind !== "preview") {
-    throw new Error(`unknown buildKind ${String(buildKind)}`);
-  }
 
   const ready = checkCompileReady(model, settings);
   if (!ready.compile_ready) {

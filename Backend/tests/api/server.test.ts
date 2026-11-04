@@ -199,12 +199,13 @@ describe("versions", () => {
   it("valid save returns 201 {n:2}, stores artifact, calls onVersionSaved", async () => {
     const { server, store, artifacts, onVersionSaved } = setup();
     await seedRun(store, artifacts);
-    const res = await server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 1, body: { x: 2 }, author: "u" } });
+    const body = { x: 2, meta: { version: 2, parent_version: 1 } };
+    const res = await server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 1, body, author: "u" } });
     expect(res.statusCode).toBe(201);
-    expect(res.json()).toEqual({ n: 2 });
+    expect(res.json()).toEqual({ n: 2, checks_status: "ok" });
     expect(onVersionSaved).toHaveBeenCalledWith("r1", 2);
     const got = await server.inject({ method: "GET", url: routes.version("r1", 2) });
-    expect(got.json().body).toEqual({ x: 2 });
+    expect(got.json().body).toEqual(body);
     expect(got.json().version.parent).toBe(1);
   });
 
@@ -223,21 +224,22 @@ describe("versions", () => {
     const { server, store, artifacts } = setup();
     await seedRun(store, artifacts);
     const save = (marker: string) =>
-      server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 1, body: { marker }, author: marker } });
+      server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 1, body: { marker, meta: { version: 2, parent_version: 1 } }, author: marker } });
     const [a, b] = await Promise.all([save("A"), save("B")]);
     expect([a.statusCode, b.statusCode].sort()).toEqual([201, 409]);
     const winner = a.statusCode === 201 ? "A" : "B";
     const versions = await store.listVersions("r1");
     expect(versions).toHaveLength(2);
     const got = await server.inject({ method: "GET", url: routes.version("r1", 2) });
-    expect(got.json().body).toEqual({ marker: winner });
+    expect(got.json().body.marker).toBe(winner);
   });
 
-  it("onVersionSaved throwing still returns 201", async () => {
+  it("onVersionSaved throwing still returns 201, saying the checks failed (DEC-020)", async () => {
     const { server, store, artifacts } = setup({ onVersionSaved: async () => { throw new Error("boom"); } });
     await seedRun(store, artifacts);
-    const res = await server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 1, body: {}, author: "u" } });
+    const res = await server.inject({ method: "POST", url: routes.versions("r1"), payload: { parentVersion: 1, body: { meta: { version: 2, parent_version: 1 } }, author: "u" } });
     expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ n: 2, checks_status: "failed" });
     expect(await store.listVersions("r1")).toHaveLength(2);
   });
 });

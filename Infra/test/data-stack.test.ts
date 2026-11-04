@@ -170,7 +170,7 @@ describe("app policy", () => {
   it("grants only the dynamodb actions the code uses, on exactly the five tables", () => {
     const s = stmts().find((x) => actions(x).some((a) => a.startsWith("dynamodb:")));
     expect(actions(s).sort()).toEqual(
-      ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:UpdateItem"].sort(),
+      ["dynamodb:ConditionCheckItem", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:UpdateItem"].sort(),
     );
     const got = resources(s).map((r: any) => r["Fn::GetAtt"][0]).sort();
     const want = ["RunsTable", "StepsTable", "VersionsTable", "CommentsTable", "AuditTable"]

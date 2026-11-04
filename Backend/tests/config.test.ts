@@ -19,6 +19,13 @@ describe("loadConfig", () => {
     expect(path.basename(c.ingestScript)).toBe("prepare_input.py");
     expect(path.basename(path.dirname(c.ingestScript))).toBe("extraction");
     expect(path.basename(c.extractPrompt)).toBe("final_prompt.txt");
+    expect(path.basename(c.fillPrompt)).toBe("fill_prompt.txt");
+    expect(path.basename(path.dirname(c.fillPrompt))).toBe("extraction");
+    expect(c.fillModelId).toBe("us.m");
+  });
+  it("reads FILL_PROMPT and FILL_MODEL_ID", () => {
+    const c = loadConfig({ ...base, FILL_PROMPT: "/f.txt", FILL_MODEL_ID: "us.small" });
+    expect(c).toMatchObject({ fillPrompt: "/f.txt", fillModelId: "us.small", modelId: "us.m" });
   });
   it("reads overrides", () => {
     const c = loadConfig({ ...base, AWS_REGION: "eu-west-1", PORT: "9000", HOST: "127.0.0.1", LEASE_MS: "5000", MAX_PAGES: "10", SQS_CONCURRENCY: "2", SHUTDOWN_TIMEOUT_MS: "3000", PYTHON_BIN: "py", INGEST_SCRIPT: "/x.py", EXTRACT_PROMPT: "/p.txt", PRICES_JSON: '{"us.m":{"inPerMTok":1,"outPerMTok":2}}' });

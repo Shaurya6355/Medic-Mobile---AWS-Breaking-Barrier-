@@ -74,6 +74,66 @@ describe("DynamoStore command shapes", () => {
     expect(upd.ExpressionAttributeValues).toMatchObject({ ":parent": 1, ":n": 2 });
   });
 
+  it("addSignature checks the latest pointer and conditions the version update (officer, then clinician)", async () => {
+    const sig = { runId: "r1", n: 2, modelSha: "a".repeat(64), role: "program_officer" as const, userId: "o1", signedAt: 10 };
+    mock.on(TransactWriteCommand).resolves({});
+    mock.on(GetCommand).resolves({ Item: { runId: "r1", n: 2, parent: 1, author: "u", createdAt: 1, artifactKey: "k", signatures: [sig] } });
+    const v = await make().addSignature(sig);
+    expect(v.signatures).toEqual([sig]);
+    let items = mock.commandCalls(TransactWriteCommand)[0]!.args[0].input.TransactItems!;
+    expect(items).toHaveLength(2);
+    const check = items[0]!.ConditionCheck!;
+    expect(check).toMatchObject({ TableName: "T-versions", Key: { runId: "r1", n: 0 }, ConditionExpression: "#latest = :n" });
+    expect(check.ExpressionAttributeValues).toEqual({ ":n": 2 });
+    let upd = items[1]!.Update!;
+    expect(upd.Key).toEqual({ runId: "r1", n: 2 });
+    expect(upd.UpdateExpression).toBe("SET #sigs = :one");
+    expect(upd.ConditionExpression).toContain("attribute_not_exists(#sigs) OR size(#sigs) = :zero");
+    expect(upd.ConditionExpression).toContain("#status <> :locked");
+
+    mock.reset();
+    mock.on(TransactWriteCommand).resolves({});
+    mock.on(GetCommand).resolves({ Item: { runId: "r1", n: 2 } });
+    await make().addSignature({ ...sig, role: "clinician", userId: "c1", signedAt: 20 });
+    items = mock.commandCalls(TransactWriteCommand)[0]!.args[0].input.TransactItems!;
+    upd = items[1]!.Update!;
+    expect(upd.UpdateExpression).toBe("SET #sigs = list_append(#sigs, :one), #status = :locked, #lockedAt = :at");
+    expect(upd.ConditionExpression).toContain("#sigs[0].#role = :officer AND #sigs[0].#sha = :sha AND #sigs[0].#user <> :user");
+    expect(upd.ExpressionAttributeValues).toMatchObject({ ":sha": "a".repeat(64), ":user": "c1", ":at": 20, ":count": 1 });
+
+    mock.on(TransactWriteCommand).rejects(new TransactionCanceledException({ message: "c", $metadata: {}, CancellationReasons: [{ Code: "None" }, { Code: "ConditionalCheckFailed" }] }));
+    await expect(make().addSignature(sig)).rejects.toBeInstanceOf(Conflict);
+  });
+
+  it("addSignature normalises the userId, binds the clinician to the officer's settingsSha and refuses rejected versions (DEC-020)", async () => {
+    const sig = { runId: "r1", n: 2, modelSha: "a".repeat(64), role: "clinician" as const, userId: " Clinician\u200b", signedAt: 20, settingsSha: "5".repeat(64) };
+    mock.on(TransactWriteCommand).resolves({});
+    mock.on(GetCommand).resolves({ Item: { runId: "r1", n: 2 } });
+    await make().addSignature(sig);
+    const upd = mock.commandCalls(TransactWriteCommand)[0]!.args[0].input.TransactItems![1]!.Update!;
+    expect(upd.ExpressionAttributeValues).toMatchObject({ ":user": "clinician", ":set": "5".repeat(64), ":rejected": "rejected" });
+    expect(upd.ConditionExpression).toContain("#sigs[0].#set = :set");
+    expect(upd.ConditionExpression).toContain("#status <> :rejected");
+    expect((upd.ExpressionAttributeValues as Record<string, { userId: string }[]>)[":one"]![0]!.userId).toBe("clinician");
+    await expect(make().addSignature({ ...sig, userId: "\u200b " })).rejects.toBeInstanceOf(Conflict);
+  });
+
+  it("rejectVersion checks the latest pointer and conditions on the officer signature (AR-06)", async () => {
+    mock.on(TransactWriteCommand).resolves({});
+    mock.on(GetCommand).resolves({ Item: { runId: "r1", n: 2, status: "rejected" } });
+    const rej = { role: "clinician" as const, userId: "Doc", modelSha: "a".repeat(64), comment: "R3 must refer urgently.", urgent: true, rejectedAt: 30 };
+    const v = await make().rejectVersion("r1", 2, rej);
+    expect(v.status).toBe("rejected");
+    const items = mock.commandCalls(TransactWriteCommand)[0]!.args[0].input.TransactItems!;
+    expect(items[0]!.ConditionCheck).toMatchObject({ Key: { runId: "r1", n: 0 }, ConditionExpression: "#latest = :n" });
+    const upd = items[1]!.Update!;
+    expect(upd.UpdateExpression).toBe("SET #status = :rejected, #rej = :rej");
+    expect(upd.ConditionExpression).toContain("#sigs[0].#role = :officer AND #sigs[0].#sha = :sha AND #sigs[0].#user <> :user");
+    expect(upd.ExpressionAttributeValues).toMatchObject({ ":user": "doc", ":sha": "a".repeat(64) });
+    mock.on(TransactWriteCommand).rejects(new TransactionCanceledException({ message: "c", $metadata: {}, CancellationReasons: [{ Code: "ConditionalCheckFailed" }, { Code: "None" }] }));
+    await expect(make().rejectVersion("r1", 2, rej)).rejects.toBeInstanceOf(Conflict);
+  });
+
   it("updateRun and updateStep turn undefined values into REMOVE clauses", async () => {
     mock.on(UpdateCommand).resolves({ Attributes: { runId: "r1", state: "created", createdAt: 1 } });
     await make().updateRun("r1", { lease: undefined, state: "ingesting" });
