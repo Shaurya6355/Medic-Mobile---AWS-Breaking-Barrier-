@@ -1,5 +1,5 @@
 {
-  "modelSha": "2000cf768b4ec126420ab0f854dba3c8683c7180fb90d0516ac03622439d8dbc",
+  "modelSha": "70a70ce1bdf69c195966f53178e2df4a46bc88b5d64771b2d0ed19705476de10",
   "claim": "PROVEN",
   "gates": {
     "canOfficerSign": false,
@@ -28,14 +28,14 @@
         "code": "OPEN_QUESTION",
         "decidedBy": "program_officer",
         "yours": true,
-        "message": "Open question Q13 has not been answered: These items have no supporting quote from the guideline and are the team's wording or choice: cough_no_fast_breathing, no_cough, R5. Please confirm or correct them. It concerns cough_no_fast_breathing, no_cough, R5. The program officer decides the answer and records it before the draft can be signed."
+        "message": "Open question Q14 has not been answered: The guideline publisher and edition were not recorded. Please fill them in. It concerns the draft as a whole. The program officer decides the answer and records it before the draft can be signed."
       },
       {
         "severity": "blocking",
         "code": "OPEN_QUESTION",
         "decidedBy": "program_officer",
         "yours": true,
-        "message": "Open question Q14 has not been answered: The guideline publisher and edition were not recorded. Please fill them in. It concerns the draft as a whole. The program officer decides the answer and records it before the draft can be signed."
+        "message": "Open question Q13 has not been answered: These items have no supporting quote from the guideline and are the team's wording or choice: cough_no_fast_breathing, no_cough, R6. Please confirm or correct them. It concerns cough_no_fast_breathing, no_cough, R6. The program officer decides the answer and records it before the draft can be signed."
       },
       {
         "severity": "blocking",
@@ -84,14 +84,21 @@
         "code": "BOUNDARY_SHOWN",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "Edge check for \"Child's age in months\" at 12 months: for a child (\"Does the child have a cough?\" yes; \"For how many days has the child had the cough?\" 0 days; \"Count the child's breaths in 1 minute\" 40 breaths per minute; all other yes-or-no questions answered no), 11 months gives \"Cough without fast breathing or danger signs\", 12 months gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" and 13 months gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\". This is where two age bands meet, so a child of exactly 12 months is counted in the older band (see the open question Q4). The booklet (page 8) says: \"In a child age 2 months up to 12 months,\n50 breaths or more per minute\". This is for information; the clinician checks that each result is the intended one."
+        "message": "Edge check for \"Child's age in months\" at 60 months: for a child (every yes-or-no question answered no), 59 months gives \"No cough: this form does not apply. Assess other problems.\", 60 months gives \"Outside this form's age range, no danger sign: refer to health facility\" and 61 months gives \"Outside this form's age range, no danger sign: refer to health facility\". This is where two age bands meet, so a child of exactly 60 months is counted in the older band. The booklet (page 3) says: \"(child age 2 months up to 5 years)\". This is for information; the clinician checks that each result is the intended one."
       },
       {
         "severity": "info",
         "code": "BOUNDARY_SHOWN",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "Edge check for \"Child's age in months\" at 60 months: for a child (every yes-or-no question answered no), 59 months gives \"No cough: this form does not apply. Assess other problems.\", 60 months gives \"Refer to health facility: the child's age is outside the range this form covers\" and 61 months gives \"Refer to health facility: the child's age is outside the range this form covers\". The booklet (page 8) says: \"In a child age 2 months up to 12 months,\n50 breaths or more per minute\". This is for information; the clinician checks that each result is the intended one."
+        "message": "Edge check for \"Child's age in months\" at 2 months: for a child (every yes-or-no question answered no), 1 month gives \"Outside this form's age range, no danger sign: refer to health facility\", 2 months gives \"No cough: this form does not apply. Assess other problems.\" and 3 months gives \"No cough: this form does not apply. Assess other problems.\". This is where two age bands meet, so a child of exactly 2 months is counted in the older band (see the open question Q4). The booklet (page 3) says: \"(child age 2 months up to 5 years)\". This is for information; the clinician checks that each result is the intended one."
+      },
+      {
+        "severity": "info",
+        "code": "BOUNDARY_SHOWN",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "Edge check for \"Child's age in months\" at 12 months: for a child (\"Does the child have a cough?\" yes; \"For how many days has the child had the cough?\" 0 days; \"Count the child's breaths in 1 minute\" 40 breaths per minute; all other yes-or-no questions answered no), 11 months gives \"Cough without fast breathing or danger signs\", 12 months gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" and 13 months gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\". This is where two age bands meet, so a child of exactly 12 months is counted in the older band (see the open question Q5). The booklet (page 8) says: \"In a child age 2 months up to 12 months,\n50 breaths or more per minute\". This is for information; the clinician checks that each result is the intended one."
       },
       {
         "severity": "info",
@@ -99,13 +106,6 @@
         "decidedBy": "clinician",
         "yours": false,
         "message": "Edge check for \"Count the child's breaths in 1 minute\" at 50 breaths per minute: for a child aged 2 months (\"Does the child have a cough?\" yes; \"For how many days has the child had the cough?\" 0 days; all other yes-or-no questions answered no), 49 breaths per minute gives \"Cough without fast breathing or danger signs\", 50 breaths per minute gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" and 51 breaths per minute gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\". The booklet (page 8) says: \"In a child age 2 months up to 12 months,\n50 breaths or more per minute\". This is for information; the clinician checks that each result is the intended one."
-      },
-      {
-        "severity": "info",
-        "code": "BOUNDARY_SHOWN",
-        "decidedBy": "clinician",
-        "yours": false,
-        "message": "Edge check for \"Child's age in months\" at 2 months: for a child (every yes-or-no question answered no), 1 months gives \"Refer to health facility: the child's age is outside the range this form covers\", 2 months gives \"No cough: this form does not apply. Assess other problems.\" and 3 months gives \"No cough: this form does not apply. Assess other problems.\". The booklet (page 8) says: \"In a child age 2 months up to 12 months,\n50 breaths or more per minute\". This is for information; the clinician checks that each result is the intended one."
       },
       {
         "severity": "info",
@@ -126,7 +126,14 @@
         "code": "FOLLOWUP_NOT_COMPILED",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "The follow-up of the result \"Refer to health facility: the child's age is outside the range this form covers\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
+        "message": "The follow-up of the result \"Danger sign, outside this form's age range: refer urgently. Give no medicine...\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
+      },
+      {
+        "severity": "info",
+        "code": "FOLLOWUP_NOT_COMPILED",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "The follow-up of the result \"Outside this form's age range, no danger sign: refer to health facility\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
       },
       {
         "severity": "info",
@@ -147,49 +154,49 @@
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "The danger sign \"Has HIV and any other illness\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Has HIV and any other illness\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Red on MUAC strap\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Red on MUAC strap, or\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "The danger sign \"Diarrhoea for 14 days or more\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Diarrhoea for 14 days or more\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Swelling of both feet\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Swelling of both feet\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "The danger sign \"Red on MUAC strap\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Red on MUAC strap, or\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Has HIV and any other illness\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Has HIV and any other illness\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "The danger sign \"Yellow on MUAC strap and has HIV\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Yellow on MUAC strap and has HIV\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Diarrhoea for 14 days or more\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Diarrhoea for 14 days or more\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "The danger sign \"Swelling of both feet\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Swelling of both feet\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Fever for last 7 days or more\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Fever for last 7 days or more\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "The danger sign \"Fever for last 7 days or more\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Fever for last 7 days or more\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Yellow on MUAC strap and has HIV\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Yellow on MUAC strap and has HIV\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "GOLDEN_COUNT",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "17 test cases were run through the draft: 17 give the expected result and 0 do not. This is for information; the cases only show that the draft does what the clinician expects, so they are as good as the cases themselves."
+        "message": "20 test cases were run through the draft: 20 give the expected result and 0 do not. This is for information; the cases only show that the draft does what the clinician expects, so they are as good as the cases themselves."
       },
       {
         "severity": "info",
@@ -200,10 +207,10 @@
       },
       {
         "severity": "info",
-        "code": "TEAM_VALUE",
+        "code": "INCLUSIVITY_ASSUMED",
         "decidedBy": "clinician",
         "yours": false,
-        "message": "Rule R1, which gives the result \"Refer to health facility: the child's age is outside the range this form covers\" has numbers the team chose, with no booklet source: less than 2 months for \"Child's age in months\"; 60 months or more for \"Child's age in months\". The booklet was not used to check them. The clinician confirms that they are right; the program officer passes them on."
+        "message": "The calculated value \"Outside the age range this guideline covers\": the booklet says \"up to 5 years\". The draft reads this as: 60 months itself is not included below it, so a child of exactly 60 months counts with the higher group. The booklet (page 3) says: \"(child age 2 months up to 5 years)\". That reading is the team's, the booklet does not spell it out. See the open question Q5 for a child of exactly that value. This is for information; the clinician confirms the reading."
       },
       {
         "severity": "info",
@@ -211,6 +218,13 @@
         "decidedBy": "clinician",
         "yours": false,
         "message": "The limits on what a health worker may type in were chosen by the team, not taken from the booklet: \"Child's age in months\": 0 to 120 months; \"For how many days has the child had the cough?\": 0 to 365 days; \"Count the child's breaths in 1 minute\": 10 to 120 breaths per minute. The booklet was not used to check them. This is for information; the clinician says whether they are sensible."
+      },
+      {
+        "severity": "info",
+        "code": "NUMBER_UNIT_CONVERTED",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "The calculated value \"Outside the age range this guideline covers\" uses 60 months or more for \"Child's age in months\", while the booklet gives the same amount in another unit: 60 months is the same as 5 years. The booklet (page 3) says: \"(child age 2 months up to 5 years)\". The draft has 60 months or more for \"Child's age in months\". This is for information; the clinician may confirm the conversion if in doubt."
       },
       {
         "severity": "info",
@@ -268,7 +282,7 @@
         "code": "OPEN_QUESTION",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "Open question Q12 has not been answered: These items rest only on a passage the draft chose to cite, not on a cut-off or a question taken from the guideline, so they are marked as the team's: R2, R3, R4. Please check that each one does what the guideline says. It concerns R2, R3, R4. The clinician decides the answer and records it before the draft can be signed."
+        "message": "Open question Q12 has not been answered: These items rest only on a passage the draft chose to cite, not on a cut-off or a question taken from the guideline, so they are marked as the team's: R3, R4, R5. Please check that each one does what the guideline says. It concerns R3, R4, R5. The clinician decides the answer and records it before the draft can be signed."
       },
       {
         "severity": "blocking",
@@ -303,35 +317,42 @@
         "code": "OPEN_QUESTION",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "Open question Q10 has not been answered: When no other rule applies, the form shows \"no_cough\" (rule R6, added by the team). Is that the right result for those children? It concerns R6, no_cough. The clinician decides the answer and records it before the draft can be signed."
+        "message": "Open question Q10 has not been answered: When no other rule applies, the form shows \"no_cough\" (rule R7, added by the team). Is that the right result for those children? It concerns R7, no_cough. The clinician decides the answer and records it before the draft can be signed."
       },
       {
         "severity": "blocking",
         "code": "OPEN_QUESTION",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "Open question Q9 has not been answered: The guideline covers children from 2 months up to 60 months. Rule R1 (added by the team) refers every other child to a health facility as the most urgent result. Is that the right handling? It concerns R1, refer_outside_age_range. The clinician decides the answer and records it before the draft can be signed."
+        "message": "Open question Q9 has not been answered: The guideline covers children from 2 months up to 60 months only. We refer out-of-range children urgently if they have a danger sign (R1) and routinely otherwise (R2), with no medicine. Is that right? It concerns R1, R2, refer_urgent_outside_age_range, refer_outside_age_range. The clinician decides the answer and records it before the draft can be signed."
       },
       {
         "severity": "warning",
         "code": "AI_WORDED_TEXT",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "15 pieces of wording shown to the health worker are not the booklet's own words; the AI or the team wrote them: \"Child's age in months\"; \"Does the child have a cough?\"; \"For how many days has the child had the cough?\"; \"Has the child had convulsions?\"; \"Is the child not able to drink or feed anything?\"; \"Does the child vomit everything?\"; \"Look: does the child have chest indrawing?\"; \"Count the child's breaths in 1 minute\"; \"Look: is the child unusually sleepy or unconscious?\"; \"Refer to health facility: the child's age is outside the range this form covers\"; \"Danger sign: refer urgently and give first dose of antibiotic\"; \"Danger sign: refer urgently\"; \"Fast breathing (pneumonia): treat at home and follow up in 3 days\"; \"Cough without fast breathing or danger signs\", and 1 more. The booklet was used to check numbers and \"not\" in them, but not their meaning. The clinician reads each one and confirms that it says what the booklet says."
+        "message": "17 pieces of wording shown to the health worker are not the booklet's own words; the AI or the team wrote them: \"Child's age in months\"; \"Does the child have a cough?\"; \"For how many days has the child had the cough?\"; \"Has the child had convulsions?\"; \"Is the child not able to drink or feed anything?\"; \"Does the child vomit everything?\"; \"Look: does the child have chest indrawing?\"; \"Count the child's breaths in 1 minute\"; \"Look: is the child unusually sleepy or unconscious?\"; \"Outside the age range this guideline covers\"; \"Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.\"; \"Outside this form's age range, no danger sign: refer to health facility\"; \"Danger sign: refer urgently and give first dose of antibiotic\"; \"Danger sign: refer urgently\", and 3 more. The booklet was used to check numbers and \"not\" in them, but not their meaning. The clinician reads each one and confirms that it says what the booklet says."
       },
       {
         "severity": "info",
         "code": "BOUNDARY_SHOWN",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "Edge check for \"Child's age in months\" at 12 months: for a child (\"Does the child have a cough?\" yes; \"For how many days has the child had the cough?\" 0 days; \"Count the child's breaths in 1 minute\" 40 breaths per minute; all other yes-or-no questions answered no), 11 months gives \"Cough without fast breathing or danger signs\", 12 months gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" and 13 months gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\". This is where two age bands meet, so a child of exactly 12 months is counted in the older band (see the open question Q4). The booklet (page 8) says: \"In a child age 2 months up to 12 months,\n50 breaths or more per minute\". This is for information; the clinician checks that each result is the intended one."
+        "message": "Edge check for \"Child's age in months\" at 60 months: for a child (every yes-or-no question answered no), 59 months gives \"No cough: this form does not apply. Assess other problems.\", 60 months gives \"Outside this form's age range, no danger sign: refer to health facility\" and 61 months gives \"Outside this form's age range, no danger sign: refer to health facility\". This is where two age bands meet, so a child of exactly 60 months is counted in the older band. The booklet (page 3) says: \"(child age 2 months up to 5 years)\". This is for information; the clinician checks that each result is the intended one."
       },
       {
         "severity": "info",
         "code": "BOUNDARY_SHOWN",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "Edge check for \"Child's age in months\" at 60 months: for a child (every yes-or-no question answered no), 59 months gives \"No cough: this form does not apply. Assess other problems.\", 60 months gives \"Refer to health facility: the child's age is outside the range this form covers\" and 61 months gives \"Refer to health facility: the child's age is outside the range this form covers\". The booklet (page 8) says: \"In a child age 2 months up to 12 months,\n50 breaths or more per minute\". This is for information; the clinician checks that each result is the intended one."
+        "message": "Edge check for \"Child's age in months\" at 2 months: for a child (every yes-or-no question answered no), 1 month gives \"Outside this form's age range, no danger sign: refer to health facility\", 2 months gives \"No cough: this form does not apply. Assess other problems.\" and 3 months gives \"No cough: this form does not apply. Assess other problems.\". This is where two age bands meet, so a child of exactly 2 months is counted in the older band (see the open question Q4). The booklet (page 3) says: \"(child age 2 months up to 5 years)\". This is for information; the clinician checks that each result is the intended one."
+      },
+      {
+        "severity": "info",
+        "code": "BOUNDARY_SHOWN",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "Edge check for \"Child's age in months\" at 12 months: for a child (\"Does the child have a cough?\" yes; \"For how many days has the child had the cough?\" 0 days; \"Count the child's breaths in 1 minute\" 40 breaths per minute; all other yes-or-no questions answered no), 11 months gives \"Cough without fast breathing or danger signs\", 12 months gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" and 13 months gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\". This is where two age bands meet, so a child of exactly 12 months is counted in the older band (see the open question Q5). The booklet (page 8) says: \"In a child age 2 months up to 12 months,\n50 breaths or more per minute\". This is for information; the clinician checks that each result is the intended one."
       },
       {
         "severity": "info",
@@ -339,13 +360,6 @@
         "decidedBy": "clinician",
         "yours": true,
         "message": "Edge check for \"Count the child's breaths in 1 minute\" at 50 breaths per minute: for a child aged 2 months (\"Does the child have a cough?\" yes; \"For how many days has the child had the cough?\" 0 days; all other yes-or-no questions answered no), 49 breaths per minute gives \"Cough without fast breathing or danger signs\", 50 breaths per minute gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" and 51 breaths per minute gives \"Fast breathing (pneumonia): treat at home and follow up in 3 days\". The booklet (page 8) says: \"In a child age 2 months up to 12 months,\n50 breaths or more per minute\". This is for information; the clinician checks that each result is the intended one."
-      },
-      {
-        "severity": "info",
-        "code": "BOUNDARY_SHOWN",
-        "decidedBy": "clinician",
-        "yours": true,
-        "message": "Edge check for \"Child's age in months\" at 2 months: for a child (every yes-or-no question answered no), 1 months gives \"Refer to health facility: the child's age is outside the range this form covers\", 2 months gives \"No cough: this form does not apply. Assess other problems.\" and 3 months gives \"No cough: this form does not apply. Assess other problems.\". The booklet (page 8) says: \"In a child age 2 months up to 12 months,\n50 breaths or more per minute\". This is for information; the clinician checks that each result is the intended one."
       },
       {
         "severity": "info",
@@ -370,10 +384,24 @@
       },
       {
         "severity": "info",
+        "code": "TEAM_TEXT_TO_CONFIRM",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "The result \"Danger sign, outside this form's age range: refer urgently. Give no medicine...\" contains wording the team wrote itself, not taken from the booklet: \"Do not give medicine from this form. The guideline gives no doses outside the age range this form covers.\". The booklet was not used to check it. This is for information; the clinician confirms that the wording is right."
+      },
+      {
+        "severity": "info",
         "code": "FOLLOWUP_NOT_COMPILED",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "The follow-up of the result \"Refer to health facility: the child's age is outside the range this form covers\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
+        "message": "The follow-up of the result \"Danger sign, outside this form's age range: refer urgently. Give no medicine...\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
+      },
+      {
+        "severity": "info",
+        "code": "FOLLOWUP_NOT_COMPILED",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "The follow-up of the result \"Outside this form's age range, no danger sign: refer to health facility\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
       },
       {
         "severity": "info",
@@ -394,56 +422,56 @@
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "The danger sign \"Has HIV and any other illness\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Has HIV and any other illness\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Red on MUAC strap\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Red on MUAC strap, or\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "The danger sign \"Diarrhoea for 14 days or more\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Diarrhoea for 14 days or more\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Swelling of both feet\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Swelling of both feet\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "The danger sign \"Red on MUAC strap\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Red on MUAC strap, or\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Has HIV and any other illness\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Has HIV and any other illness\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "The danger sign \"Yellow on MUAC strap and has HIV\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Yellow on MUAC strap and has HIV\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Diarrhoea for 14 days or more\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Diarrhoea for 14 days or more\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "The danger sign \"Swelling of both feet\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Swelling of both feet\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
+        "message": "The danger sign \"Fever for last 7 days or more\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Fever for last 7 days or more\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "The danger sign \"Fever for last 7 days or more\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Fever for last 7 days or more\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q6. This is for information; the clinician confirms that it is safe to leave it out."
-      },
-      {
-        "severity": "info",
-        "code": "GOLDEN_PENDING_CLINICIAN",
-        "decidedBy": "clinician",
-        "yours": true,
-        "message": "17 test cases are still waiting for the clinician to confirm them (g01, g02, g03, g04, g05, g06, g07, g08, g09, g10, g11, g12, g13, g14, g15, g16, g17). Until then they show what the draft does, not what is right. This is for information; the clinician confirms each case."
+        "message": "The danger sign \"Yellow on MUAC strap and has HIV\" is not asked about in this form. The reading of the booklet marked it as not related to cough, and the draft lists it as left out. The booklet (page 6) says: \"Yellow on MUAC strap and has HIV\". A child with cough who also has this sign would not be sent for referral by this form. See the open question Q8. This is for information; the clinician confirms that it is safe to leave it out."
       },
       {
         "severity": "info",
         "code": "GOLDEN_COUNT",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "17 test cases were run through the draft: 17 give the expected result and 0 do not. This is for information; the cases only show that the draft does what the clinician expects, so they are as good as the cases themselves."
+        "message": "20 test cases were run through the draft: 20 give the expected result and 0 do not. This is for information; the cases only show that the draft does what the clinician expects, so they are as good as the cases themselves."
+      },
+      {
+        "severity": "info",
+        "code": "GOLDEN_PENDING_CLINICIAN",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "20 test cases are still waiting for the clinician to confirm them (g01, g02, g03, g04, g05, g06, g07, g08, g09, g10, g11, g12, g13, g14, g15, g16, g17, g18, g19, g20). Until then they show what the draft does, not what is right. This is for information; the clinician confirms each case."
       },
       {
         "severity": "info",
@@ -454,10 +482,10 @@
       },
       {
         "severity": "info",
-        "code": "TEAM_VALUE",
+        "code": "INCLUSIVITY_ASSUMED",
         "decidedBy": "clinician",
         "yours": true,
-        "message": "Rule R1, which gives the result \"Refer to health facility: the child's age is outside the range this form covers\" has numbers the team chose, with no booklet source: less than 2 months for \"Child's age in months\"; 60 months or more for \"Child's age in months\". The booklet was not used to check them. The clinician confirms that they are right."
+        "message": "The calculated value \"Outside the age range this guideline covers\": the booklet says \"up to 5 years\". The draft reads this as: 60 months itself is not included below it, so a child of exactly 60 months counts with the higher group. The booklet (page 3) says: \"(child age 2 months up to 5 years)\". That reading is the team's, the booklet does not spell it out. See the open question Q5 for a child of exactly that value. This is for information; the clinician confirms the reading."
       },
       {
         "severity": "info",
@@ -465,6 +493,13 @@
         "decidedBy": "clinician",
         "yours": true,
         "message": "The limits on what a health worker may type in were chosen by the team, not taken from the booklet: \"Child's age in months\": 0 to 120 months; \"For how many days has the child had the cough?\": 0 to 365 days; \"Count the child's breaths in 1 minute\": 10 to 120 breaths per minute. The booklet was not used to check them. This is for information; the clinician says whether they are sensible."
+      },
+      {
+        "severity": "info",
+        "code": "NUMBER_UNIT_CONVERTED",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "The calculated value \"Outside the age range this guideline covers\" uses 60 months or more for \"Child's age in months\", while the booklet gives the same amount in another unit: 60 months is the same as 5 years. The booklet (page 3) says: \"(child age 2 months up to 5 years)\". The draft has 60 months or more for \"Child's age in months\". This is for information; the clinician may confirm the conversion if in doubt."
       },
       {
         "severity": "info",

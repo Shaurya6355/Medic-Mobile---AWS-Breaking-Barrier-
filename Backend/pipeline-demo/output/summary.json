@@ -5,7 +5,7 @@
     {
       "n": 1,
       "status": "superseded",
-      "modelSha": "2000cf768b4ec126420ab0f854dba3c8683c7180fb90d0516ac03622439d8dbc",
+      "modelSha": "70a70ce1bdf69c195966f53178e2df4a46bc88b5d64771b2d0ed19705476de10",
       "signatures": [],
       "gates": {
         "canOfficerSign": false,
@@ -17,12 +17,12 @@
     {
       "n": 2,
       "status": "superseded",
-      "modelSha": "e8f0021598645d51fb6aada02b392b92cf40739b13c17216371337900c799260",
+      "modelSha": "57aa65f51417a58d609eb77ca3ac443da503f8bc3bb4934616924e1ab64d9c24",
       "signatures": [
         {
           "runId": "pipeline-demo",
           "n": 2,
-          "modelSha": "e8f0021598645d51fb6aada02b392b92cf40739b13c17216371337900c799260",
+          "modelSha": "57aa65f51417a58d609eb77ca3ac443da503f8bc3bb4934616924e1ab64d9c24",
           "role": "program_officer",
           "userId": "demo-officer-amara",
           "signedAt": 1793782839000,
@@ -39,12 +39,12 @@
     {
       "n": 3,
       "status": "locked",
-      "modelSha": "9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96",
+      "modelSha": "a4c0e9d27b45be13530375ca9dfd443647fc7cac14c5d3816c71162df16d0f59",
       "signatures": [
         {
           "runId": "pipeline-demo",
           "n": 3,
-          "modelSha": "9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96",
+          "modelSha": "a4c0e9d27b45be13530375ca9dfd443647fc7cac14c5d3816c71162df16d0f59",
           "role": "program_officer",
           "userId": "demo-officer-amara",
           "signedAt": 1793782849000,
@@ -53,7 +53,7 @@
         {
           "runId": "pipeline-demo",
           "n": 3,
-          "modelSha": "9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96",
+          "modelSha": "a4c0e9d27b45be13530375ca9dfd443647fc7cac14c5d3816c71162df16d0f59",
           "role": "clinician",
           "userId": "demo-clinician-tomas",
           "signedAt": 1793782854000,
@@ -70,7 +70,7 @@
     {
       "n": 4,
       "status": "awaiting_officer",
-      "modelSha": "97d4f32b4ceadb7c92d230c9818e618e9fdbe5a3fb217b46e9b3805c5237f9fe",
+      "modelSha": "c4e9bb2b7e9f9632a5a03331bc2205b38fc309615cf4c747a1959f9456c759c7",
       "signatures": [],
       "gates": {
         "canOfficerSign": true,

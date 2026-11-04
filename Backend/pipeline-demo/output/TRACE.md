@@ -16,12 +16,12 @@ except the cht-conf timings in compile/logs.
 
 ## 2. Findings for version 1 (GET findings, per audience)
 
-   modelSha 2000cf768b4e...; claim PROVEN; 14 blocking, 6 warning, 26 info
+   modelSha 70a70ce1bdf6...; claim PROVEN; 14 blocking, 6 warning, 29 info
    gates: The program officer cannot sign yet. Still to settle: 5 unanswered open questions. The clinician cannot sign yet: this waits for the program officer's signature, and these are for the clinician: 9 unanswered open questions. The form cannot be built yet: 14 items still block.
    program_officer: 5 blocking item(s) for them to settle, for example:
      - Open question Q7 has not been answered: How many days should the follow-up task stay open after it is due? The guideline gives the due day only. It concerns tre
      - Open question Q2 has not been answered: The guideline sends the health worker to page 10 to give the first dose of oral medicine, but page 10 is the ORS page an
-     - Open question Q13 has not been answered: These items have no supporting quote from the guideline and are the team's wording or choice: cough_no_fast_breathing, 
+     - Open question Q14 has not been answered: The guideline publisher and edition were not recorded. Please fill them in. It concerns the draft as a whole. The progr
    clinician: 9 blocking item(s) for them to settle, for example:
      - Open question Q11 has not been answered: The booklet passage for the medicine step act_amox_home ("Give twice daily for 5 days: Age 2 months up to 12 months—1 t
      - Open question Q6 has not been answered: These danger signs from the guideline are not asked in this form: Diarrhoea for 14 days or more; Blood in stool; Fever f
@@ -39,7 +39,7 @@ except the cht-conf timings in compile/logs.
 ## 4. Second pass: the program officer fixes their items (new version 2)
 
    OK: POST versions -> 201 (new version 2, author demo-officer-amara)
-   v2: status awaiting_officer, run awaiting_officer, modelSha e8f002159864...
+   v2: status awaiting_officer, run awaiting_officer, modelSha 57aa65f51417...
    gates: The program officer can sign now. The clinician cannot sign yet. Still to settle: 9 unanswered open questions. The form cannot be built yet: 9 items still block.
    OK: officer can sign, clinician still blocked
    officer signs v2: HTTP 201 awaiting_clinician
@@ -51,7 +51,7 @@ except the cht-conf timings in compile/logs.
 
    OK: POST versions -> 201 (new version 3, author demo-clinician-tomas)
    v2: status superseded; its officer signature stays in the history (1 stored)
-   v3: status awaiting_officer, 0 signatures, modelSha 9c4f35489161...
+   v3: status awaiting_officer, 0 signatures, modelSha a4c0e9d27b45...
    gates: The program officer can sign now. The clinician can sign once the program officer has signed. The form can be built once both have signed.
    OK: old version superseded, new version starts with zero signatures
    clinician signs v3 first: HTTP 409 officer_signature_required - The program officer signs first (AR-03)
@@ -71,7 +71,7 @@ except the cht-conf timings in compile/logs.
 
    [compile] compile refused: release build refused for run pipeline-demo version 2: version 2: is not locked (it needs the program officer's and then the clinician's signature)
    OK: compile of v2 refused (release build refused for run pipeline-demo version 2: version 2: is not locked (it needs the program officer's and then the clinician's signature))
-   [compile] compiled cough_fast_breathing release-9c4f3548 (release) from run pipeline-demo version 3: 11 files
+   [compile] compiled cough_fast_breathing release-a4c0e9d2 (release) from run pipeline-demo version 3: 11 files
    [compile] python probe /opt/homebrew/bin/python3 (Python 3.15.2): FAIL ValueError: Cannot use capturing groups in re.Scanner
    [compile] python probe /opt/homebrew/bin/python3.13 (Python 3.13.5): OK
    [compile] cht-conf launcher: node --preserve-symlinks --preserve-symlinks-main <tmp>/cht-tools/node_modules/cht-conf/src/bin/index.js
@@ -80,7 +80,7 @@ except the cht-conf timings in compile/logs.
    [compile] cht compile-app-settings: PASS (exit 0, 0 errors, 1 warnings)
    [compile] cht-conf: PASS
    OK: compile of v3: pass
-   release build release-9c4f3548, modelSha 9c4f35489161... (equals the signed sha: true)
+   release build release-a4c0e9d2, modelSha a4c0e9d27b45... (equals the signed sha: true)
    cht convert-app-forms: PASS
    cht validate-app-forms: PASS
    cht compile-app-settings: PASS
@@ -103,16 +103,16 @@ except the cht-conf timings in compile/logs.
    2026-11-04T09:00:28.000Z run_state {"from":"checking","to":"awaiting_officer"}
    2026-11-04T09:00:35.000Z run_state {"from":"awaiting_officer","to":"checking"}
    2026-11-04T09:00:37.000Z run_state {"from":"checking","to":"awaiting_officer"}
-   2026-11-04T09:00:39.000Z signature {"n":2,"role":"program_officer","userId":"demo-officer-amara","modelSha":"e8f0021598645d51fb6aada02b392b92cf40739b13c17216371337900c799260","settingsSha":"60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939","inputsSha":"28954afef48e4f4607c6b5b85be41208bf4f96047a7820a3169297e1879c4cc3","checksVersion":"dec020-1","checksNotRun":[]}
+   2026-11-04T09:00:39.000Z signature {"n":2,"role":"program_officer","userId":"demo-officer-amara","modelSha":"57aa65f51417a58d609eb77ca3ac443da503f8bc3bb4934616924e1ab64d9c24","settingsSha":"60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939","inputsSha":"8661edd023b083bb52c4eda64d07711331d3d403cfde3cda4b0a6f9684e1f5b5","checksVersion":"dec020-2","checksNotRun":[]}
    2026-11-04T09:00:40.000Z run_state {"from":"awaiting_officer","to":"awaiting_clinician"}
    2026-11-04T09:00:44.000Z run_state {"from":"awaiting_clinician","to":"checking"}
    2026-11-04T09:00:46.000Z run_state {"from":"checking","to":"awaiting_officer"}
-   2026-11-04T09:00:49.000Z signature {"n":3,"role":"program_officer","userId":"demo-officer-amara","modelSha":"9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96","settingsSha":"60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939","inputsSha":"28954afef48e4f4607c6b5b85be41208bf4f96047a7820a3169297e1879c4cc3","checksVersion":"dec020-1","checksNotRun":[]}
+   2026-11-04T09:00:49.000Z signature {"n":3,"role":"program_officer","userId":"demo-officer-amara","modelSha":"a4c0e9d27b45be13530375ca9dfd443647fc7cac14c5d3816c71162df16d0f59","settingsSha":"60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939","inputsSha":"8661edd023b083bb52c4eda64d07711331d3d403cfde3cda4b0a6f9684e1f5b5","checksVersion":"dec020-2","checksNotRun":[]}
    2026-11-04T09:00:50.000Z run_state {"from":"awaiting_officer","to":"awaiting_clinician"}
-   2026-11-04T09:00:54.000Z signature {"n":3,"role":"clinician","userId":"demo-clinician-tomas","modelSha":"9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96","settingsSha":"60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939","inputsSha":"28954afef48e4f4607c6b5b85be41208bf4f96047a7820a3169297e1879c4cc3","checksVersion":"dec020-1","checksNotRun":[]}
-   2026-11-04T09:00:54.000Z version_locked {"n":3,"modelSha":"9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96","settingsSha":"60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939"}
+   2026-11-04T09:00:54.000Z signature {"n":3,"role":"clinician","userId":"demo-clinician-tomas","modelSha":"a4c0e9d27b45be13530375ca9dfd443647fc7cac14c5d3816c71162df16d0f59","settingsSha":"60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939","inputsSha":"8661edd023b083bb52c4eda64d07711331d3d403cfde3cda4b0a6f9684e1f5b5","checksVersion":"dec020-2","checksNotRun":[]}
+   2026-11-04T09:00:54.000Z version_locked {"n":3,"modelSha":"a4c0e9d27b45be13530375ca9dfd443647fc7cac14c5d3816c71162df16d0f59","settingsSha":"60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939"}
    2026-11-04T09:00:55.000Z run_state {"from":"awaiting_clinician","to":"locked"}
-   2026-11-04T09:00:59.000Z compiled {"n":3,"modelSha":"9c4f35489161b4c8ee88e1f8c3ec5e724afb395050802c1e4e9a6f2ecd2c6c96","settingsSha":"60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939","bodySha256":"f1dab5e23818a9e1e05707d6323cb150875dfd1b444e2d6783a9f62b08f62ddd","checksVersion":"dec020-1","inputsSha":"28954afef48e4f4607c6b5b85be41208bf4f96047a7820a3169297e1879c4cc3","goldenCases":true,"checksNotRun":[],"formVersion":"release-9c4f3548","files":11}
+   2026-11-04T09:00:59.000Z compiled {"n":3,"modelSha":"a4c0e9d27b45be13530375ca9dfd443647fc7cac14c5d3816c71162df16d0f59","settingsSha":"60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939","bodySha256":"1962ab45d488214376e76bbb09ad44d50a6bf5b1c55ed1a0b7189972894c7b94","checksVersion":"dec020-2","inputsSha":"8661edd023b083bb52c4eda64d07711331d3d403cfde3cda4b0a6f9684e1f5b5","goldenCases":true,"checksNotRun":[],"formVersion":"release-a4c0e9d2","files":11}
    2026-11-04T09:01:02.000Z run_state {"from":"locked","to":"checking"}
    2026-11-04T09:01:04.000Z run_state {"from":"checking","to":"awaiting_officer"}
 
