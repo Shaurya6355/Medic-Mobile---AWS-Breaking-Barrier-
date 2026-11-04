@@ -11,7 +11,26 @@ npx tsc --noEmit      # typecheck
 npm run build         # emits dist/ (tests excluded)
 npm start             # node dist/index.js
 npm run dev           # tsx watch src/index.ts
+npm run compile:demo  # logic model fixture -> CHT project -> real cht-conf (see compile-demo/README.md)
 ```
+
+## CHT compiler (src/compiler)
+
+`compileSnapshot(model, { projectDir, buildKind, settings, approval?, flowLimits? })` turns a parsed logic model (v1.json shape, DEC-017) into a CHT project directory that cht-conf compiles: `forms/app/<pathway_id>.xlsx` and `.properties.json`, `tasks.js` (scheduled follow-ups only), `targets.js`, `contact-summary.templated.js`, `app_settings/base_settings.json`, `.eslintrc`, `translations/messages-en.properties`, `sourcemap.json` and a README. It returns a manifest (file sha256s, formId, modelSha, buildKind, warnings, notCompiled, flow, sourcemap) and refuses with a `CompileError` (`result.compile_ready === false`, every missing field listed) when something it needs is absent. Compiler settings (form title, icon, team default task window, contact types, flowMode) are a separate settings JSON, not part of the model or of modelSha. Static project files are in `src/compiler/template/` (copied to `dist/` by `npm run build`). `npm run compile:demo` runs the real cht-conf 6.6.1 against the output; it is not part of `npm test`.
+
+### Question flow (which questions the form asks)
+
+The form shows one question per screen. By default it asks only the questions whose answer can still change the outcome. `deriveFlow` (src/logic/flow.ts) works this out from the rule table at compile time. The flow is not part of the signed model. It is a deterministic artefact: anyone can rebuild it from modelSha, the flow mode and `FLOW_DERIVATION_VERSION` (currently `flow-2-is_no`). Its conditions use a flow-only type, `FlowCondition`. This type has the model's atoms plus `is_no`, which is true only when the answer is no; a blank answer never counts as no. It also has the constant `"never"`. The model's own condition vocabulary (is_yes, at_least, less_than, all, any) is unchanged. The compiler emits `is_no` as `${f} = 'no'` (never `not()`) and `"never"` as `false()`. Each question row and its page group get the authored shown_when AND the flow condition, so a skipped question's screen disappears.
+
+`settings.flowMode` picks the flow, and the clinician chooses it:
+
+- `minimal` (default): only the questions that can still change the outcome. On the v1 grid this averages 3.19 questions instead of 8.92.
+- `danger_signs_always`: like minimal, but every danger-sign question is always asked (8.20).
+- `full`: the authored shown_when only, as before (8.92).
+
+The minimal flow never asks danger-sign questions of a child outside 2 to 59 months, because the outcome is already decided. For example, a 1-month-old with convulsions is referred without anyone asking about convulsions. That is the Q2 hazard, and minimal makes it silent. `danger_signs_always` exists for this reason.
+
+Before emitting, `compileSnapshot` runs `verifyFlow` on every point of the exact answer grid. The short form must give the same outcome as answering every question. Any mismatch is refused with a `CompileError`, and so is a flow too large to derive (`flowLimits`). The manifest (`flow`), the project README and `sourcemap.json` record flowMode, the derivation version, the flow stats and the average question counts. The sourcemap marks question rows that carry a flow condition with `flowCondition`. The saved answer of a skipped question is blank.
 
 ## Environment variables
 
