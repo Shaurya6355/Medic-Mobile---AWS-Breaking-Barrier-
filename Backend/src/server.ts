@@ -125,7 +125,8 @@ export async function createApp(cfg: Config = defaults, builder: LogicModelBuild
 
   const server = createServer((req, res) => {
     const origin = req.headers.origin;
-    if (origin && cfg.corsOrigins.includes(origin)) {
+    const allowed = cfg.corsOrigins === "localhost" ? /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin ?? "") : cfg.corsOrigins.includes(origin ?? "");
+    if (origin && allowed) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Vary", "Origin");
       res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");

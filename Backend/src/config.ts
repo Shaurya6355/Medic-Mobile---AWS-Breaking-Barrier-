@@ -13,7 +13,8 @@ export const config = {
   region: process.env.AWS_REGION ?? "us-west-2",
   /** Base URL the browser uses to reach this server (for local presigned upload URLs). */
   publicUrl: process.env.PUBLIC_URL ?? `http://localhost:${port}`,
-  corsOrigins: (process.env.CORS_ORIGINS ?? "http://localhost:5173,http://localhost:5174").split(",").map(s => s.trim()),
+  /** Browser origins allowed to call the API. Unset: any http://localhost or 127.0.0.1 port (local dev; Vite moves port when one is busy). */
+  corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(",").map(s => s.trim()) : "localhost" as const,
   maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES ?? 50 * 1024 * 1024),
   presignSeconds: 15 * 60,
   pollMs: Number(process.env.WORKER_POLL_MS ?? 500),

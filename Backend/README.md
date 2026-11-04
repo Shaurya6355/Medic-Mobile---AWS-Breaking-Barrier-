@@ -11,7 +11,7 @@ Node 22.18 or later (runs TypeScript directly, no build step).
     cd Backend && npm install && npm run dev     # http://localhost:8787
     cd Frontend && npm run dev                   # uses VITE_API_URL from Frontend/.env.local
 
-`Frontend/.env.local` holds `VITE_API_URL=http://localhost:8787`. Remove it to go back to sample data.
+`Frontend/.env.local` holds `VITE_API_URL=http://localhost:8787`. Remove it to go back to sample data. The API accepts any localhost port by default (Vite moves to 5174, 5175... when a port is busy); set `CORS_ORIGINS` to restrict it.
 
 Sample file to upload: `samples/cough-guideline-sample.pdf` (synthetic; regenerate with `npm run sample-pdf`).
 
