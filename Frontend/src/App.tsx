@@ -49,7 +49,7 @@ export default function App() {
     apply: (msgId, i) => { if (w) run(api.applyProposal(w.id, msgId, i)); },
     dismiss: msgId => { if (w) run(api.dismissProposal(w.id, msgId)); },
     answer: (flagId, choice) => { if (w) run(api.answer(w.id, flagId, choice)); },
-    approveAll: () => { if (w) run(api.approve(w.id), () => nav("/release")); },
+    approveAll: async () => { if (w) await run(api.approve(w.id), () => nav("/release")); },
     runVerify: () => { if (w) run(api.runVerify(w.id)); },
     approveDeploy: () => { if (w) run(api.approveDeploy(w.id)); },
     setRole,
