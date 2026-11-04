@@ -22,6 +22,7 @@ interface InputPage {
   image: string;
 }
 interface InputDoc {
+  doc_sha256?: unknown;
   page_count: number;
   pages: InputPage[];
   [k: string]: unknown;
@@ -75,6 +76,12 @@ export function createIngestStep(opts: { pythonBin: string; scriptPath: string; 
         await opts.exec(opts.pythonBin, [opts.scriptPath, pdfPath, outDir]);
 
         const doc = JSON.parse(await readFile(path.join(outDir, "input_blocks.json"), "utf8")) as InputDoc;
+
+        // Record the document hash once; a retry finds it already set.
+        if (!ctx.run.docSha256 && typeof doc.doc_sha256 === "string" && doc.doc_sha256 !== "") {
+          const stored = await ctx.store.getRun(runId);
+          if (stored && !stored.docSha256) await ctx.store.updateRun(runId, { docSha256: doc.doc_sha256 });
+        }
 
         if (selected) {
           const outOfRange = selected.filter((n) => n < 1 || n > doc.page_count);

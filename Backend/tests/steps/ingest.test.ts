@@ -48,18 +48,26 @@ function fakeExec(
 }
 const pngFor = (i: number) => new Uint8Array([...PNG, i % 256]);
 
-async function setup(pages?: number[], hasPdf = true) {
+async function setup(pages?: number[], hasPdf = true, docSha256?: string) {
   const artifacts = new MemoryArtifactStore();
   if (hasPdf) await artifacts.put(inputPdfKey("r1"), new Uint8Array([37, 80, 68, 70]));
-  const run = { runId: "r1", state: "ingesting" as const, createdAt: 0, ...(pages ? { pages } : {}) };
+  const run = {
+    runId: "r1",
+    state: "ingesting" as const,
+    createdAt: 0,
+    ...(pages ? { pages } : {}),
+    ...(docSha256 ? { docSha256 } : {}),
+  };
+  const store = new MemoryStore();
+  await store.createRun(run);
   const ctx: StepContext = {
     run,
-    store: new MemoryStore(),
+    store,
     artifacts,
     model: {} as ModelClient,
     now: () => 0,
   };
-  return { ctx, artifacts };
+  return { ctx, artifacts, store };
 }
 
 describe("ingest step", () => {
@@ -101,6 +109,23 @@ describe("ingest step", () => {
     expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-04.png"))).toBe(true);
     expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-01.png"))).toBe(false);
     expect(await artifacts.exists(artifactKey("r1", "ingest", "pages", "page-03.png"))).toBe(false);
+  });
+
+  it("records the document hash on the run when it has none", async () => {
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(1) });
+    const { ctx, store } = await setup();
+    await step.run(ctx);
+    expect((await store.getRun("r1"))!.docSha256).toBe("abc");
+    // Idempotent on retry.
+    await step.run(ctx);
+    expect((await store.getRun("r1"))!).toMatchObject({ docSha256: "abc", state: "ingesting" });
+  });
+
+  it("leaves an existing document hash alone", async () => {
+    const step = createIngestStep({ pythonBin: "py", scriptPath: "s.py", exec: fakeExec(1) });
+    const { ctx, store } = await setup(undefined, true, "from-event");
+    await step.run(ctx);
+    expect((await store.getRun("r1"))!.docSha256).toBe("from-event");
   });
 
   it("finds pdftoppm images with 1-digit names (fewer than 10 pages)", async () => {
