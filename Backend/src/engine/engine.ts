@@ -8,6 +8,12 @@ import type { Store } from "../store/store.js";
 import { runStep, type RunStepOptions } from "./runner.js";
 import type { Step } from "./step.js";
 
+const MAX_ERROR_CHARS = 500;
+
+function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 export interface OrchestratorOptions {
   store: Store;
   artifacts: ArtifactStore;
@@ -63,7 +69,9 @@ export class Orchestrator {
   }
 
   async advance(runId: string): Promise<void> {
-    if (!(await this.store.acquireLease(runId, this.owner, this.leaseMs, this.now()))) return;
+    if (!(await this.renewLease(runId))) return;
+    let threw = false;
+    let current: Step | undefined;
     try {
       let run = await this.mustGet(runId);
       if (run.state === "created") {
@@ -76,6 +84,9 @@ export class Orchestrator {
         const index = this.steps.findIndex((s) => s.runState === run.state);
         if (index === -1) return;
         const step = this.steps[index]!;
+        current = step;
+        // Another owner may have taken the run after our lease lapsed: stop quietly.
+        if (!(await this.renewLease(runId))) return;
 
         const records = (await this.store.listSteps(runId)).filter((r) => r.step === step.name);
         // A succeeded record means the step's outputs already exist; skip it.
@@ -90,6 +101,7 @@ export class Orchestrator {
           const firstAttempt = records.reduce((max, r) => Math.max(max, r.attempt), 0) + 1;
           const ctx = { run, store: this.store, artifacts: this.artifacts, model: this.model, now: this.now };
           const rec = await runStep(step, ctx, { ...this.runnerOpts, firstAttempt });
+          if (!(await this.renewLease(runId))) return;
           if (rec.status === "failed") {
             await this.transition(run, "failed", { currentStep: step.name });
             return;
@@ -98,8 +110,17 @@ export class Orchestrator {
 
         run = await this.transition(run, this.steps[index + 1]?.runState ?? "in_review");
       }
+    } catch (e) {
+      threw = true;
+      await this.failAfterError(runId, current);
+      throw e;
     } finally {
-      await this.store.updateRun(runId, { lease: undefined });
+      try {
+        await this.store.releaseLease(runId, this.owner);
+      } catch (releaseError) {
+        // Never mask an error from the body.
+        if (!threw) throw releaseError;
+      }
     }
   }
 
@@ -113,9 +134,42 @@ export class Orchestrator {
     await this.advance(runId);
   }
 
+  // Never throws for a single run's failure: records resume_error on it and moves on.
   async resumeAll(): Promise<void> {
     for (const run of await this.store.listResumable(this.now())) {
-      await this.advance(run.runId);
+      try {
+        await this.advance(run.runId);
+      } catch (e) {
+        try {
+          await this.store.appendAudit(run.runId, {
+            at: this.now(),
+            type: "resume_error",
+            detail: { error: errorText(e).slice(0, MAX_ERROR_CHARS) },
+          });
+        } catch {
+          // Best effort only.
+        }
+      }
+    }
+  }
+
+  private renewLease(runId: string): Promise<boolean> {
+    return this.store.acquireLease(runId, this.owner, this.leaseMs, this.now());
+  }
+
+  // Best effort after an unexpected error: if we still hold the run, move it to
+  // failed so it does not sit in a working state forever. Errors here are dropped;
+  // the caller rethrows the original.
+  private async failAfterError(runId: string, current: Step | undefined): Promise<void> {
+    try {
+      if (!(await this.renewLease(runId))) return;
+      const run = await this.mustGet(runId);
+      // A created run is left as is: a redelivered upload event retries it.
+      if (run.state === "failed" || run.state === "created" || !canTransition(run.state, "failed")) return;
+      const step = this.steps.find((s) => s.runState === run.state) ?? current;
+      await this.transition(run, "failed", { currentStep: step?.name });
+    } catch {
+      // Best effort only.
     }
   }
 

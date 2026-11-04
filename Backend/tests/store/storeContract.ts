@@ -137,6 +137,20 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
       await expect(s.acquireLease("missing", "a", 1, 1)).rejects.toThrow();
     });
 
+    it("releaseLease: owner release frees the run at once; non-owner release is a no-op", async () => {
+      const s = await makeStore();
+      await s.createRun(run("r1"));
+      await s.acquireLease("r1", "a", 1000, 1000);
+      await s.releaseLease("r1", "b");
+      expect((await s.getRun("r1"))!.lease).toEqual({ owner: "a", expiresAt: 2000 });
+      expect(await s.acquireLease("r1", "b", 100, 1100)).toBe(false);
+      await s.releaseLease("r1", "a");
+      expect((await s.getRun("r1"))!.lease).toBeUndefined();
+      expect(await s.acquireLease("r1", "b", 100, 1100)).toBe(true);
+      await s.releaseLease("missing", "a");
+      expect(await s.getRun("missing")).toBeUndefined();
+    });
+
     it("listResumable: work states without a live lease only", async () => {
       const s = await makeStore();
       await s.createRun(run("created", { state: "created" }));

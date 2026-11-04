@@ -105,6 +105,11 @@ export class MemoryStore implements Store {
     return true;
   }
 
+  async releaseLease(runId: string, owner: string): Promise<void> {
+    const run = this.runs.get(runId);
+    if (run?.lease?.owner === owner) delete run.lease;
+  }
+
   async listResumable(now: number): Promise<Run[]> {
     const out = [...this.runs.values()].filter(
       (r) => WORK_STATES.includes(r.state) && (!r.lease || r.lease.expiresAt <= now),

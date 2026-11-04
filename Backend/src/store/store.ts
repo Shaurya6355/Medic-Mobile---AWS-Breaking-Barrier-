@@ -37,5 +37,7 @@ export interface Store {
   appendAudit(runId: string, event: AuditEvent): Promise<void>;
   listAudit(runId: string): Promise<AuditEvent[]>;
   acquireLease(runId: string, owner: string, ttlMs: number, now: number): Promise<boolean>;
+  // Clears the lease only if owner holds it; otherwise (or for an unknown run) a no-op.
+  releaseLease(runId: string, owner: string): Promise<void>;
   listResumable(now: number): Promise<Run[]>;
 }

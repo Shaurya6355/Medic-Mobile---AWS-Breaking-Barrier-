@@ -5,6 +5,7 @@ import { Orchestrator } from "../../src/engine/engine.js";
 import { TransientError, type Step, type StepResult } from "../../src/engine/step.js";
 import type { ModelClient } from "../../src/model/modelClient.js";
 import { MemoryStore } from "../../src/store/memoryStore.js";
+import type { Store } from "../../src/store/store.js";
 
 const LEASE_MS = 60_000;
 
@@ -32,7 +33,7 @@ function flow(overrides: Partial<Record<"ingest" | "extract" | "fill_logic", Arr
   ];
 }
 
-function setup(steps: Step[], opts: { store?: MemoryStore; owner?: string; clock?: { t: number } } = {}) {
+function setup(steps: Step[], opts: { store?: Store; owner?: string; clock?: { t: number } } = {}) {
   const store = opts.store ?? new MemoryStore();
   const clock = opts.clock ?? { t: 1000 };
   const sleeps: number[] = [];
@@ -286,4 +287,132 @@ describe("Orchestrator", () => {
     expect((await store.getRun(run.runId))!.state).toBe("in_review");
     expect(stepsA.map((s) => s.calls)).toEqual([1, 1, 1]);
   });
+  it("stops when the lease is taken by another owner mid-run and leaves that lease alone", async () => {
+    const store = new MemoryStore();
+    let runId = "";
+    const steps = flow({
+      extract: [
+        async () => {
+          // Our lease lapsed and another owner took the run while this step ran.
+          await store.updateRun(runId, { lease: { owner: "B", expiresAt: 10_000_000 } });
+          return { artifactRefs: {} };
+        },
+      ],
+    });
+    const { orch } = setup(steps, { store, owner: "A" });
+    runId = (await orch.createRun(undefined, "doc.pdf")).runId;
+    await orch.onUploaded(runId);
+
+    const after = (await store.getRun(runId))!;
+    expect(after.state).toBe("extracting");
+    expect(after.lease).toEqual({ owner: "B", expiresAt: 10_000_000 });
+    expect(steps.map((s) => s.calls)).toEqual([1, 1, 0]);
+  });
+
+  it("renews the lease before each step", async () => {
+    const store = new MemoryStore();
+    const clock = { t: 1000 };
+    const expiries: number[] = [];
+    let runId = "";
+    const record = async () => {
+      expiries.push((await store.getRun(runId))!.lease!.expiresAt);
+      clock.t += LEASE_MS; // each step takes a whole lease period
+      return { artifactRefs: {} };
+    };
+    const steps = flow({ ingest: [record], extract: [record], fill_logic: [record] });
+    const { orch } = setup(steps, { store, clock });
+    runId = (await orch.createRun(undefined, "doc.pdf")).runId;
+    await orch.onUploaded(runId);
+    expect((await store.getRun(runId))!.state).toBe("in_review");
+    expect(expiries).toHaveLength(3);
+    expect(expiries[1]! - expiries[0]!).toBeGreaterThanOrEqual(LEASE_MS);
+    expect(expiries[2]! - expiries[1]!).toBeGreaterThanOrEqual(LEASE_MS);
+  });
+
+  it("a store error mid-run fails the run with currentStep, rethrows, and resume completes it", async () => {
+    const inner = new MemoryStore();
+    let failOnce = true;
+    const store = wrap(inner, {
+      async updateStep(runId, step, attempt, patch) {
+        if (step === "extract" && failOnce) {
+          failOnce = false;
+          throw new Error("store down");
+        }
+        return inner.updateStep(runId, step, attempt, patch);
+      },
+    });
+    const steps = flow();
+    const { orch } = setup(steps, { store });
+    const run = await orch.createRun(undefined, "doc.pdf");
+    await expect(orch.onUploaded(run.runId)).rejects.toThrow("store down");
+
+    let after = (await inner.getRun(run.runId))!;
+    expect(after).toMatchObject({ state: "failed", currentStep: "extract" });
+    expect(after.lease).toBeUndefined();
+
+    await orch.resume(run.runId);
+    after = (await inner.getRun(run.runId))!;
+    expect(after.state).toBe("in_review");
+    expect(steps.map((s) => s.calls)).toEqual([1, 2, 1]);
+    const extracts = (await inner.listSteps(run.runId)).filter((r) => r.step === "extract");
+    expect(extracts.map((r) => [r.attempt, r.status, r.error])).toEqual([
+      [1, "failed", "abandoned"],
+      [2, "succeeded", undefined],
+    ]);
+  });
+
+  it("a release error does not mask the original error", async () => {
+    const inner = new MemoryStore();
+    const store = wrap(inner, {
+      async listSteps() {
+        throw new Error("original");
+      },
+      async releaseLease() {
+        throw new Error("release failed");
+      },
+    });
+    const { orch } = setup(flow(), { store });
+    const run = await orch.createRun(undefined, "doc.pdf");
+    await expect(orch.onUploaded(run.runId)).rejects.toThrow("original");
+  });
+
+  it("resumeAll continues past a poisoned run and records resume_error on it", async () => {
+    const inner = new MemoryStore();
+    await inner.createRun({ runId: "bad", state: "extracting", createdAt: 0 });
+    await inner.createRun({ runId: "good", state: "extracting", createdAt: 0 });
+    await inner.createRun({ runId: "mute", state: "extracting", createdAt: 0 });
+    const store = wrap(inner, {
+      async listSteps(runId) {
+        if (runId !== "good") throw new Error("poison ".repeat(200));
+        return inner.listSteps(runId);
+      },
+      async appendAudit(runId, event) {
+        if (runId === "mute") throw new Error("audit down");
+        return inner.appendAudit(runId, event);
+      },
+    });
+    const steps = flow();
+    const { orch } = setup(steps, { store });
+    await expect(orch.resumeAll()).resolves.toBeUndefined();
+
+    expect((await inner.getRun("good"))!.state).toBe("in_review");
+    expect(await inner.getRun("bad")).toMatchObject({ state: "failed", currentStep: "extract" });
+    const errors = (await inner.listAudit("bad")).filter((e) => e.type === "resume_error");
+    expect(errors).toHaveLength(1);
+    const detail = errors[0]!.detail as { error: string };
+    expect(detail.error.startsWith("poison")).toBe(true);
+    expect(detail.error.length).toBeLessThanOrEqual(500);
+  });
 });
+
+// Delegates every Store method to inner except the overrides.
+function wrap(inner: MemoryStore, overrides: Partial<Store>): Store {
+  return new Proxy(inner, {
+    get(target, prop, receiver) {
+      const o = (overrides as Record<string | symbol, unknown>)[prop];
+      if (o) return o;
+      const v = Reflect.get(target, prop, receiver);
+      return typeof v === "function" ? v.bind(target) : v;
+    },
+  }) as Store;
+}

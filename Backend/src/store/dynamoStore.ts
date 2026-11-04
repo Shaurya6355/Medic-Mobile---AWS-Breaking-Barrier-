@@ -342,6 +342,24 @@ export class DynamoStore implements Store {
     }
   }
 
+  async releaseLease(runId: string, owner: string): Promise<void> {
+    try {
+      await this.doc.send(
+        new UpdateCommand({
+          TableName: this.tables.runs,
+          Key: { runId },
+          UpdateExpression: "REMOVE #lease",
+          // Fails (no-op) when another owner holds the lease, there is none, or the run is unknown.
+          ConditionExpression: "#lease.#owner = :owner",
+          ExpressionAttributeNames: { "#lease": "lease", "#owner": "owner" },
+          ExpressionAttributeValues: { ":owner": owner },
+        }),
+      );
+    } catch (e) {
+      if (!isConditionFailure(e)) throw e;
+    }
+  }
+
   async listResumable(now: number): Promise<Run[]> {
     const names: Record<string, string> = { "#state": "state", "#lease": "lease" };
     const values: Record<string, unknown> = { ":now": now };

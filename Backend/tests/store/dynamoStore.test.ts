@@ -134,6 +134,22 @@ describe("DynamoStore command shapes", () => {
     await expect(make().acquireLease("r1", "b", 100, 1000)).rejects.toThrow(/not found/i);
   });
 
+  it("releaseLease removes the lease only for its owner and ignores condition failures", async () => {
+    mock.on(UpdateCommand).resolves({});
+    await make().releaseLease("r1", "a");
+    const input = mock.commandCalls(UpdateCommand)[0]!.args[0].input;
+    expect(input.TableName).toBe("T-runs");
+    expect(input.Key).toEqual({ runId: "r1" });
+    expect(input.UpdateExpression).toBe("REMOVE #lease");
+    expect(input.ConditionExpression).toBe("#lease.#owner = :owner");
+    expect(input.ExpressionAttributeNames).toEqual({ "#lease": "lease", "#owner": "owner" });
+    expect(input.ExpressionAttributeValues).toEqual({ ":owner": "a" });
+    mock.on(UpdateCommand).rejects(ccf());
+    await expect(make().releaseLease("r1", "b")).resolves.toBeUndefined();
+    mock.on(UpdateCommand).rejects(new Error("network"));
+    await expect(make().releaseLease("r1", "a")).rejects.toThrow("network");
+  });
+
   it("appendAudit puts with a unique, ordered sort key and a not-exists condition", async () => {
     mock.on(PutCommand).resolves({});
     const s = make();
