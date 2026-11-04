@@ -1,19 +1,8 @@
 // End-to-end compile demo: logic model fixture -> compileSnapshot (preview) -> real cht-conf.
 // Run from Backend/:  npm run compile:demo   (runs this file with tsx so it can import the TS sources)
 // Writes everything under compile-demo/output/ (see compile-demo/README.md).
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +12,8 @@ import { readSheets } from "../src/compiler/xlsx.js";
 import { buildForm, SURVEY_COLUMNS, SURVEY_HEADERS } from "../src/compiler/form.js";
 import { FLOW_MODES } from "../src/compiler/types.js";
 import { writeFlowOutputs } from "./flow-outputs.mjs";
+// The cht-conf driver is shared with scripts/compileLocked.ts and the pipeline demo (one copy).
+import { ASSUMED_CHT_VERSION, chtConfVersion, chtToolsInstalled, installChtTools, runChtConf } from "./chtConf.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BACKEND = resolve(HERE, "..");
@@ -31,9 +22,6 @@ const OUT = join(HERE, "output");
 const PROJECT = join(OUT, "project");
 const LOGS = join(OUT, "logs");
 const TOOLS = join(HERE, "tools");
-const CHT = join(TOOLS, "node_modules", ".bin", "cht");
-const ZIPAPP = join(TOOLS, "node_modules", "cht-conf", "bin", "xls2xform-medic");
-const SHIM = join(TOOLS, ".pyshim");
 const FIXTURE = join(BACKEND, "tests", "fixtures", "logic", "v1.json");
 const SETTINGS = join(HERE, "settings.demo.json");
 const GOLDEN = join(BACKEND, "tests", "fixtures", "logic", "golden-proposed.json");
@@ -45,10 +33,6 @@ if (flowArg !== undefined && !FLOW_MODES.includes(flowArg)) {
   process.stdout.write(`unknown --flow=${flowArg}; use one of ${FLOW_MODES.join(", ")}\n`);
   process.exit(2);
 }
-/** CHT version assumed for the offline run of validations cht-conf skips without an instance
- *  (deprecated-appearance, deprecated-tel-type): the version of the local cht-core checkout. */
-const ASSUMED_CHT_VERSION = "5.3.0";
-const CHT_STEPS = ["convert-app-forms", "validate-app-forms", "compile-app-settings"];
 
 const sha256 = (b) => createHash("sha256").update(b).digest("hex");
 const stripAnsi = (s) => s.replace(/\u001b\[[0-9;]*m/g, "");
@@ -65,15 +49,14 @@ function log(msg) {
 }
 
 // ---------------------------------------------------------------- 0. tools
-if (!existsSync(CHT)) {
+if (!chtToolsInstalled(TOOLS)) {
   log("cht-conf not installed in compile-demo/tools; installing (npm install, pinned cht-conf@6.6.1)...");
-  const r = spawnSync("npm", ["install", "--no-audit", "--no-fund"], { cwd: TOOLS, stdio: "inherit" });
-  if (r.status !== 0) {
+  if (!installChtTools(TOOLS)) {
     log("npm install failed in compile-demo/tools");
     process.exit(1);
   }
 }
-const chtVersion = JSON.parse(readFileSync(join(TOOLS, "node_modules", "cht-conf", "package.json"), "utf8")).version;
+const chtVersion = chtConfVersion(TOOLS);
 
 const keptVerify = join(tmpRoot, "verify-modes");
 if (existsSync(VERIFY_MODES)) cpSync(VERIFY_MODES, keptVerify, { recursive: true });
@@ -122,115 +105,18 @@ const sheetsB = await readSheets(readFileSync(join(tmpRoot, "second", xlsxPath))
 const sheetsEqual = JSON.stringify(sheetsA) === JSON.stringify(sheetsB);
 log(`determinism: ${mismatches.length === 0 ? "all file sha256 identical" : `${mismatches.length} mismatches`}; sheet contents ${sheetsEqual ? "identical" : "DIFFER"}`);
 
-// ---------------------------------------------------------------- 3. python for xls2xform-medic
-function which(cmd) {
-  const r = spawnSync("/bin/sh", ["-c", `command -v ${cmd}`], { encoding: "utf8" });
-  return r.status === 0 ? r.stdout.trim() : null;
-}
-const candidates = [];
-if (process.env.CHT_PYTHON) candidates.push(process.env.CHT_PYTHON);
-for (const c of ["python3", "python3.13", "python3.12", "python3.11", "python3.10"]) {
-  const p = which(c);
-  if (p && !candidates.includes(p)) candidates.push(p);
-}
-const probes = [];
-let python = null;
-for (const p of candidates) {
-  const v = spawnSync(p, ["--version"], { encoding: "utf8" });
-  const version = (v.stdout || v.stderr || "").trim();
-  const out = join(tmpRoot, `probe-${probes.length}.xml`);
-  const r = spawnSync(p, [ZIPAPP, "--skip_validate", "--json", join(PROJECT, xlsxPath), out], { encoding: "utf8" });
-  let ok = false;
-  let detail = "";
-  try {
-    // like cht-conf's exec-promise: the JSON result comes on stdout, or on stderr when stdout is empty
-    const last = (r.stdout || r.stderr || "").trim().split("\n").filter(Boolean).at(-1) ?? "";
-    const j = JSON.parse(last);
-    ok = j.code === 100 || j.code === 101;
-    detail = j.message ?? "";
-  } catch {
-    detail = ((r.stderr || "").trim().split("\n").at(-1) ?? "").slice(0, 200);
-  }
-  probes.push({ python: p, version, ok, detail });
-  log(`python probe ${p} (${version}): ${ok ? "OK" : `FAIL ${detail}`}`);
-  if (ok) {
-    python = p;
-    break;
-  }
-}
-
-// cht-conf runs bin/xls2xform-medic through its "#!/usr/bin/env python3" shebang. Least invasive
-// fix: a private directory holding a python3 symlink to the working interpreter, put first on
-// PATH for the cht-conf child processes only. Nothing global changes.
-rmSync(SHIM, { recursive: true, force: true });
-mkdirSync(SHIM, { recursive: true });
-if (python) symlinkSync(python, join(SHIM, "python3"));
-const childEnv = { ...process.env, PATH: `${SHIM}:${process.env.PATH ?? ""}`, FORCE_COLOR: "0" };
-
-// cht-conf 6.6.1 runs `${XLS2XFORM} --skip_validate ...` through /bin/sh without escaping the path of its own
-// bin/xls2xform-medic (convert-forms/index.js); it only escapes the form paths. When the tools folder path
-// contains whitespace (this repo lives under "vs code/"), the shell splits it. Workaround: reach cht-conf
-// through a whitespace-free symlink and start node with --preserve-symlinks(-main) so __dirname, and hence
-// the XLS2XFORM path, keeps the symlinked spelling. No file of cht-conf is modified.
-let chtLauncher = [join(TOOLS, "node_modules", "cht-conf", "src", "bin", "index.js")];
-let usedSymlink = null;
-if (/\s/.test(TOOLS)) {
-  usedSymlink = join(tmpRoot, "cht-tools");
-  if (/\s/.test(usedSymlink)) throw new Error(`temp dir has whitespace too: ${usedSymlink}`);
-  symlinkSync(TOOLS, usedSymlink);
-  chtLauncher = ["--preserve-symlinks", "--preserve-symlinks-main", join(usedSymlink, "node_modules", "cht-conf", "src", "bin", "index.js")];
-}
-log(`cht-conf launcher: node ${sanitize(chtLauncher.join(" "))}`);
-
-// ---------------------------------------------------------------- 4. cht-conf steps
-const steps = [];
-let failed = !python;
-for (const [i, action] of CHT_STEPS.entries()) {
-  const args = [`--source=${PROJECT}`, "--skip-dependency-check", "--skip-version-check", "--skip-git-check", action];
-  const logFile = join(LOGS, `${i + 1}-${action}.log`);
-  if (failed) {
-    writeFileSync(logFile, "skipped: an earlier step failed\n");
-    steps.push({ action, status: "skipped", exit: null, log: logFile, errors: [], warnings: [] });
-    continue;
-  }
-  const t0 = Date.now();
-  const r = spawnSync(process.execPath, [...chtLauncher, ...args], { cwd: PROJECT, env: childEnv, encoding: "utf8" });
-  const text = sanitize(
-    `$ cht ${args.map((a) => (a.includes(" ") ? `'${a}'` : a)).join(" ")}\n# exit ${r.status} in ${Date.now() - t0} ms\n` +
-      `# ---- stdout\n${r.stdout ?? ""}\n# ---- stderr\n${r.stderr ?? ""}`,
-  );
-  writeFileSync(logFile, text);
-  const lines = text.split("\n");
-  const errors = lines.filter((l) => /\bERROR\b/.test(l));
-  const warnings = lines.filter((l) => /\bWARN\b/.test(l));
-  const pass = r.status === 0 && errors.length === 0;
-  steps.push({ action, status: pass ? "pass" : "fail", exit: r.status, log: logFile, errors, warnings });
-  log(`cht ${action}: ${pass ? "PASS" : "FAIL"} (exit ${r.status}, ${errors.length} errors, ${warnings.length} warnings)`);
-  if (!pass) failed = true;
-}
-
-// ---------------------------------------------------------------- 5. offline run of instance-only validations
+// ---------------------------------------------------------------- 3-5. cht-conf (compile-demo/chtConf.ts)
+// Python probe and shim, whitespace-safe launcher, the three cht-conf steps, then the offline run of the
+// instance-only validations. See compile-demo/README.md ("How Python is chosen", "Paths with spaces").
 const xmlRel = `forms/app/${manifest.formId}.xml`;
 const xmlAbs = join(PROJECT, xmlRel);
-const extra = [];
-if (existsSync(xmlAbs)) {
-  const { createRequire } = await import("node:module");
-  const req = createRequire(join(TOOLS, "node_modules", "cht-conf", "package.json"));
-  const { DOMParser } = req("@xmldom/xmldom");
-  const xmlStr = readFileSync(xmlAbs, "utf8");
-  const xmlDoc = new DOMParser().parseFromString(xmlStr);
-  for (const name of ["deprecated-appearance", "deprecated-tel-type"]) {
-    const v = req(`./src/lib/validation/form/${name}.js`);
-    const res = await v.execute({ xformPath: rel(xmlAbs), xmlStr, xmlDoc, apiVersion: ASSUMED_CHT_VERSION, propsData: {} });
-    extra.push({ name, errors: res.errors ?? [], warnings: res.warnings ?? [] });
-  }
-  writeFileSync(
-    join(LOGS, "4-offline-instance-validations.log"),
-    `# cht-conf validations that need a CHT instance, run directly with apiVersion ${ASSUMED_CHT_VERSION} (assumed)\n` +
-      extra.map((e) => `${e.name}: errors=${JSON.stringify(e.errors)} warnings=${JSON.stringify(e.warnings)}`).join("\n") +
-      "\n# can-generate-xform needs the CHT API (forms validate endpoint) and was NOT run.\n",
-  );
-}
+const cht = await runChtConf({ projectDir: PROJECT, logsDir: LOGS, formId: manifest.formId, tmpRoot, sanitize, log, tools: TOOLS });
+const python = cht.python.chosen;
+const probes = cht.python.probes;
+const chtLauncher = cht.launcher.args;
+const usedSymlink = cht.launcher.whitespaceSymlink;
+const steps = cht.steps;
+const extra = cht.extraValidations;
 
 // ---------------------------------------------------------------- 6. collect outputs
 const appSettingsAbs = join(PROJECT, "app_settings.json");
@@ -267,7 +153,7 @@ const result = {
   flow: manifest.flow,
   chtConfVersion: chtVersion,
   python: { chosen: python, probes },
-  chtLauncher: { args: chtLauncher.map(sanitize), whitespaceSymlink: usedSymlink ? sanitize(usedSymlink) : null },
+  chtLauncher: { args: chtLauncher, whitespaceSymlink: usedSymlink },
   steps: steps.map((s) => ({ ...s, log: rel(s.log) })),
   extraValidations: extra,
   outputs,

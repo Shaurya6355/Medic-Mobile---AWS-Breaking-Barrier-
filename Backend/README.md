@@ -1,6 +1,6 @@
 # Orchestrator
 
-Backend service that takes an uploaded clinical guideline PDF through a fixed flow (ingest, extract, fill logic), stores every run, step, version, comment and audit event in DynamoDB and S3, and exposes an HTTP API for the UI to create runs, save edited versions, comment and resume. Uploads are detected through an S3 event notification delivered to SQS.
+Backend service that takes an uploaded clinical guideline PDF through a fixed flow (ingest, extract, fill logic, automatic checks), then through sign-off (program officer, then clinician, then lock; DEC-019), stores every run, step, version, comment and audit event in DynamoDB and S3, and exposes an HTTP API for the UI to create runs, save edited versions, comment and resume. Uploads are detected through an S3 event notification delivered to SQS.
 
 ## Develop
 
@@ -12,7 +12,21 @@ npm run build         # emits dist/ (tests excluded)
 npm start             # node dist/index.js
 npm run dev           # tsx watch src/index.ts
 npm run compile:demo  # logic model fixture -> CHT project -> real cht-conf (see compile-demo/README.md)
+npm run pipeline:demo # whole chain with sign-off rules, in memory, FakeModelClient (see "Sign-off" below)
+npm run compile:locked -- --run <id> --version <n> --settings <file> [--out <dir>]  # compile job (DynamoDB + S3)
 ```
+
+## Sign-off (src/signoff, DEC-019)
+
+Humans approve; code enforces BRD AR-01 to AR-10. Run states after fill_logic: `checking` (the `checks` step runs `runChecks` and stores the findings) -> `awaiting_officer` -> `awaiting_clinician` -> `locked`. Every version saved through the API goes back through `checking` to `awaiting_officer` (from any review state, `locked` included), via `onVersionSaved`.
+
+- Findings: one artifact per content, `runs/<id>/checks/<modelSha>.json`, with every finding, the gates and the plain-language view per audience (`findingsFor`). Computed again on demand when missing, so a crash between save and check never lets a version be signed unchecked.
+- Signature record `{runId, n, modelSha, role, userId, signedAt}` appended to the version item by `Store.addSignature`, an atomic conditional write (DynamoDB: a transaction with a ConditionCheck that the version is still the latest). The request names the `modelSha` the signer reviewed; any other sha is refused.
+- Rules: officer first, clinician second (409 `officer_signature_required`); two different people (403 `separation_of_duties`); refused while the role's gate has blocking findings (422 `blocked`, with the blockers in plain words; officer: officer-owned blockers, clinician: clinical blockers including open questions routed to the clinician; an open question is settled by marking it resolved with a written resolution in a new version); only the latest version can be signed (409 `superseded`); a locked version takes no signature (409 `locked`); role in the body must match the endpoint (403 `role_mismatch`). Both signatures on the same sha set `status: "locked"`; a later save is a new version with zero signatures and the locked one stays the releasable one (`latestLocked` in the status view, AR-09).
+- AUTH SEAM: `role` and `userId` come from the request body until Cognito is built (DEC-015). Separation of duties therefore holds only against honest callers for now.
+- Compile guard: `compileSnapshot` with `buildKind: "release"` needs `approval: { snapshotSha, version }` and re-checks the lock evidence (`verifyLock`); `compileLockedVersion` (src/compiler/compileLocked.ts) reads it from the store. Preview builds stay unguarded and are stamped "not approved, not deployable".
+- Compile is NOT a Lambda step (DEC-014). `scripts/compileLocked.ts` is the job for the build host (EC2, not built): it refuses an unlocked version before touching its output folder, builds the release project, runs cht-conf through `compile-demo/chtConf.ts` (shared with compile:demo) and stores the manifest and cht-conf outputs under `runs/<id>/compile/<modelSha>/`. Exit codes 0 pass, 2 usage, 3 refused, 4 cht-conf failed, 5 cht-conf not installed.
+- `npm run pipeline:demo` runs the whole chain with the in-memory store and writes `pipeline-demo/output/` (TRACE.md, findings, summary, the locked version and the compiled project). Its edits come from `tests/helpers/resolveForDemo.ts`, which is TEST-ONLY: its answers to the open questions are placeholders, not clinical decisions. Without `compile-demo/tools` installed the cht-conf part is skipped with a message.
 
 ## CHT compiler (src/compiler)
 
@@ -58,6 +72,10 @@ Before emitting, `compileSnapshot` runs `verifyFlow` on every point of the exact
 | PYTHON_BIN | python3 | Python executable for ingest |
 | INGEST_SCRIPT | extraction/prepare_input.py next to the build | Ingest script path |
 | EXTRACT_PROMPT | extraction/final_prompt.txt next to the build | Extraction system prompt path |
+| FILL_PROMPT | extraction/fill_prompt.txt next to the build | fill_logic (draft) system prompt path |
+| FILL_MODEL_ID | MODEL_ID | Bedrock model for the fill_logic draft. Infra grants Bedrock access to MODEL_ID only, so a different value also needs the IAM policy widened |
+| GOLDEN_CASES_PATH | tests/fixtures/logic/golden-proposed.json (proposed, awaiting Medic; TODO DEC-020) | Golden cases for the checks when the run has no `runs/<id>/inputs/golden_cases.json`. `none` switches them off; a set path that is missing is an error. Missing default (Lambda image): the findings say the test-case check did not run |
+| COMPILE_SETTINGS_PATH | compile-demo/settings.demo.json (TODO DEC-020) | Compile settings for the checks when the run has no `runs/<id>/inputs/compile_settings.json`. Their sha256 is recorded on each signature; a release build must use the same settings |
 | PRICES_JSON | none | JSON map of model ID to `{inPerMTok, outPerMTok}` for cost metrics |
 
 Startup fails with a list of the names of any missing required variables.
@@ -68,7 +86,7 @@ On SIGTERM or SIGINT the process stops polling SQS and the resume sweep, waits u
 
 ## HTTP API
 
-Route names and request/response shapes are defined only in `src/contract/` (`routes.ts`, `schemas.ts`). The API covers creating a run (returning a presigned upload URL), reading a run, saving versions, comments, and resuming a run. See that folder for the exact paths.
+Route names and request/response shapes are defined only in `src/contract/` (`routes.ts`, `schemas.ts`). The API covers creating a run (returning a presigned upload URL), reading a run, saving versions, comments, resuming a run, and sign-off: `GET .../versions/:n/findings[?audience=program_officer|clinician]`, `GET .../versions/:n/status`, `POST .../versions/:n/signatures/:role` with body `{role, userId, modelSha}` (201, or 400/403/404/409/422 as listed under "Sign-off"). See that folder for the exact paths.
 
 ## Docker
 
@@ -122,7 +140,9 @@ Security: there is no authentication on the API yet. `/events` must not be reach
 - Hosting is undecided. Project rules say EC2 containers; the team prefers Strands on AgentCore. See `docs/superpowers/specs/2026-11-03-orchestrator-design.md` (OI-6, OI-7).
 - The lease can lapse during a single very long step, so `LEASE_MS` must exceed the longest step.
 - Ingest kills `prepare_input.py` after 5 minutes (`DEFAULT_EXEC_TIMEOUT_MS` in `src/steps/ingest.ts`; pass `createDefaultExec({ timeoutMs })` to change it). A very long PDF can exceed this; the step then fails non-transiently.
-- The logic model schema is a placeholder (`acceptAnyObjectValidator`); the check steps that run on save are not registered yet.
+- Version bodies (the fill_logic draft and versions saved through the API) are validated with `parseModelValidator` (the logic model schema, `src/logic/schema.ts`); the checks run after fill_logic (`checks` step) and on every save (`onVersionSaved`, synchronously inside the save request).
+- Sign-off has no real identity yet (DEC-015): role and user are taken from the request body. Reject (BR-17, AR-06), urgent marking (RR-02), release to IT and the single-editor lock (BR-10) are not built.
+- fill_logic: the model returns a draft that names extraction items by id and thresholds by index (`src/logic/fill/draftSchema.ts`); `src/logic/fill/resolve.ts` writes every number, operator, quote and the meta, adds the out-of-age-range and catch-all rules (origin team) and lists team choices and every unclear item as open questions. Draft problems get one repair call, then the step fails. The live Bedrock run (`npm run fill:live`, needs AWS credentials) has not been run.
 - The upload queue MUST have a redrive policy with a dead-letter queue and a `maxReceiveCount` (suggested: 5). This is infrastructure the IaC must create; this repo does not. When `onUploaded` throws, the consumer leaves the message on the queue so SQS redelivers it, and without a dead-letter queue a poison message is redelivered forever. A poison message looks like a message that keeps reappearing with the same run ID in the "onUploaded failed" log, for example a stray `runs/<id>/input/guideline.pdf` upload for a run that does not exist, or an event that arrives before the run row is written.
 - A run stuck in `created` (its upload event failed every delivery and went to the dead-letter queue) has no automatic recovery: the resume sweep does not start runs in `created`. Replay the upload event, for example by redriving it from the dead-letter queue, once the cause is fixed.
 - The SQS visibility timeout (default 900 s here) and `LEASE_MS` must BOTH exceed the longest single step. Redelivery of a message whose run is already running or finished is harmless, because the engine ignores a start for a run that is no longer `created`.

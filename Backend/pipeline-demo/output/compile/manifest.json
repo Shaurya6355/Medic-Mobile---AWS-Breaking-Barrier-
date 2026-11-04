@@ -1,0 +1,637 @@
+{
+  "files": [
+    {
+      "path": ".eslintrc",
+      "sha256": "69900468e911f75d4c15ff56b504da43d2d76a7489847e076c6d5cd1868354e7",
+      "bytes": 106
+    },
+    {
+      "path": "README.md",
+      "sha256": "fc9f0079d221a3f7934b5ecec3bd85dbaf2fe2d4295c22b2e1e8859e0518c4d7",
+      "bytes": 2387
+    },
+    {
+      "path": "app_settings/base_settings.json",
+      "sha256": "e2d2dbd149367821f4c64ad15a1ee28ffc8a29b60651208781b4b3aba33b57e5",
+      "bytes": 48
+    },
+    {
+      "path": "contact-summary.templated.js",
+      "sha256": "22b31b3000a60f1f5dda4d0cc8d885fdb081870d3908247ff7e353414a262e6e",
+      "bytes": 63
+    },
+    {
+      "path": "forms/app/cough_fast_breathing.properties.json",
+      "sha256": "341d653852d2d29324f5d8e5f04b658136dd254df33846c4b094aef9579664ea",
+      "bytes": 202
+    },
+    {
+      "path": "forms/app/cough_fast_breathing.xlsx",
+      "sha256": "4f90820d468998c918e2a1f8b9b549850882146d49ca53ffb112cd1cee6ee45c",
+      "bytes": 10664
+    },
+    {
+      "path": "package.json",
+      "sha256": "7da897f481c6ca033b1ac7ba5e5377955688d0f2909d55637318063116c7441c",
+      "bytes": 245
+    },
+    {
+      "path": "sourcemap.json",
+      "sha256": "9909b6594140094d97bfdd66c8a7edc87eb9ea00cbb26995b4ad6e6d14721b46",
+      "bytes": 12811
+    },
+    {
+      "path": "targets.js",
+      "sha256": "4707cce5979ba8f9408b54b0f076b033f630f1d29476e110730be212556a9cae",
+      "bytes": 21
+    },
+    {
+      "path": "tasks.js",
+      "sha256": "7c918ddc075270a9512c7dfe008dea9984dbc95bc9609b3e08ab1b7f68fa5d9c",
+      "bytes": 1752
+    },
+    {
+      "path": "translations/messages-en.properties",
+      "sha256": "869524bf9ac92e18c20cddbf882c1837d003e6b0ef20249ccbc55e3d7d9be61c",
+      "bytes": 140
+    }
+  ],
+  "formId": "cough_fast_breathing",
+  "modelSha": "5e8e1bac61b3328a47fcb80e7e3e72db6fb1b866b056d445143758f18c6ed271",
+  "buildKind": "release",
+  "version": "release-5e8e1bac",
+  "warnings": [
+    "TEAM_DEFAULT_USED: outcomes.treat_fast_breathing_at_home.follow_up.task_window_days_after_due is null; used settings.taskWindowDays = 7 (open question no open question recorded)",
+    "NOT_COMPILED: outcomes.outside_age_range.follow_up: needs a return date (no trigger defined)",
+    "NOT_COMPILED: outcomes.refer_urgent_with_antibiotic.follow_up: needs a return date (no trigger defined)",
+    "NOT_COMPILED: outcomes.refer_urgent.follow_up: needs a return date (no trigger defined)"
+  ],
+  "notCompiled": [
+    {
+      "item": "outcomes.outside_age_range.follow_up",
+      "reason": "needs a return date (no trigger defined)"
+    },
+    {
+      "item": "outcomes.refer_urgent_with_antibiotic.follow_up",
+      "reason": "needs a return date (no trigger defined)"
+    },
+    {
+      "item": "outcomes.refer_urgent.follow_up",
+      "reason": "needs a return date (no trigger defined)"
+    }
+  ],
+  "flow": {
+    "mode": "minimal",
+    "derivationVersion": "flow-2-is_no",
+    "nodes": 105,
+    "leaves": 54,
+    "maxDepth": 9,
+    "questionsAlwaysAsked": [
+      "age_months"
+    ],
+    "questionsSometimesSkipped": [
+      "cough",
+      "cough_days",
+      "convulsions",
+      "not_able_to_drink_or_feed",
+      "vomits_everything",
+      "chest_indrawing",
+      "breaths_per_minute",
+      "unusually_sleepy"
+    ],
+    "neverAsked": [],
+    "points": 6400,
+    "avgQuestions": 3.19125,
+    "avgQuestionsFullForm": 8.92,
+    "treeMismatches": 0,
+    "compiledMismatches": 0,
+    "sequenceDifferences": 0
+  },
+  "sourcemap": {
+    "formId": "cough_fast_breathing",
+    "modelSha": "5e8e1bac61b3328a47fcb80e7e3e72db6fb1b866b056d445143758f18c6ed271",
+    "flowMode": "minimal",
+    "entries": [
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 15,
+          "name": "age_months"
+        },
+        "kind": "question",
+        "item": "age_months",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 3,
+            "quote": "(child age 2 months up to 5 years)"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 18,
+          "name": "cough"
+        },
+        "kind": "question",
+        "item": "cough",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 5,
+            "quote": "Cough? If yes"
+          },
+          {
+            "page": 5,
+            "quote": "Cough? If yes, for how long? ____days"
+          }
+        ],
+        "flowCondition": "minimal"
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 21,
+          "name": "cough_days"
+        },
+        "kind": "question",
+        "item": "cough_days",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 5,
+            "quote": "for how long? ____days"
+          }
+        ],
+        "flowCondition": "minimal"
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 24,
+          "name": "convulsions"
+        },
+        "kind": "question",
+        "item": "convulsions",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 5,
+            "quote": "Convulsions?"
+          },
+          {
+            "page": 6,
+            "quote": "Convulsions"
+          }
+        ],
+        "flowCondition": "minimal"
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 27,
+          "name": "not_able_to_drink_or_feed"
+        },
+        "kind": "question",
+        "item": "not_able_to_drink_or_feed",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 5,
+            "quote": "If yes, not able to drink\nor feed anything?"
+          },
+          {
+            "page": 6,
+            "quote": "Not able to drink or feed any-\nthing"
+          }
+        ],
+        "flowCondition": "minimal"
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 30,
+          "name": "vomits_everything"
+        },
+        "kind": "question",
+        "item": "vomits_everything",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 5,
+            "quote": "If yes, vomits everything?"
+          },
+          {
+            "page": 6,
+            "quote": "Vomits everything"
+          }
+        ],
+        "flowCondition": "minimal"
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 33,
+          "name": "chest_indrawing"
+        },
+        "kind": "question",
+        "item": "chest_indrawing",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 5,
+            "quote": "Chest indrawing?"
+          },
+          {
+            "page": 6,
+            "quote": "Chest indrawing"
+          }
+        ],
+        "flowCondition": "minimal"
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 36,
+          "name": "breaths_per_minute"
+        },
+        "kind": "question",
+        "item": "breaths_per_minute",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 5,
+            "quote": "count breaths in 1 minute: ___ breaths per\nminute (bpm)"
+          },
+          {
+            "page": 5,
+            "quote": "If cough, count breaths in 1 minute: ___ breaths per\nminute (bpm)."
+          }
+        ],
+        "flowCondition": "minimal"
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 39,
+          "name": "unusually_sleepy"
+        },
+        "kind": "question",
+        "item": "unusually_sleepy",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 5,
+            "quote": "Unusually sleepy or unconscious?"
+          },
+          {
+            "page": 6,
+            "quote": "Unusually sleepy\nor unconscious"
+          }
+        ],
+        "flowCondition": "minimal"
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 41,
+          "name": "fast_breathing"
+        },
+        "kind": "derived",
+        "item": "fast_breathing",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 8,
+            "quote": "In a child age 2 months up to 12 months,\n50 breaths or more per minute"
+          },
+          {
+            "page": 8,
+            "quote": "In a child age 12 months up to 5 years,\n40 breaths or more per minute"
+          },
+          {
+            "page": 8,
+            "quote": "Fast breathing:"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 42,
+          "name": "danger_sign"
+        },
+        "kind": "derived",
+        "item": "danger_sign",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 6,
+            "quote": "Cough for 14 days or more"
+          },
+          {
+            "page": 6,
+            "quote": "Any\nDANGER SIGN?"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 43,
+          "name": "outcome"
+        },
+        "kind": "rule",
+        "item": "R1",
+        "origin": "team",
+        "sources": []
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 43,
+          "name": "outcome"
+        },
+        "kind": "rule",
+        "item": "R2",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 7,
+            "quote": "If fast breathing or chest indrawing, give first\ndose of oral antibiotic (amoxycillin tablet—250 mg):"
+          },
+          {
+            "page": 7,
+            "quote": "Age 2 months up to 12 months—1 tablet\nAge 12 months up to 5 years—2 tablets"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 43,
+          "name": "outcome"
+        },
+        "kind": "rule",
+        "item": "R3",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 6,
+            "quote": "Any\nDANGER SIGN?"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 43,
+          "name": "outcome"
+        },
+        "kind": "rule",
+        "item": "R4",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 9,
+            "quote": "If\nFast Breathing"
+          },
+          {
+            "page": 9,
+            "quote": "(pneumonia)"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 43,
+          "name": "outcome"
+        },
+        "kind": "rule",
+        "item": "R5",
+        "origin": "team",
+        "sources": []
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 43,
+          "name": "outcome"
+        },
+        "kind": "rule",
+        "item": "R6",
+        "origin": "team",
+        "sources": []
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 45,
+          "name": "outcome_outside_age_range"
+        },
+        "kind": "outcome_note",
+        "item": "outside_age_range",
+        "origin": "team",
+        "sources": []
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 46,
+          "name": "outcome_refer_urgent_with_antibiotic"
+        },
+        "kind": "outcome_note",
+        "item": "refer_urgent_with_antibiotic",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 6,
+            "quote": "REFER URGENTLY\nTO HEALTH\nFACILITY"
+          },
+          {
+            "page": 6,
+            "quote": "Begin treatment\nand\nAssist referral"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 47,
+          "name": "outcome_refer_urgent_with_antibiotic_dose_2_1"
+        },
+        "kind": "dose_note",
+        "item": "refer_urgent_with_antibiotic",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 7,
+            "quote": "If fast breathing or chest indrawing, give first\ndose of oral antibiotic (amoxycillin tablet—250 mg):"
+          },
+          {
+            "page": 7,
+            "quote": "Age 2 months up to 12 months—1 tablet\nAge 12 months up to 5 years—2 tablets"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 48,
+          "name": "outcome_refer_urgent_with_antibiotic_dose_2_2"
+        },
+        "kind": "dose_note",
+        "item": "refer_urgent_with_antibiotic",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 7,
+            "quote": "If fast breathing or chest indrawing, give first\ndose of oral antibiotic (amoxycillin tablet—250 mg):"
+          },
+          {
+            "page": 7,
+            "quote": "Age 2 months up to 12 months—1 tablet\nAge 12 months up to 5 years—2 tablets"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 49,
+          "name": "outcome_refer_urgent"
+        },
+        "kind": "outcome_note",
+        "item": "refer_urgent",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 6,
+            "quote": "REFER URGENTLY\nTO HEALTH\nFACILITY"
+          },
+          {
+            "page": 6,
+            "quote": "Begin treatment\nand\nAssist referral"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 50,
+          "name": "outcome_treat_fast_breathing_at_home"
+        },
+        "kind": "outcome_note",
+        "item": "treat_fast_breathing_at_home",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 9,
+            "quote": "If\nFast Breathing"
+          },
+          {
+            "page": 9,
+            "quote": "(pneumonia)"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 51,
+          "name": "outcome_treat_fast_breathing_at_home_dose_2_1"
+        },
+        "kind": "dose_note",
+        "item": "treat_fast_breathing_at_home",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 9,
+            "quote": "Give twice daily for 5 days:\nAge 2 months up to 12 months—1 tablet (total 10 tabs)\nAge 12 months up to 5 years—2 tablets (total 20 tabs)"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 52,
+          "name": "outcome_treat_fast_breathing_at_home_dose_2_2"
+        },
+        "kind": "dose_note",
+        "item": "treat_fast_breathing_at_home",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 9,
+            "quote": "Give twice daily for 5 days:\nAge 2 months up to 12 months—1 tablet (total 10 tabs)\nAge 12 months up to 5 years—2 tablets (total 20 tabs)"
+          }
+        ]
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 53,
+          "name": "outcome_cough_no_fast_breathing"
+        },
+        "kind": "outcome_note",
+        "item": "cough_no_fast_breathing",
+        "origin": "team",
+        "sources": []
+      },
+      {
+        "target": {
+          "file": "forms/app/cough_fast_breathing.xlsx",
+          "sheet": "survey",
+          "row": 54,
+          "name": "outcome_no_cough"
+        },
+        "kind": "outcome_note",
+        "item": "no_cough",
+        "origin": "team",
+        "sources": []
+      },
+      {
+        "target": {
+          "file": "tasks.js",
+          "name": "cough_fast_breathing.treat_fast_breathing_at_home.follow_up"
+        },
+        "kind": "task",
+        "item": "treat_fast_breathing_at_home",
+        "origin": "guideline",
+        "sources": [
+          {
+            "page": 9,
+            "quote": "Follow up child in 3 days."
+          }
+        ]
+      }
+    ]
+  }
+}

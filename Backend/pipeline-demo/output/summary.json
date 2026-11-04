@@ -1,0 +1,89 @@
+{
+  "runId": "pipeline-demo",
+  "finalRunState": "awaiting_officer",
+  "versions": [
+    {
+      "n": 1,
+      "status": "superseded",
+      "modelSha": "a97593f9cdea794ae3a8da1ce90b6b17436749eab4e2c575c5744df88a371b31",
+      "signatures": [],
+      "gates": {
+        "canOfficerSign": false,
+        "canClinicianSign": false,
+        "canCompile": false,
+        "summary": "The program officer cannot sign yet. Still to settle: 7 unanswered open questions. The clinician cannot sign yet: this waits for the program officer's signature, and these are for the clinician: 5 unanswered open questions. The form cannot be built yet: 12 items still block."
+      }
+    },
+    {
+      "n": 2,
+      "status": "superseded",
+      "modelSha": "5f7f001c518e147a9e418c5e83189401ddc75d24144b7e51facb359c7699b6aa",
+      "signatures": [
+        {
+          "runId": "pipeline-demo",
+          "n": 2,
+          "modelSha": "5f7f001c518e147a9e418c5e83189401ddc75d24144b7e51facb359c7699b6aa",
+          "role": "program_officer",
+          "userId": "demo-officer-amara",
+          "signedAt": 1793782835000
+        }
+      ],
+      "gates": {
+        "canOfficerSign": true,
+        "canClinicianSign": false,
+        "canCompile": false,
+        "summary": "The program officer can sign now. The clinician cannot sign yet. Still to settle: 5 unanswered open questions. The form cannot be built yet: 5 items still block."
+      }
+    },
+    {
+      "n": 3,
+      "status": "locked",
+      "modelSha": "5e8e1bac61b3328a47fcb80e7e3e72db6fb1b866b056d445143758f18c6ed271",
+      "signatures": [
+        {
+          "runId": "pipeline-demo",
+          "n": 3,
+          "modelSha": "5e8e1bac61b3328a47fcb80e7e3e72db6fb1b866b056d445143758f18c6ed271",
+          "role": "program_officer",
+          "userId": "demo-officer-amara",
+          "signedAt": 1793782842000
+        },
+        {
+          "runId": "pipeline-demo",
+          "n": 3,
+          "modelSha": "5e8e1bac61b3328a47fcb80e7e3e72db6fb1b866b056d445143758f18c6ed271",
+          "role": "clinician",
+          "userId": "demo-clinician-tomas",
+          "signedAt": 1793782844000
+        }
+      ],
+      "gates": {
+        "canOfficerSign": true,
+        "canClinicianSign": true,
+        "canCompile": true,
+        "summary": "The program officer can sign now. The clinician can sign once the program officer has signed. The form can be built once both have signed."
+      }
+    },
+    {
+      "n": 4,
+      "status": "awaiting_officer",
+      "modelSha": "9f4fddf1fa8e6c7e82c9929a325c4b303e329c84331296e8a9aee362b782b7e2",
+      "signatures": [],
+      "gates": {
+        "canOfficerSign": true,
+        "canClinicianSign": true,
+        "canCompile": true,
+        "summary": "The program officer can sign now. The clinician can sign once the program officer has signed. The form can be built once both have signed."
+      }
+    }
+  ],
+  "compile": {
+    "v3": "pass",
+    "refused": [
+      1,
+      2,
+      4
+    ]
+  },
+  "problems": []
+}

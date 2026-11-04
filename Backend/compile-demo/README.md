@@ -44,7 +44,7 @@ which holds the latest compile:verify summary for each flow mode.
 
 ### How Python is chosen (least invasive)
 
-`run.mjs` probes, in order, `$CHT_PYTHON` (if set), `python3`, `python3.13`, `python3.12`, `python3.11`,
+`run.mjs` (through `chtConf.ts`, the cht-conf driver shared with `scripts/compileLocked.ts` and `npm run pipeline:demo`) probes, in order, `$CHT_PYTHON` (if set), `python3`, `python3.13`, `python3.12`, `python3.11`,
 `python3.10` by actually converting the generated xlsx with the zipapp, and takes the first that works.
 On the development machine that is Homebrew's `/opt/homebrew/bin/python3.13` (3.13.5, already installed;
 nothing was installed). The zipapp's shebang is `#!/usr/bin/env python3`, so the script creates
@@ -56,7 +56,7 @@ file is changed. To force an interpreter: `CHT_PYTHON=/path/to/python3.12 npm ru
 
 cht-conf 6.6.1 runs its own `bin/xls2xform-medic` through `/bin/sh` without quoting that path (it only
 escapes the form paths). This repo lives under `vs code/`, so the call breaks with
-`/bin/sh: ~/vs: No such file or directory`. When the tools path contains whitespace, `run.mjs` reaches
+`/bin/sh: ~/vs: No such file or directory`. When the tools path contains whitespace, `chtConf.ts` reaches
 cht-conf through a whitespace-free symlink in the OS temp dir and starts node with
 `--preserve-symlinks --preserve-symlinks-main`, so cht-conf sees the symlinked path. Removed at the end of the run.
 

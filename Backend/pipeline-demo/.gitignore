@@ -1,0 +1,3 @@
+# cht-conf caches (eslint-webpack-plugin) inside the generated project
+output/compile/project/node_modules/
+node_modules/

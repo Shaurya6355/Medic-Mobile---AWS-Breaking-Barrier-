@@ -14,7 +14,10 @@
     "compile:demo": "tsx compile-demo/run.mjs",
     "compile:preview": "node compile-demo/preview/cli.mjs preview",
     "compile:screenshots": "node compile-demo/preview/cli.mjs screenshots",
-    "compile:verify": "tsx compile-demo/preview/verify-golden.mjs"
+    "compile:verify": "tsx compile-demo/preview/verify-golden.mjs",
+    "fill:live": "tsx scripts/fillLive.ts",
+    "pipeline:demo": "tsx pipeline-demo/run.ts",
+    "compile:locked": "tsx scripts/compileLocked.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agentcore": "^3.1161.0",
