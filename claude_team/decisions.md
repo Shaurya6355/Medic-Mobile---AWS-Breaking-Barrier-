@@ -125,3 +125,12 @@ Other options considered (and why not):
 Revisit if: A pathway needs a different hit policy, numeric derived values, or select-multiple questions.
 Related: INT-004, DEC-006
 
+
+### DEC-008 | Everything reaches the clinician through the PO
+Status: decided
+Date: 2026-11-04
+Decided by: Vishnu Athreya
+Feature or area: Review workflow
+Decision: Open questions marked route_to clinician are flags for the PO first. The clinician sees only what the PO sent. Notes are required only to send something on or to request a change.
+Why: Human asked that nothing go to the clinician directly and that approvals not need a note.
+Related: INT-007

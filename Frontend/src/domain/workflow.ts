@@ -1,25 +1,28 @@
 /* Workflow state machine: none -> po_draft -> clinician -> (po_revise -> clinician)* -> verify -> deploy -> done.
    Every transition is a pure function returning a new Workflow. The api layer persists the result. */
-import { applyPatch, CondSyntaxError, itemOf, mutationScore, parse, print, splitItem, type Path, type Source } from "../../../shared/pathway/index.ts";
+import { applyPatch, CondSyntaxError, itemOf, srcList, mutationScore, parse, print, splitItem, type Path, type Source } from "../../../shared/pathway/index.ts";
 import { DRAFT, V3, clone, fnv, hashOf } from "./data";
-import { allItems, changedVs, classify, getO, getQ, grid, nodeSig, qStatus, runChecks, slots, srcOf, trayIds, usesOf, type Slot } from "./logic";
+import { allItems, clean, changedVs, classify, getO, getQ, grid, nodeSig, qStatus, runChecks, slots, srcOf, trayIds, usesOf, type Slot } from "./logic";
 import type { Check, Decision, FbType, Flag, ItemId, Model, Patch, Review, Suggestion, SuggestionOutcome, WfState, Workflow } from "./types";
 
 export { applyPatch };
 
-/** Flags come from the logic model's open_questions: clinician questions block approval, PO questions block sending. */
+/** What the clinician can do with a flag the PO sent them. A change request needs a note; agreeing does not. */
+const CLIN_OPTS = [{ label: "Agree, keep as drafted" }, { label: "Request a change", fb: {}, needsNote: true }];
+
+/** Flags come from the logic model's open_questions. Every flag goes to the PO first; nothing reaches the clinician
+    unless the PO sends it. route_to "clinician" only marks the flag as suggested for the clinician. */
 export function flagsFrom(m: Model): Flag[] {
   return m.open_questions.filter(q => q.status === "open").map(q => {
-    const clinical = q.route_to === "clinician";
+    const src = srcList(q.source);
     return {
-      id: "F-" + q.id, clinical, kind: clinical ? "Clinical question" : "Open question",
+      id: "F-" + q.id, clinical: false, suggested: q.route_to === "clinician",
+      kind: q.route_to === "clinician" ? "Clinical question" : "Open question",
       about: q.affects.map(a => itemOf(m, a)).find(Boolean) ?? "scope",
-      title: q.question,
-      src: q.source ? "p. " + q.source.page + ": " + q.source.quote : "No guideline passage",
+      title: clean(q.question),
+      src: src.length ? src.map(s => "p. " + s.page + ": " + s.quote).join(" · ") : "No guideline passage",
       why: "Raised while drafting. Affects " + q.affects.join(", ") + ".",
-      opts: clinical
-        ? [{ label: "Keep as drafted" }, { label: "Change it (say how in the note)", fb: {} }]
-        : [{ label: "Keep as drafted" }, { label: "Escalate to clinician", escalate: true }],
+      opts: [{ label: "Keep as drafted" }, { label: "Send to clinician", escalate: true, needsNote: true }],
     };
   });
 }
@@ -232,12 +235,12 @@ export function decideFlag(w: Workflow, flagId: string, choice: number, note: st
   const f = w.flags.find(z => z.id === flagId);
   if (!f || f.res) throw new Error("Flag not open");
   expect(w, ...(f.clinical ? ["clinician"] as WfState[] : ["po_draft", "po_revise"] as WfState[]));
-  if (!note.trim()) throw new Error("A note is required");
   const o = f.opts[choice];
+  if (o.needsNote && !note.trim()) throw new Error("A note is required to send this on or to request a change");
   const by = f.clinical ? "Clinician" : "Program officer";
   if (o.escalate) {
-    const flags = w.flags.map(z => z.id === flagId ? { ...z, clinical: true, escalated: true } : z);
-    return logged({ ...w, flags }, by, "Escalated flag " + flagId + " to clinician", note);
+    const flags = w.flags.map(z => z.id === flagId ? { ...z, clinical: true, escalated: true, poNote: note, opts: CLIN_OPTS } : z);
+    return logged({ ...w, flags }, by, "Sent flag " + flagId + " to the clinician", note);
   }
   let y: Workflow = { ...w, flags: w.flags.map(z => z.id === flagId ? { ...z, res: { choice: o.label, note, by, round: w.round } } : z) };
   if (o.fb && f.clinical) {
@@ -303,3 +306,23 @@ export function approveDeploy(w: Workflow): Workflow {
   expect(w, "deploy");
   return logged({ ...w, state: "done" }, "IT approver", "Approved deploy", "Upload to CHT test instance; rollback target v3 " + fnv(JSON.stringify(V3)));
 }
+
+/** The current role's open items as step ids, in order (a flag counts as the step it is about). Drives Next buttons. */
+export function todoItems(w: Workflow, role: string, checks: Check[]): ItemId[] {
+  const g = gate(w, checks);
+  const about = (fs: Flag[]) => fs.map(f => f.about);
+  let ids: ItemId[] = [];
+  if (w.state === "po_draft" && role === "po") ids = [...g.blockIds, ...about(g.poFlags)];
+  else if (w.state === "po_revise" && role === "po") ids = [...g.unresolved, ...g.blockIds, ...about(g.poFlags)];
+  else if (w.state === "clinician" && role === "clinician") ids = [...g.reqLeft, ...about(g.clinFlags)];
+  const order = allItems(w.model, V3);
+  return [...new Set(ids)].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+}
+/** The clinician's steps for this round: everything sent to them, in order, done or not. */
+export function clinicianSteps(w: Workflow): ItemId[] {
+  const order = allItems(w.model, V3);
+  return [...new Set([...w.required, ...w.flags.filter(f => f.clinical).map(f => f.about)])].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+}
+
+/** Flags this role sees: the PO sees every flag; the clinician only those the PO sent them. */
+export const flagsFor = (w: Workflow, role: string) => w.flags.filter(f => role !== "clinician" || f.clinical || f.res?.by === "Clinician");

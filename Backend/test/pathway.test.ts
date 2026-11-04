@@ -67,3 +67,15 @@ test("boundary patients reach every rule; mutants are caught", () => {
   const m = P.mutationScore(SPEC, ps);
   assert.ok(m.killed >= m.total - 2, JSON.stringify(m));
 });
+
+test("schema 1.0 limits: operators, not, sources", () => {
+  const s1 = clone(SPEC); s1.rules[4].when = { field: "cough", op: "is_no" };
+  assert.match(errors(s1), /allows only/);
+  const s2 = clone(SPEC); s2.rules[4].when = { not: { field: "cough", op: "is_yes" } };
+  assert.match(errors(s2), /"not" is not allowed/);
+  const s3 = clone(SPEC); delete s3.rules[1].source;
+  assert.match(errors(s3), /cites no passage/);
+  const s4 = clone(SPEC); s4.rules[1].source = [{ page: 7, quote: "a" }, { page: 8, quote: "b" }];
+  assert.equal(errors(s4), "");
+  assert.equal(P.sources(s4).filter(x => x.path.startsWith("rules.R2")).length, 2);
+});

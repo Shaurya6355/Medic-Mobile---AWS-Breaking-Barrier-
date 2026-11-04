@@ -96,3 +96,11 @@ Files or resources touched: Frontend/package.json (+@xyflow/react), Frontend/src
 What others must do or know: Run npm install in Frontend after pulling.
 Open items: none new.
 Related: INT-005
+
+### INT-007 | 2026-11-04 | Vishnu Athreya (agent) | Review journeys, IT diff, schema parity with main
+What changed: Shared compiler matches main's Backend/src/logic/schema.ts: source may be one passage or a list, open_questions.resolution, only is_yes / at_least / less_than and all/any in conditions, guideline items must cite a source, severity 1 to 9. Flags: every open question goes to the PO first; the PO keeps it (note optional) or sends it to the clinician (note required); the clinician agrees (note optional) or requests a change (note required). Flags show as a card deck and on the step they belong to. Flow view: Next item button, zooms to the step being worked on and fades the rest. Clinician reviews one step card at a time with Previous / Next. PO can remove a rule from the editor. IT Release view: Changes panel with Flow (live v3 or new), JSON diff and Form diff. Removed: team-written warnings, derived-values strip under the flow, internal document references in flag text.
+Files or resources touched: shared/pathway/{types,analyze,compile}.ts, shared/pathway/samples/cough_fast_breathing.v1.json, Backend/test/pathway.test.ts, Frontend/src/{domain,components,screens}/*.
+What others must do or know: Flags never reach the clinician unless the PO sends them (DEC-008).
+Open items: none new.
+Related: DEC-008, INT-006
+

@@ -3,7 +3,7 @@
    "error" means the spec cannot be compiled or run; the backend rejects it. "warning" is for review. */
 import { leaves, refs } from "./cond.ts";
 import { derivedOrder } from "./evaluate.ts";
-import { BOOL_OPS, NUM_OPS, item, type Cond, type ItemId, type Spec } from "./types.ts";
+import { BOOL_OPS, NUM_OPS, SCHEMA_OPS, item, srcList, type Cond, type ItemId, type Origin, type Sources, type Spec } from "./types.ts";
 
 export interface Diagnostic { level: "error" | "warning"; item: ItemId; path: string; message: string }
 
@@ -23,7 +23,8 @@ export function checkStructure(x: J): Diagnostic[] {
   const strOrEmpty = (v: J) => typeof v === "string";
   const nullable = (f: (v: J) => boolean) => (v: J) => v === null || f(v);
   const origin = (v: J) => v === "guideline" || v === "team";
-  const source = (v: J) => isObj(v) && isInt(v.page) && (v.page as number) >= 1 && str(v.quote);
+  const one = (v: J) => isObj(v) && isInt(v.page) && (v.page as number) >= 1 && str(v.quote);
+  const source = (v: J) => one(v) || (Array.isArray(v) && v.length > 0 && v.every(one));
   const arr = (v: J) => Array.isArray(v);
   const cond = (v: J, p: string, it: ItemId): void => {
     if (!isObj(v)) { err(p, "must be a condition object", it); return; }
@@ -56,7 +57,7 @@ export function checkStructure(x: J): Diagnostic[] {
   else {
     need(x.scope, "age_months_min", "scope", isInt, "an integer");
     need(x.scope, "age_months_below", "scope", isInt, "an integer");
-    need(x.scope, "source", "scope", source, "{page, quote}", "scope", true);
+    need(x.scope, "source", "scope", source, "{page, quote} or a list of them", "scope", true);
     need(x.scope, "excluded", "scope", v => arr(v) && (v as J[]).every(e => isObj(e) && str(e.item) && strOrEmpty(e.reason)), "a list of {item, reason}");
   }
   const list = (k: string) => { if (!Array.isArray(x[k])) { err(k, "must be a list"); return [] as J[]; } return x[k] as J[]; };
@@ -72,7 +73,7 @@ export function checkStructure(x: J): Diagnostic[] {
     need(q, "unit", p, str, "a string", it, true);
     need(q, "required", p, v => typeof v === "boolean", "true or false", it);
     need(q, "origin", p, origin, "guideline or team", it);
-    need(q, "source", p, source, "{page, quote}", it, true);
+    need(q, "source", p, source, "{page, quote} or a list of them", it, true);
     if ("constraint" in q) {
       if (!isObj(q.constraint)) err(p + ".constraint", "must be an object", it);
       else {
@@ -90,7 +91,7 @@ export function checkStructure(x: J): Diagnostic[] {
     need(d, "id", p, str, "a string", it);
     need(d, "label", p, strOrEmpty, "a string", it);
     need(d, "origin", p, origin, "guideline or team", it);
-    need(d, "source", p, source, "{page, quote}", it, true);
+    need(d, "source", p, source, "{page, quote} or a list of them", it, true);
     if (!("definition" in d)) err(p + ".definition", "missing definition", it); else cond(d.definition, p + ".definition", it);
   });
   list("outcomes").forEach((o, i) => {
@@ -101,14 +102,14 @@ export function checkStructure(x: J): Diagnostic[] {
     need(o, "severity", p, isInt, "an integer", it);
     need(o, "title", p, strOrEmpty, "a string", it);
     need(o, "origin", p, origin, "guideline or team", it);
-    need(o, "source", p, source, "{page, quote}", it, true);
+    need(o, "source", p, source, "{page, quote} or a list of them", it, true);
     if (!Array.isArray(o.actions)) err(p + ".actions", "must be a list", it);
     else (o.actions as J[]).forEach((a, k) => {
       const pa = p + ".actions[" + k + "]";
       if (!isObj(a)) return err(pa, "must be an object", it);
       need(a, "text", pa, strOrEmpty, "a string", it);
       need(a, "origin", pa, origin, "guideline or team", it);
-      need(a, "source", pa, source, "{page, quote}", it, true);
+      need(a, "source", pa, source, "{page, quote} or a list of them", it, true);
       need(a, "dose_by_age", pa, v => arr(v) && (v as J[]).every(r => isObj(r) && isInt(r.age_months_min) && isInt(r.age_months_below) && str(r.dose)), "a list of {age_months_min, age_months_below, dose}", it, true);
     });
     if (!("follow_up" in o)) err(p + ".follow_up", "missing follow_up (use null for none)", it);
@@ -120,7 +121,7 @@ export function checkStructure(x: J): Diagnostic[] {
         need(f, "due_in_days", pf, nullable(isInt), "an integer or null", fi);
         need(f, "task_window_days_after_due", pf, nullable(isInt), "an integer or null", fi);
         need(f, "origin", pf, origin, "guideline or team", fi);
-        need(f, "source", pf, source, "{page, quote}", fi, true);
+        need(f, "source", pf, source, "{page, quote} or a list of them", fi, true);
       }
     }
   });
@@ -132,7 +133,7 @@ export function checkStructure(x: J): Diagnostic[] {
     need(r, "priority", p, isInt, "an integer", it);
     need(r, "outcome", p, str, "an outcome id", it);
     need(r, "origin", p, origin, "guideline or team", it);
-    need(r, "source", p, source, "{page, quote}", it, true);
+    need(r, "source", p, source, "{page, quote} or a list of them", it, true);
     if (r.when !== "otherwise") cond(r.when, p + ".when", it);
   });
   list("open_questions").forEach((q, i) => {
@@ -143,7 +144,8 @@ export function checkStructure(x: J): Diagnostic[] {
     need(q, "affects", p, v => arr(v) && (v as J[]).every(str), "a list of ids");
     need(q, "route_to", p, v => v === "clinician" || v === "program_officer", "clinician or program_officer");
     need(q, "status", p, v => v === "open" || v === "resolved", "open or resolved");
-    need(q, "source", p, source, "{page, quote}", "scope", true);
+    need(q, "resolution", p, str, "a string", "scope", true);
+    need(q, "source", p, source, "{page, quote} or a list of them", "scope", true);
   });
   return out;
 }
@@ -177,9 +179,12 @@ export function analyze(spec: Spec): Diagnostic[] {
   [...spec.questions.map(q => [q.id, item.q(q.id)]), ...spec.derived.map(d => [d.id, item.d(d.id)]), ...spec.outcomes.map(o => [o.id, item.out(o.id)])]
     .forEach(([id, it]) => { if (!ID.test(id)) add("error", it, "id", "Id " + JSON.stringify(id) + " must be lower_snake_case (it becomes an XLSForm field name)."); });
 
-  // Type check every condition.
+  // Type check every condition. Schema 1.0 allows only is_yes, at_least, less_than, all and any.
   const checkCond = (c: Cond, it: ItemId, path: string, allowDerived = true) => {
+    const hasNot = (x: Cond): boolean => "not" in x || ("all" in x && x.all.some(hasNot)) || ("any" in x && x.any.some(hasNot));
+    if (hasNot(c)) add("error", it, path, "\"not\" is not allowed in schema 1.0. Rewrite it with is yes, >= or <.");
     leaves(c).forEach(({ leaf: l }) => {
+      if (!SCHEMA_OPS.includes(l.op)) add("error", it, path, l.field + ": schema 1.0 allows only \"is yes\", \">=\" and \"<\".");
       const q = qs.get(l.field), d = ds.get(l.field);
       if (!q && !d) return add("error", it, path, "Unknown field " + l.field + ".");
       if (d && !allowDerived) return add("error", it, path, "A show condition may only use questions, not the derived value " + l.field + ".");
@@ -188,6 +193,20 @@ export function analyze(spec: Spec): Diagnostic[] {
       if (NUM_OPS.includes(l.op) && isBool) add("error", it, path, l.field + " is yes/no; compare it with \"is yes\" or \"is no\".");
     });
   };
+
+  // Anything taken from the guideline must cite where.
+  const cites = (origin: Origin, src: Sources | undefined, it: ItemId, path: string) => {
+    if (origin === "guideline" && !srcList(src).length) add("error", it, path, "Marked as from the guideline but cites no passage.");
+  };
+  spec.questions.forEach(q => cites(q.origin, q.source, item.q(q.id), "source"));
+  spec.derived.forEach(d => cites(d.origin, d.source, item.d(d.id), "source"));
+  spec.rules.forEach(r => cites(r.origin, r.source, item.rule(r.id), "source"));
+  spec.outcomes.forEach(o => {
+    cites(o.origin, o.source, item.out(o.id), "source");
+    o.actions.forEach((a, i) => cites(a.origin, a.source, item.out(o.id), "actions[" + i + "].source"));
+    if (o.follow_up) cites(o.follow_up.origin, o.follow_up.source, item.fu(o.id), "follow_up.source");
+    if (o.severity < 1 || o.severity > 9) add("error", item.out(o.id), "severity", "Severity must be 1 (most urgent) to 9.");
+  });
 
   // Scope.
   if (spec.scope.age_months_min >= spec.scope.age_months_below) add("error", item.scope, "scope", "The age range is empty.");

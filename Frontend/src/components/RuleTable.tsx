@@ -1,4 +1,4 @@
-import { item, print, type Rule } from "../../../shared/pathway/index.ts";
+import { item, print, srcList, type Rule, type Sources } from "../../../shared/pathway/index.ts";
 import { sevColor } from "../domain/data";
 import { getO, rowIssues } from "../domain/logic";
 import type { Check, ItemId, Model, Workflow } from "../domain/types";
@@ -21,8 +21,9 @@ function Status({ s, n }: { s: keyof typeof STATUS; n?: number }) {
   return <span className={"rstat " + STATUS[s][1]}>{STATUS[s][0]}{n ? " · " + n : ""}</span>;
 }
 
-function Src({ s }: { s?: { page: number; quote: string } }) {
-  return s ? <span className="rsrc" title={"“" + s.quote + "”"}>{"p. " + s.page}</span> : <span className="rsrc team">no quote</span>;
+function Src({ s }: { s?: Sources }) {
+  const l = srcList(s);
+  return l.length ? <span className="rsrc" title={l.map(x => "p. " + x.page + ": “" + x.quote + "”").join("\n")}>{"p. " + [...new Set(l.map(x => x.page))].join(", ")}</span> : <span className="rsrc team">no quote</span>;
 }
 
 /** Rules in priority order: the IR as an editable table. The decision flow is drawn from this same data. */

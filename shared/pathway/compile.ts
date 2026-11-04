@@ -3,7 +3,7 @@
 import { leaves, xpath } from "./cond.ts";
 import { byOrder, byPriority, derivedOrder, evaluate, visibleAnswers } from "./evaluate.ts";
 import { applyPatch, type Path } from "./patch.ts";
-import { item, type Answers, type Cond, type ItemId, type Leaf, type Source, type Spec } from "./types.ts";
+import { item, srcList, type Answers, type Cond, type ItemId, type Leaf, type Source, type Sources, type Spec } from "./types.ts";
 
 /* ---------- Flow graph ---------- */
 export type GKind = "start" | "decision" | "outcome" | "task";
@@ -84,7 +84,7 @@ export function rowDiff(a: XlsRow[], b: XlsRow[]): RowDiff[] {
 /* ---------- Sources ---------- */
 export function sources(spec: Spec): { item: ItemId; path: string; source: Source }[] {
   const out: { item: ItemId; path: string; source: Source }[] = [];
-  const add = (it: ItemId, path: string, s?: Source) => { if (s) out.push({ item: it, path, source: s }); };
+  const add = (it: ItemId, path: string, s?: Sources) => srcList(s).forEach((x, i, all) => out.push({ item: it, path: path + (all.length > 1 ? "#" + (i + 1) : ""), source: x }));
   add(item.scope, "scope", spec.scope.source);
   spec.questions.forEach(q => add(item.q(q.id), "questions." + q.id, q.source));
   spec.derived.forEach(d => add(item.d(d.id), "derived." + d.id, d.source));

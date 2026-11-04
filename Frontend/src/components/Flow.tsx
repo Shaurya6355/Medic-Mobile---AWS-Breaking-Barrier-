@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dagre from "dagre";
-import { Background, Controls, Handle, MarkerType, Panel, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import { Background, Controls, Handle, MarkerType, Panel, Position, ReactFlow, useReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { toGraph, type GKind } from "../../../shared/pathway/index.ts";
 import { sevColor } from "../domain/data";
-import { condText, getO, getR, usesOf } from "../domain/logic";
+import { condText, getO, getR, relatedFlowIds, usesOf } from "../domain/logic";
 import type { Model } from "../domain/types";
 
 export type Badge = [cls: string, label: string];
@@ -52,12 +52,12 @@ function estHeight(n: FlowNode, width: number = WIDTH[n.type]): number {
   return 16 + 16 + main * 18 + sub * 16 + (sub ? 4 : 0) + (n.type === "outcome" ? 6 : 0) + 8;
 }
 type Dir = "TB" | "LR";
-type BoxData = { n: FlowNode; badges: Badge[]; tone?: "changed" | "bad"; sel: boolean; dir: Dir };
+type BoxData = { n: FlowNode; badges: Badge[]; tone?: "changed" | "bad"; sel: boolean; dim: boolean; dir: Dir };
 
 /** One box in the flow. Read-only: no handles to drag from, clicks only select. */
 function Box({ data }: NodeProps<Node<BoxData>>) {
-  const { n, badges, tone, sel, dir } = data;
-  const cls = ["node", n.type, n.color ? "o-" + n.color : "", tone === "changed" ? "d-changed" : "", tone === "bad" ? "d-changed bad" : "", sel ? "sel" : ""].join(" ");
+  const { n, badges, tone, sel, dim, dir } = data;
+  const cls = ["node", n.type, n.color ? "o-" + n.color : "", tone === "changed" ? "d-changed" : "", tone === "bad" ? "d-changed bad" : "", sel ? "sel" : "", dim ? "dim" : ""].join(" ");
   return (
     <div className={cls} style={{ width: WIDTH[n.type] }} aria-label={KICK[n.type] + ": " + n.text}>
       <Handle type="target" position={dir === "TB" ? Position.Top : Position.Left} isConnectable={false} />
@@ -84,23 +84,41 @@ function layout(nodes: FlowNode[], edges: [string, string, string][], dir: Dir) 
   return new Map(nodes.map(n => { const p = g.node(n.id); return [n.id, { x: p.x - WIDTH[n.type] / 2, y: p.y - estHeight(n) / 2 }]; }));
 }
 
-interface Props { m: Model; selected?: string; onSelect?: (id: string) => void; markers?: Markers; tone?: Tone; label: string }
+interface Props {
+  m: Model; selected?: string; onSelect?: (id: string) => void; markers?: Markers; tone?: Tone; label: string;
+  /** Moves to the next open item; shown as a Next button on the flow. */
+  next?: { onNext: () => void; left: number } | null;
+}
 
-export function Flow({ m, selected, onSelect, markers = {}, tone = {}, label }: Props) {
+/** Zooms to the boxes for the step being worked on; with nothing selected, to the top of the flow. */
+function Focus({ ids, fallback }: { ids: string[]; fallback: string[] }) {
+  const rf = useReactFlow();
+  const key = ids.join("|") || "-";
+  useEffect(() => {
+    const t = setTimeout(() => rf.fitView({ nodes: (ids.length ? ids : fallback).map(id => ({ id })), duration: 450, padding: ids.length ? 0.25 : 0.06, maxZoom: 1.1 }), 30);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return null;
+}
+
+export function Flow({ m, selected, onSelect, markers = {}, tone = {}, label, next }: Props) {
   const [dir, setDir] = useState<Dir>("TB");
   const { nodes: fns, edges: fes } = toNodes(m);
   const key = JSON.stringify([fns, fes, dir]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const pos = useMemo(() => layout(fns, fes, dir), [key]);
 
+  const related = selected ? relatedFlowIds(m, selected) : [];
+  const near = new Set(related);
   const nodes: Node<BoxData>[] = fns.map(n => ({
     id: n.id, type: "box", position: pos.get(n.id)!, draggable: false, connectable: false,
-    data: { n, badges: markers[n.id] || [], tone: tone[n.id], sel: selected === n.id, dir },
+    data: { n, badges: markers[n.id] || [], tone: tone[n.id], sel: selected === n.id, dim: near.size > 0 && !near.has(n.id), dir },
   }));
   const edges: Edge[] = fes.map(([a, b, l]) => ({
     id: a + "->" + b, source: a, target: b, type: "smoothstep", label: l && l !== "task" ? l : undefined,
     markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-    style: l === "task" ? { strokeDasharray: "5 4" } : undefined,
+    style: { ...(l === "task" ? { strokeDasharray: "5 4" } : {}), ...(near.size && !(near.has(a) && near.has(b)) ? { opacity: 0.15 } : {}) },
     labelBgPadding: [4, 2] as [number, number], labelBgBorderRadius: 4,
   }));
 
@@ -119,6 +137,12 @@ export function Flow({ m, selected, onSelect, markers = {}, tone = {}, label }: 
             <button type="button" aria-pressed={dir === "LR"} onClick={() => setDir("LR")}>Horizontal</button>
           </div>
         </Panel>
+        {next ? (
+          <Panel position="top-left">
+            <button type="button" className="btn primary" disabled={!next.left} onClick={next.onNext}>{next.left ? "Next item ▶ (" + next.left + " left)" : "Nothing left to do"}</button>
+          </Panel>
+        ) : null}
+        <Focus ids={related} fallback={focus.map(f => f.id)} />
         <Controls showInteractive={false} />
         <Background gap={16} />
       </ReactFlow>

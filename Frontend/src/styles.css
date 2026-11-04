@@ -557,3 +557,22 @@ h2{font-size:15px;font-weight:600}
 .rissues li{display:grid;grid-template-columns:62px 1fr;gap:8px}
 .rissues li b{font-size:11px;text-transform:uppercase;letter-spacing:.05em}
 .rsec{font-size:15px;margin:18px 0 4px;display:flex;gap:10px;align-items:baseline}
+.deck{display:flex;gap:8px;align-items:center}
+.fcard{display:grid;gap:6px}
+.stepflags{display:grid;gap:8px;margin-top:6px}
+.rfwrap .node.dim{opacity:.22}
+.rfwrap .node{transition:opacity .25s}
+.stepcard{border:2px solid var(--accent);scroll-margin-top:150px}
+.stepgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+@media (max-width:960px){.stepgrid{grid-template-columns:1fr}}
+.progress{height:6px;background:var(--bg);border-radius:999px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.jdiff table{font-family:var(--font-mono);font-size:12px}
+.jdiff td{padding:0 8px;border:0;vertical-align:top}
+.jdiff td pre{margin:0;white-space:pre-wrap;word-break:break-word;font:inherit}
+.jdiff td.ln{color:var(--muted);text-align:right;width:36px;user-select:none}
+.jdiff td.m{width:14px;font-weight:700}
+.jdiff tr.add td{background:var(--add-bg)}.jdiff tr.add td.m{color:var(--add)}
+.jdiff tr.del td{background:var(--del-bg)}.jdiff tr.del td.m{color:var(--del)}
+.jdiff tr.fold td{background:var(--bg);padding:3px 8px}
+.qdetails summary{cursor:pointer;font-size:13px;color:var(--accent);margin-top:8px}

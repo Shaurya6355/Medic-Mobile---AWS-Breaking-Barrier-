@@ -336,7 +336,7 @@
     },
     {
       "id": "Q2",
-      "question": "The guideline covers 2 months up to 5 years only. Should a child under 2 months or 5 years and over be referred urgently or routinely? (BRD OQ-03)",
+      "question": "The guideline covers 2 months up to 5 years only. Should a child under 2 months or 5 years and over be referred urgently or routinely?",
       "affects": ["R1", "refer_outside_age_range"],
       "route_to": "clinician",
       "status": "open",

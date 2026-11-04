@@ -80,7 +80,7 @@ export function QuestionsRead({ m, id, edit }: { m: Model; id: ItemId; edit?: Ed
   );
 }
 
-export function NodeEditor({ m, id, edit }: { m: Model; id: ItemId; edit: EditFn }) {
+export function NodeEditor({ m, id, edit, onRemoved }: { m: Model; id: ItemId; edit: EditFn; onRemoved?: () => void }) {
   const [k, key] = splitItem(id);
   if (k === "q" && !getQ(m, key)) {
     const orig = anyQ(key);
@@ -98,6 +98,13 @@ export function NodeEditor({ m, id, edit }: { m: Model; id: ItemId; edit: EditFn
     <div className="stack">
       {rule ? <div className="note">{"Priority " + rule.priority + (rule.when === "otherwise" ? " · Otherwise: matches when no earlier rule did." : " · tried after every rule with a lower priority.")}</div> : null}
       {sl.map(s => <SlotField key={s.key} m={m} id={id} s={s} edit={edit} />)}
+      {rule && rule.when !== "otherwise" ? (
+        <button type="button" className="btn tiny bad" onClick={() => {
+          const rest = m.rules.filter(r => r.id !== key).sort((a, b) => a.priority - b.priority).map((r, i) => ({ ...r, priority: i + 1 }));
+          edit("rules", "remove " + key, { op: "set", path: ["rules"], value: rest });
+          onRemoved?.();
+        }}>Remove rule {key}</button>
+      ) : null}
       {k === "q" ? (
         <>
           <div className="note">Type: {getQ(m, key)!.answer_type === "yes_no" ? "yes/no" : "integer"}</div>

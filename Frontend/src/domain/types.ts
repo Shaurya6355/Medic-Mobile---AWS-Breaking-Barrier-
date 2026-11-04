@@ -27,12 +27,18 @@ export interface FlagOption {
   /** Turns the decision into a change request on `about`; the decider's note becomes the request. */
   fb?: { type?: FbType };
   escalate?: boolean;
+  /** Sending on or requesting a change needs a note; keeping or agreeing does not. */
+  needsNote?: boolean;
 }
 export interface Flag {
   id: string; clinical: boolean; kind: string; about: ItemId; title: string; src: string; why: string;
   opts: FlagOption[];
   res?: { choice: string; note: string; by: string; round: number };
   escalated?: boolean;
+  /** The JSON suggested the clinician; the PO still decides whether to send it. */
+  suggested?: boolean;
+  /** The PO's note when sending it to the clinician. */
+  poNote?: string;
 }
 
 export type WfState = "none" | "po_draft" | "clinician" | "po_revise" | "verify" | "deploy" | "done";

@@ -1,7 +1,7 @@
 /* Read-only views of the logic model for the UI: items, facts, editable slots, checks. Deterministic, no AI.
    All semantics (types, evaluation, compile) come from the shared pathway compiler. */
 import {
-  analyze, evaluate, humanize, item, literals, patients, print, sources, splitItem, toGraph, usedFields, refs,
+  analyze, evaluate, humanize, item, literals, srcList, patients, print, sources, splitItem, toGraph, usedFields, refs,
   type Answers, type Cond, type ItemId, type Literal, type Path, type Question, type Spec,
 } from "../../../shared/pathway/index.ts";
 import { DRAFT, GOLDEN, V3, same } from "./data";
@@ -261,16 +261,6 @@ export function runChecks(m: Spec): Check[] {
   });
   m.outcomes.forEach(o => { if (o.follow_up?.origin === "guideline") num(item.fu(o.id), o.follow_up.due_in_days); });
 
-  // How the drafting step did: every rule and outcome should trace back to the guideline.
-  m.rules.forEach(r => {
-    if (r.origin === "team") out.push({ sev: "warning", id: item.rule(r.id), text: "Written by the team, not taken from the guideline. Confirm it or cite a passage." });
-    else if (!r.source) out.push({ sev: "warning", id: item.rule(r.id), text: "Marked as from the guideline but cites no passage." });
-  });
-  m.outcomes.forEach(o => {
-    if (o.origin === "team") out.push({ sev: "warning", id: item.out(o.id), text: "Outcome written by the team, not the guideline. Confirm the advice." });
-    o.actions.forEach((a, i) => { if (a.origin === "guideline" && !a.source) out.push({ sev: "warning", id: item.out(o.id), text: "Action " + (i + 1) + " cites no passage." }); });
-  });
-
   golden(m).filter(x => !x.ok).forEach(x => out.push({
     sev: "blocking", id: x.rule ? item.rule(x.rule) : item.scope,
     text: "Golden case " + x.id + " (" + describeP(m, x.a) + ") expected " + outName(m, x.exp) + ", got " + outName(m, x.got) + ".",
@@ -300,7 +290,8 @@ export function srcOf(m: Spec, id: ItemId): [quote: string, where: string] {
   const [k, key] = splitItem(id);
   const x = k === "scope" ? m.scope : k === "q" ? getQ(m, key) || anyQ(key) : k === "d" ? getD(m, key) : k === "rule" ? getR(m, key) : k === "out" ? getO(m, key) : k === "fu" ? getO(m, key)?.follow_up : null;
   if (!x) return ["(no quote)", "-"];
-  if ("source" in x && x.source) return [x.source.quote, "page " + x.source.page];
+  const ss = "source" in x ? srcList(x.source) : [];
+  if (ss.length) return [ss.map(s => s.quote).join(" … "), ss.map(s => "page " + s.page).join(", ")];
   return ["Team decision: no guideline quote.", "origin: " + ("origin" in x ? x.origin : "team")];
 }
 
@@ -310,5 +301,25 @@ export function rowIssues(checks: Check[], flags: { id: string; about: ItemId; r
   const fs = flags.filter(f => !f.res && ids.includes(f.about));
   const status: "edit" | "check" | "ok" = cs.some(c => c.sev === "blocking") ? "edit" : cs.length || fs.length ? "check" : "ok";
   return { checks: cs, flags: fs, status };
+}
+
+/** Strip references to internal documents (BRD, PRD, spec ids) from text shown to users. */
+export const clean = (t: string) => t.replace(/\s*\((?:BRD|PRD|SRS|FRD|internal)\b[^)]*\)/gi, "").replace(/\s+([.,;:?])/g, "$1").trim();
+
+/** Flow boxes to zoom to for a step: the box and its neighbours, or for a question or derived value the rules that read it. */
+export function relatedFlowIds(m: Spec, id: ItemId): ItemId[] {
+  const g = toGraph(m);
+  const nodes = new Set(g.nodes.map(n => n.id));
+  const [k, key] = splitItem(id);
+  let core: ItemId[] = [];
+  if (nodes.has(id)) core = [id];
+  else if (k === "q" || k === "d") core = m.rules.filter(r => usesOf(m, item.rule(r.id)).includes(key) || (r.when !== "otherwise" && reads(m, r.when, key))).map(r => item.rule(r.id));
+  if (!core.length || id === item.scope) return [];
+  const out = new Set(core);
+  g.edges.forEach(e => { if (core.includes(e.from)) out.add(e.to); if (core.includes(e.to)) out.add(e.from); });
+  return [...out];
+}
+function reads(m: Spec, c: Cond, f: string): boolean {
+  return refs(c).some(r => r === f || (!!getD(m, r) && reads(m, getD(m, r)!.definition, f)));
 }
 

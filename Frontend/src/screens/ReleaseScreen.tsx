@@ -3,6 +3,45 @@ import { classify, describeP, getO, golden, grid } from "../domain/logic";
 import type { Model, Role, Workflow } from "../domain/types";
 import type { Actions } from "../actions";
 import { XlsCompare } from "../components/XlsCompare";
+import { JsonDiff } from "../components/JsonDiff";
+import { Flow, type Markers } from "../components/Flow";
+import { allItems, changedVs } from "../domain/logic";
+import { useState } from "react";
+
+type Tab = "flow" | "json" | "form";
+/** What IT approves: the flow (live or new), the logic model JSON diff and the form diff, all built from the approved hash. */
+function Changes({ w }: { w: Workflow }) {
+  const [tab, setTab] = useState<Tab>("flow");
+  const [side, setSide] = useState<"new" | "live">("new");
+  const m = w.model, ver = w.approved!.ver;
+  const shown = side === "new" ? m : V3;
+  const mk: Markers = {};
+  if (side === "new") allItems(m, V3).forEach(id => { if (changedVs(m, id)) mk[id] = [["changed", "Changed"]]; });
+  const n = allItems(m, V3).filter(id => changedVs(m, id)).length;
+  return (
+    <section className="panel">
+      <div className="ph">
+        <h2>{"Changes · v3 → " + ver}</h2>
+        <div className="viewtgl" role="group" aria-label="Changes view">
+          {([["flow", "Flow"], ["json", "JSON diff"], ["form", "Form diff"]] as [Tab, string][]).map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>)}
+        </div>
+      </div>
+      {tab === "flow" ? (
+        <>
+          <div className="btnrow">
+            <div className="viewtgl" role="group" aria-label="Version">
+              <button type="button" aria-pressed={side === "live"} onClick={() => setSide("live")}>Live v3</button>
+              <button type="button" aria-pressed={side === "new"} onClick={() => setSide("new")}>{"New " + ver}</button>
+            </div>
+            <span className="note">{n + " steps changed. Read-only; boxes marked Changed differ from v3."}</span>
+          </div>
+          <Flow key={side} m={shown} markers={mk} label={"Decision flow " + (side === "new" ? ver : "v3")} />
+        </>
+      ) : tab === "json" ? <JsonDiff a={V3} b={m} la="v3" lb={ver} />
+        : <XlsCompare a={V3} b={m} la="v3" lb={ver} />}
+    </section>
+  );
+}
 
 function ClsTag({ o, m }: { o: string | null; m: Model }) {
   const x = o ? getO(m, o) : null;
@@ -71,7 +110,7 @@ export function ReleaseScreen({ w, role, act }: { w: Workflow | null; role: Role
             </div>
             <p className="note" style={{ margin: 0 }}>Simulated: the "Actual (form)" column will come from cht-conf-test-harness once the backend runs it.</p>
           </section>
-          <XlsCompare a={V3} b={m} la="v3" lb={a.ver} />
+          <Changes w={w} />
         </>
       )}
     </>
