@@ -1,4 +1,7 @@
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import dagre from "dagre";
+import { Background, Controls, Handle, MarkerType, Panel, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import { toGraph, type GKind } from "../../../shared/pathway/index.ts";
 import { sevColor } from "../domain/data";
 import { condText, getO, getR, usesOf } from "../domain/logic";
@@ -48,134 +51,77 @@ function estHeight(n: FlowNode, width: number = WIDTH[n.type]): number {
   const sub = n.sub ? Math.ceil(n.sub.length / Math.floor(w / 6.6)) : 0;
   return 16 + 16 + main * 18 + sub * 16 + (sub ? 4 : 0) + (n.type === "outcome" ? 6 : 0) + 8;
 }
-interface Pt { x: number; y: number }
-interface LNode { x: number; y: number; width: number; height: number; n: FlowNode }
-interface LEdge { points: Pt[]; label?: string; width?: number; x?: number; y?: number }
+type Dir = "TB" | "LR";
+type BoxData = { n: FlowNode; badges: Badge[]; tone?: "changed" | "bad"; sel: boolean; dir: Dir };
 
-/** Decision-table layout: rules stacked in priority order, each rule's outcome beside it, its follow-up task beside that.
-    The compiler always emits a first-match chain, so this reads like the rule table it is. */
-function layout(nodes: FlowNode[], edges: [string, string, string][]) {
-  const GAP_X = 40, GAP_Y = 34, M = 6;
-  const W = { decision: 230, outcome: 220, task: 160 };
-  const col: Record<string, number> = {}, row: Record<string, number> = {};
-  const chain = nodes.filter(n => n.type === "start" || n.type === "decision").map(n => n.id);
-  chain.forEach((id, i) => { col[id] = 0; row[id] = i; });
-  let nextRow = chain.length;
-  edges.forEach(([a, b, l]) => {
-    if (b in row) return;
-    if (l === "yes") { col[b] = 1; row[b] = row[a]; }
-    else if (l === "no" || l === "") { col[b] = 0; row[b] = nextRow++; }
-  });
-  nodes.filter(n => n.type === "outcome" && !(n.id in row)).forEach(n => { col[n.id] = 1; row[n.id] = nextRow++; });
-  edges.forEach(([a, b, l]) => { if (l === "task" && !(b in row)) { col[b] = col[a] + 1; row[b] = row[a]; } });
-
-  const colW = [W.decision, W.outcome, W.task].map((w, c) => (c === 0 ? w : Math.max(w, ...nodes.filter(n => col[n.id] === c).map(n => (n.type === "task" ? W.task : W.outcome)))));
-  const colX: number[] = []; let x = M;
-  colW.forEach((w, c) => { colX[c] = x + w / 2; x += w + GAP_X; });
-  const rowH: number[] = Array(nextRow).fill(0);
-  const width = (n: FlowNode) => (col[n.id] === 0 ? W.decision : n.type === "task" ? W.task : W.outcome);
-  nodes.forEach(n => { rowH[row[n.id]] = Math.max(rowH[row[n.id]], estHeight(n, width(n))); });
-  const rowY: number[] = []; let y = M;
-  rowH.forEach((h, r) => { rowY[r] = y; y += h + GAP_Y; });
-
-  const L = new Map<string, LNode>();
-  nodes.forEach(n => {
-    const w = width(n), h = estHeight(n, w);
-    L.set(n.id, { x: colX[col[n.id]], y: rowY[row[n.id]] + h / 2, width: w, height: h, n });
-  });
-  const E: { v: string; w: string; e: LEdge }[] = edges.filter(([a, b]) => L.has(a) && L.has(b)).map(([a, b, l]) => {
-    const A = L.get(a)!, B = L.get(b)!;
-    let pts: Pt[];
-    if (col[a] === col[b]) pts = [{ x: A.x, y: A.y + A.height / 2 }, { x: B.x, y: B.y - B.height / 2 }];
-    else {
-      // Boxes are top-aligned per row; leave and enter every side edge at the same height so arrows stay level.
-      const ya = rowY[row[a]] + 28, yb = rowY[row[b]] + 28, mx = A.x + A.width / 2 + GAP_X / 2;
-      pts = row[a] === row[b] ? [{ x: A.x + A.width / 2, y: ya }, { x: B.x - B.width / 2, y: yb }]
-        : [{ x: A.x + A.width / 2, y: ya }, { x: mx, y: ya }, { x: mx, y: yb }, { x: B.x - B.width / 2, y: yb }];
-    }
-    const mid = pts.length === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : { x: pts[1].x, y: (pts[1].y + pts[2].y) / 2 };
-    return { v: a, w: b, e: { points: pts, label: l === "task" ? "" : l, width: l ? l.length * 6.5 + 10 : 0, x: mid.x, y: mid.y } };
-  });
-  return {
-    graph: () => ({ width: x - GAP_X + M, height: y - GAP_Y + M }),
-    nodes: () => [...L.keys()],
-    node: (id: string) => L.get(id)!,
-    edges: () => E.map(({ v, w }) => ({ v, w })),
-    edge: (k: { v: string; w: string }) => E.find(e => e.v === k.v && e.w === k.w)!.e,
-  };
+/** One box in the flow. Read-only: no handles to drag from, clicks only select. */
+function Box({ data }: NodeProps<Node<BoxData>>) {
+  const { n, badges, tone, sel, dir } = data;
+  const cls = ["node", n.type, n.color ? "o-" + n.color : "", tone === "changed" ? "d-changed" : "", tone === "bad" ? "d-changed bad" : "", sel ? "sel" : ""].join(" ");
+  return (
+    <div className={cls} style={{ width: WIDTH[n.type] }} aria-label={KICK[n.type] + ": " + n.text}>
+      <Handle type="target" position={dir === "TB" ? Position.Top : Position.Left} isConnectable={false} />
+      <div className="kick">
+        <span>{KICK[n.type]}</span>
+        <span className="badges">{badges.map((b, i) => <span key={i} className={"badge " + b[0]}>{b[1]}</span>)}</span>
+      </div>
+      {n.type === "outcome"
+        ? <><div className="ttl">{n.text}</div><div className="sub">{n.sub}</div></>
+        : <><div>{n.text}</div>{n.sub ? <div className="sub">{n.sub}</div> : null}</>}
+      <Handle type="source" position={dir === "TB" ? Position.Bottom : Position.Right} isConnectable={false} />
+    </div>
+  );
 }
-function smooth(p: { x: number; y: number }[]): string {
-  let d = "M" + p[0].x + "," + p[0].y;
-  if (p.length === 2) return d + " L" + p[1].x + "," + p[1].y;
-  for (let i = 1; i < p.length - 1; i++) {
-    const last = i === p.length - 2;
-    const ex = last ? p[i + 1].x : (p[i].x + p[i + 1].x) / 2, ey = last ? p[i + 1].y : (p[i].y + p[i + 1].y) / 2;
-    d += " Q" + p[i].x + "," + p[i].y + " " + ex + "," + ey;
-  }
-  return d;
+const nodeTypes = { box: Box };
+
+/** dagre layout, as in the React Flow dagre example: dagre gives centres, React Flow wants top-left corners. */
+function layout(nodes: FlowNode[], edges: [string, string, string][], dir: Dir) {
+  const g = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: dir, nodesep: 30, ranksep: dir === "TB" ? 50 : 70 });
+  nodes.forEach(n => g.setNode(n.id, { width: WIDTH[n.type], height: estHeight(n) }));
+  edges.forEach(([a, b]) => g.setEdge(a, b));
+  dagre.layout(g);
+  return new Map(nodes.map(n => { const p = g.node(n.id); return [n.id, { x: p.x - WIDTH[n.type] / 2, y: p.y - estHeight(n) / 2 }]; }));
 }
 
 interface Props { m: Model; selected?: string; onSelect?: (id: string) => void; markers?: Markers; tone?: Tone; label: string }
 
 export function Flow({ m, selected, onSelect, markers = {}, tone = {}, label }: Props) {
-  const { nodes, edges } = toNodes(m);
-  const key = JSON.stringify([nodes, edges]);
+  const [dir, setDir] = useState<Dir>("TB");
+  const { nodes: fns, edges: fes } = toNodes(m);
+  const key = JSON.stringify([fns, fes, dir]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const g = useMemo(() => layout(nodes, edges), [key]);
-  const W = Math.ceil(g.graph().width || 0), H = Math.ceil(g.graph().height || 0);
-  const ref = useRef<HTMLDivElement>(null);
-  const mk = "ah" + useId().replace(/[^a-zA-Z0-9]/g, "");
-  const [scale, setScale] = useState(1);
-  useLayoutEffect(() => {
-    const el = ref.current; if (!el) return;
-    const fit = () => setScale(Math.min(1, el.clientWidth / W));
-    fit();
-    const ro = new ResizeObserver(fit); ro.observe(el);
-    return () => ro.disconnect();
-  }, [W]);
+  const pos = useMemo(() => layout(fns, fes, dir), [key]);
+
+  const nodes: Node<BoxData>[] = fns.map(n => ({
+    id: n.id, type: "box", position: pos.get(n.id)!, draggable: false, connectable: false,
+    data: { n, badges: markers[n.id] || [], tone: tone[n.id], sel: selected === n.id, dir },
+  }));
+  const edges: Edge[] = fes.map(([a, b, l]) => ({
+    id: a + "->" + b, source: a, target: b, type: "smoothstep", label: l && l !== "task" ? l : undefined,
+    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+    style: l === "task" ? { strokeDasharray: "5 4" } : undefined,
+    labelBgPadding: [4, 2] as [number, number], labelBgBorderRadius: 4,
+  }));
+
+  // Open readable: fit the start box, the first three rules and what they lead to. The fit button shows everything.
+  const firstRules = fns.filter(n => n.type === "decision").slice(0, 3).map(n => n.id);
+  const focus = fns.filter(n => n.type === "start" || firstRules.includes(n.id) || fes.some(([a, b, l]) => firstRules.includes(a) && b === n.id && l === "yes")).map(n => ({ id: n.id }));
 
   return (
-    <div ref={ref} className="stage" style={{ height: H * scale }} role="group" aria-label={label}>
-      <div className="canvas" style={{ width: W, height: H, transform: "scale(" + scale + ")" }}>
-        <svg width={W} height={H} aria-hidden="true">
-          <defs>
-            <marker id={mk} viewBox="0 0 10 10" refX={9} refY={5} markerWidth={7} markerHeight={7} orient="auto-start-reverse">
-              <path className="ah" d="M0,0 L10,5 L0,10 z" />
-            </marker>
-          </defs>
-          {g.edges().map((e, i) => {
-            const ed = g.edge(e);
-            return (
-              <g key={i}>
-                <path className="edge" d={smooth(ed.points)} markerEnd={"url(#" + mk + ")"} strokeDasharray={e.w.startsWith("fu:") ? "5 4" : undefined} />
-                {ed.label ? (
-                  <g className="elbl">
-                    <rect x={(ed.x || 0) - (ed.width || 0) / 2} y={(ed.y || 0) - 8} width={ed.width} height={16} rx={4} />
-                    <text x={ed.x} y={(ed.y || 0) + 4} textAnchor="middle">{ed.label}</text>
-                  </g>
-                ) : null}
-              </g>
-            );
-          })}
-        </svg>
-        {g.nodes().map(id => {
-          const nd = g.node(id), n = nd.n, t = tone[id];
-          const cls = ["node", n.type, n.color ? "o-" + n.color : "", t === "changed" ? "d-changed" : "", t === "bad" ? "d-changed bad" : "", selected === id ? "sel" : ""].join(" ");
-          return (
-            <button key={id} type="button" className={cls} aria-pressed={selected === id} aria-label={KICK[n.type] + ": " + n.text}
-              style={{ left: nd.x - nd.width / 2, top: nd.y - nd.height / 2, width: nd.width, minHeight: nd.height }}
-              onClick={() => onSelect?.(id)}>
-              <div className="kick">
-                <span>{KICK[n.type]}</span>
-                <span className="badges">{(markers[id] || []).map((b, i) => <span key={i} className={"badge " + b[0]}>{b[1]}</span>)}</span>
-              </div>
-              {n.type === "outcome"
-                ? <><div className="ttl">{n.text}</div><div className="sub">{n.sub}</div></>
-                : <><div>{n.text}</div>{n.sub ? <div className="sub">{n.sub}</div> : null}</>}
-            </button>
-          );
-        })}
-      </div>
+    <div className="rfwrap" role="group" aria-label={label}>
+      <ReactFlow key={dir} nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.06, nodes: focus }}
+        nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} elementsSelectable={false}
+        onNodeClick={(_e, n) => onSelect?.(n.id)} minZoom={0.2} proOptions={{ hideAttribution: true }}>
+        <Panel position="top-right">
+          <div className="viewtgl" role="group" aria-label="Layout">
+            <button type="button" aria-pressed={dir === "TB"} onClick={() => setDir("TB")}>Vertical</button>
+            <button type="button" aria-pressed={dir === "LR"} onClick={() => setDir("LR")}>Horizontal</button>
+          </div>
+        </Panel>
+        <Controls showInteractive={false} />
+        <Background gap={16} />
+      </ReactFlow>
     </div>
   );
 }

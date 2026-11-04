@@ -9,17 +9,20 @@ import { CommitInput, CondInput } from "./inputs";
 const STATUS = { edit: ["Edit required", "bad"], check: ["Check", "warn"], ok: ["OK", "good"] } as const;
 
 function Issues({ checks, flags }: ReturnType<typeof rowIssues>) {
-  if (!checks.length && !flags.length) return null;
   return (
     <ul className="rissues">
-      {checks.map((c, i) => <li key={i} className={c.sev}>{c.text}</li>)}
-      {flags.map(f => <li key={f.id} className="flag">{"Flag " + f.id.slice(2) + (f.clinical ? " (clinician): " : " (you): ") + f.title}</li>)}
+      {checks.map((c, i) => <li key={i} className={c.sev}><b>{c.sev === "blocking" ? "Fix" : "Check"}</b>{c.text}</li>)}
+      {flags.map(f => <li key={f.id} className="flag"><b>{"Flag " + f.id.slice(2)}</b>{(f.clinical ? "Clinician decides: " : "You decide: ") + f.title}</li>)}
     </ul>
   );
 }
 
-function Status({ s }: { s: keyof typeof STATUS }) {
-  return <span className={"rstat " + STATUS[s][1]}>{STATUS[s][0]}</span>;
+function Status({ s, n }: { s: keyof typeof STATUS; n?: number }) {
+  return <span className={"rstat " + STATUS[s][1]}>{STATUS[s][0]}{n ? " · " + n : ""}</span>;
+}
+
+function Src({ s }: { s?: { page: number; quote: string } }) {
+  return s ? <span className="rsrc" title={"“" + s.quote + "”"}>{"p. " + s.page}</span> : <span className="rsrc team">no quote</span>;
 }
 
 /** Rules in priority order: the IR as an editable table. The decision flow is drawn from this same data. */
@@ -51,17 +54,20 @@ export function RuleTable({ w, canEdit, checks, sel, onSelect, edit, markers }: 
       </div>
       <div className="tw">
         <table className="rtable">
-          <thead><tr>{["#", "Rule", "If", "Then", "Follow-up", "Source", "Status"].map(t => <th key={t}>{t}</th>)}{canEdit ? <th /> : null}</tr></thead>
-          <tbody>
-            {rules.map((r, i) => {
-              const id = item.rule(r.id), o = getO(m, r.outcome), fu = o?.follow_up;
-              const iss = rowIssues(checks, w.flags, [id, item.out(r.outcome), item.fu(r.outcome)]);
-              const other = r.when === "otherwise";
-              const last = i === rules.length - 1, beforeOther = rules[i + 1]?.when === "otherwise";
-              return (
-                <tr key={r.id} className={"r-" + iss.status + (sel === id ? " sel" : "")} onClick={() => onSelect(id)}>
-                  <td className="mono">
-                    {r.priority}
+          <colgroup><col style={{ width: 52 }} /><col style={{ width: 118 }} /><col /><col style={{ width: 230 }} /><col style={{ width: 118 }} /><col style={{ width: 128 }} />{canEdit ? <col style={{ width: 44 }} /> : null}</colgroup>
+          <thead><tr>{["#", "Rule", "If", "Then", "Follow-up", "Status"].map(t => <th key={t}>{t}</th>)}{canEdit ? <th /> : null}</tr></thead>
+          {rules.map((r, i) => {
+            const id = item.rule(r.id), o = getO(m, r.outcome), fu = o?.follow_up;
+            const iss = rowIssues(checks, w.flags, [id, item.out(r.outcome), item.fu(r.outcome)]);
+            const n = iss.checks.length + iss.flags.length;
+            const other = r.when === "otherwise";
+            const last = i === rules.length - 1, beforeOther = rules[i + 1]?.when === "otherwise";
+            const stop = (e: React.MouseEvent) => { if (canEdit) e.stopPropagation(); };
+            return (
+              <tbody key={r.id} className={"r-" + iss.status + (sel === id ? " sel" : "")} onClick={() => onSelect(id)}>
+                <tr>
+                  <td className="rnum">
+                    <span className="mono">{r.priority}</span>
                     {canEdit && !other ? (
                       <span className="rmove" onClick={e => e.stopPropagation()}>
                         <button type="button" className="lnk" aria-label={"Move " + r.id + " up"} disabled={i === 0} onClick={() => move(i, -1)}>{"▲"}</button>
@@ -70,71 +76,76 @@ export function RuleTable({ w, canEdit, checks, sel, onSelect, edit, markers }: 
                     ) : null}
                   </td>
                   <td>
-                    <b className="mono">{r.id}</b>
+                    <div className="rid"><b className="mono">{r.id}</b><Src s={r.source} /></div>
+                    <div className="rmeta">{r.origin === "team" ? "team rule" : "from guideline"}</div>
                     <span className="badges">{(markers[id] || []).map((b, k) => <span key={k} className={"badge " + b[0]}>{b[1]}</span>)}</span>
-                    <span className="note">{r.origin}</span>
                   </td>
-                  <td className="rcond" onClick={e => canEdit && e.stopPropagation()}>
-                    {other ? <i className="note">otherwise (no earlier rule matched)</i>
+                  <td className="rcond" onClick={stop}>
+                    {other ? <i className="note">otherwise: no earlier rule matched</i>
                       : canEdit ? <CondInput id={"rw-" + r.id} live value={r.when as Exclude<Rule["when"], "otherwise">}
                           onCommit={c => c && edit(id, "when", { op: "set", path: ["rules", r.id, "when"], value: c })} />
                       : <span className="mono">{print(r.when as Exclude<Rule["when"], "otherwise">)}</span>}
                   </td>
-                  <td onClick={e => canEdit && e.stopPropagation()}>
-                    <span className="cls"><i style={{ background: "var(--" + sevColor(o?.severity ?? 5) + ")" }} />
+                  <td onClick={stop}>
+                    <span className="rthen"><i style={{ background: "var(--" + sevColor(o?.severity ?? 5) + ")" }} />
                       {canEdit ? (
                         <select aria-label={"Outcome for " + r.id} value={r.outcome} onChange={e => edit(id, "outcome", { op: "set", path: ["rules", r.id, "outcome"], value: e.target.value })}>
                           {m.outcomes.map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
                         </select>
-                      ) : o?.title ?? r.outcome}
+                      ) : <span>{o?.title ?? r.outcome}</span>}
                     </span>
                   </td>
-                  <td onClick={e => canEdit && e.stopPropagation()}>
+                  <td onClick={stop}>
                     {!fu ? <span className="note">none</span> : (
-                      <span className="rfu">
-                        <span className="note">{fu.kind === "scheduled" ? "visit, day" : "on return, day"}</span>
-                        {canEdit ? <CommitInput type="number" live aria-label={"Follow-up due day for " + r.outcome} value={fu.due_in_days ?? ""}
+                      <div className="rfu">
+                        <span className="rmeta">{fu.kind === "scheduled" ? "visit on day" : "on return, day"}</span>
+                        {canEdit ? <CommitInput type="number" live aria-label={"Follow-up due day for " + r.outcome} value={fu.due_in_days ?? ""} placeholder="-"
                           onCommit={v => edit(item.fu(r.outcome), "due", { op: "set", path: ["outcomes", r.outcome, "follow_up", "due_in_days"], value: v.trim() === "" ? null : Number(v) })} />
                           : <b>{fu.due_in_days ?? "-"}</b>}
-                      </span>
+                      </div>
                     )}
                   </td>
-                  <td className="rsrc">{r.source ? <><b>{"p. " + r.source.page}</b> {"“" + r.source.quote + "”"}</> : <span className="note">team, no quote</span>}</td>
-                  <td><Status s={iss.status} /><Issues {...iss} /></td>
+                  <td><Status s={iss.status} n={n} /></td>
                   {canEdit ? (
                     <td onClick={e => e.stopPropagation()}>
-                      {!other ? <button type="button" className="btn tiny bad" aria-label={"Delete " + r.id} onClick={() => remove(i)}>{"×"}</button> : null}
+                      {!other ? <button type="button" className="rdel" aria-label={"Delete " + r.id} title={"Delete " + r.id} onClick={() => remove(i)}>{"×"}</button> : null}
                     </td>
                   ) : null}
                 </tr>
-              );
-            })}
-          </tbody>
+                {n ? <tr className="rdetail"><td /><td colSpan={canEdit ? 6 : 5}><Issues {...iss} /></td></tr> : null}
+              </tbody>
+            );
+          })}
         </table>
       </div>
-      {canEdit ? <div className="btnrow"><button type="button" className="btn tiny" onClick={add}>+ Add rule</button><span className="note">New rules go just before "otherwise".</span></div> : null}
+      {canEdit ? <div className="btnrow"><button type="button" className="btn tiny" onClick={add}>+ Add rule</button><span className="note">New rules go just before "otherwise". Hover a page number to read the quote.</span></div> : null}
 
-      <div className="lab" style={{ marginTop: 14 }}>Derived values (the rules read these)</div>
+      <h3 className="rsec">Derived values <span className="note">computed from the answers; the rules read these</span></h3>
       <div className="tw">
         <table className="rtable">
-          <thead><tr>{["Value", "Name", "Yes when", "Source", "Status"].map(t => <th key={t}>{t}</th>)}</tr></thead>
-          <tbody>
-            {m.derived.map(d => {
-              const id = item.d(d.id), iss = rowIssues(checks, w.flags, [id]);
-              return (
-                <tr key={d.id} className={"r-" + iss.status + (sel === id ? " sel" : "")} onClick={() => onSelect(id)}>
-                  <td><b className="mono">{d.id}</b><span className="badges">{(markers[id] || []).map((b, k) => <span key={k} className={"badge " + b[0]}>{b[1]}</span>)}</span></td>
-                  <td onClick={e => canEdit && e.stopPropagation()}>{canEdit ? <CommitInput type="text" live aria-label={"Name of " + d.id} value={d.label} onCommit={v => edit(id, "label", { op: "set", path: ["derived", d.id, "label"], value: v })} /> : d.label}</td>
-                  <td className="rcond" onClick={e => canEdit && e.stopPropagation()}>
+          <colgroup><col style={{ width: 170 }} /><col style={{ width: 200 }} /><col /><col style={{ width: 128 }} /></colgroup>
+          <thead><tr>{["Value", "Name", "Yes when", "Status"].map(t => <th key={t}>{t}</th>)}</tr></thead>
+          {m.derived.map(d => {
+            const id = item.d(d.id), iss = rowIssues(checks, w.flags, [id]), n = iss.checks.length + iss.flags.length;
+            const stop = (e: React.MouseEvent) => { if (canEdit) e.stopPropagation(); };
+            return (
+              <tbody key={d.id} className={"r-" + iss.status + (sel === id ? " sel" : "")} onClick={() => onSelect(id)}>
+                <tr>
+                  <td>
+                    <div className="rid"><b className="mono">{d.id}</b><Src s={d.source} /></div>
+                    <span className="badges">{(markers[id] || []).map((b, k) => <span key={k} className={"badge " + b[0]}>{b[1]}</span>)}</span>
+                  </td>
+                  <td onClick={stop}>{canEdit ? <CommitInput type="text" live aria-label={"Name of " + d.id} value={d.label} onCommit={v => edit(id, "label", { op: "set", path: ["derived", d.id, "label"], value: v })} /> : d.label}</td>
+                  <td className="rcond" onClick={stop}>
                     {canEdit ? <CondInput id={"dw-" + d.id} live value={d.definition} onCommit={c => c && edit(id, "def", { op: "set", path: ["derived", d.id, "definition"], value: c })} />
                       : <span className="mono">{print(d.definition)}</span>}
                   </td>
-                  <td className="rsrc">{d.source ? <><b>{"p. " + d.source.page}</b> {"“" + d.source.quote + "”"}</> : <span className="note">team, no quote</span>}</td>
-                  <td><Status s={iss.status} /><Issues {...iss} /></td>
+                  <td><Status s={iss.status} n={n} /></td>
                 </tr>
-              );
-            })}
-          </tbody>
+                {n ? <tr className="rdetail"><td colSpan={4}><Issues {...iss} /></td></tr> : null}
+              </tbody>
+            );
+          })}
         </table>
       </div>
     </div>

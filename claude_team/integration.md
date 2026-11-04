@@ -89,3 +89,10 @@ Files or resources touched: Frontend/src/components/{RuleTable,inputs,NodeEditor
 What others must do or know: Live edits use the same Patch path as before, so audit and versions are unchanged (consecutive edits to one field merge into one version).
 Open items: Questions are still edited from the list below the flow, not in a table.
 Related: INT-004, DEC-007
+
+### INT-006 | 2026-11-04 | Vishnu Athreya (agent) | Review UI: React Flow, table layout
+What changed: The decision flow uses React Flow (@xyflow/react) with dagre layout, following the React Flow dagre example: read-only (no dragging or connecting), zoom and pan, vertical or horizontal layout, opens zoomed on the first rules. The Review screen toggle is now Table or Flow only. The rule table is reorganised: fixed columns (#, Rule, If, Then, Follow-up, Status), source page next to the rule id (quote on hover), issues listed in a row under each rule, status pill with issue count.
+Files or resources touched: Frontend/package.json (+@xyflow/react), Frontend/src/components/{Flow,RuleTable}.tsx, Frontend/src/screens/ReviewScreen.tsx, Frontend/src/styles.css.
+What others must do or know: Run npm install in Frontend after pulling.
+Open items: none new.
+Related: INT-005

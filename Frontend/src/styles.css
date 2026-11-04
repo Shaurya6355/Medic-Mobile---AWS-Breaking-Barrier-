@@ -518,3 +518,42 @@ h2{font-size:15px;font-weight:600}
 .rissues li.flag{color:var(--muted)}
 .flowro{position:relative}
 .flowro .node{cursor:default}
+
+/* React Flow (decision flow) */
+.rfwrap{height:720px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.rfwrap .node{position:relative;cursor:pointer}
+.rfwrap .react-flow__handle{opacity:0;pointer-events:none;width:6px;height:6px;min-width:0;min-height:0}
+.rfwrap .react-flow__edge-path{stroke:var(--muted);stroke-width:1.4}
+.rfwrap .react-flow__edge-text{font-size:11px;fill:var(--ink)}
+.rfwrap .react-flow__node{cursor:pointer}
+
+/* Rule table, organised */
+.rtable{table-layout:fixed}
+.rtable > tbody{cursor:pointer}
+.rtable > tbody td{border-bottom:0;background:var(--surface)}
+.rtable > tbody{border-bottom:1px solid var(--line)}
+.rtable > tbody:hover td{background:var(--bg)}
+.rtable > tbody.sel td{background:#E6F2F3}
+.rtable > tbody.r-edit tr:first-child td:first-child{box-shadow:inset 4px 0 0 var(--del)}
+.rtable > tbody.r-check tr:first-child td:first-child{box-shadow:inset 4px 0 0 var(--chg)}
+.rtable > tbody.r-ok tr:first-child td:first-child{box-shadow:inset 4px 0 0 var(--green)}
+.rtable > tbody.r-edit tr.rdetail td:first-child{box-shadow:inset 4px 0 0 var(--del)}
+.rtable > tbody.r-check tr.rdetail td:first-child{box-shadow:inset 4px 0 0 var(--chg)}
+.rtable tr.rdetail td{padding-top:0}
+.rtable .rnum{padding-left:12px}
+.rtable .rid{display:flex;gap:8px;align-items:baseline}
+.rtable .rmeta{font-size:11px;color:var(--muted)}
+.rtable .rsrc{font-size:11px;color:var(--accent);border-bottom:1px dotted var(--accent);cursor:help}
+.rtable .rsrc.team{color:var(--muted);border-bottom-color:var(--line)}
+.rtable .rthen{display:flex;gap:8px;align-items:center}
+.rtable .rthen i{width:10px;height:10px;border-radius:50%;flex:none}
+.rtable .rthen select{width:100%;max-width:none}
+.rtable .rfu{display:grid;gap:2px}
+.rtable .rfu input{width:64px}
+.rtable td.rcond{min-width:0}
+.rdel{border:1px solid var(--line);background:var(--surface);color:var(--del);border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:15px;line-height:1}
+.rdel:hover{border-color:var(--del);background:var(--del-bg)}
+.rissues{list-style:none;padding:8px 10px;margin:0;background:var(--bg);border-radius:8px;min-width:0}
+.rissues li{display:grid;grid-template-columns:62px 1fr;gap:8px}
+.rissues li b{font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.rsec{font-size:15px;margin:18px 0 4px;display:flex;gap:10px;align-items:baseline}

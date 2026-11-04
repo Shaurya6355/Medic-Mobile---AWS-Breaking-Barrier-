@@ -13,9 +13,9 @@ import { FeedbackCard } from "../components/FeedbackCard";
 import { ChecksPanel, FlagsPanel } from "../components/panels";
 import { RuleTable } from "../components/RuleTable";
 
-type View = "table" | "both" | "flow";
-const VIEWS: [View, string][] = [["table", "Table"], ["both", "Table + flow"], ["flow", "Flow"]];
-const readView = (): View => { try { const v = localStorage.getItem("reviewView"); return v === "table" || v === "flow" ? v : "both"; } catch { return "both"; } };
+type View = "table" | "flow";
+const VIEWS: [View, string][] = [["table", "Table"], ["flow", "Flow"]];
+const readView = (): View => { try { return localStorage.getItem("reviewView") === "flow" ? "flow" : "table"; } catch { return "table"; } };
 
 function markersFor(w: Workflow, role: Role, checks: Check[]) {
   const mk: Markers = {}, tone: Tone = {};
@@ -52,7 +52,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
   const title = role === "clinician" ? "Clinical review" + (w.round ? " · round " + w.round : "") : role === "it" ? "Workflow (read-only)" : "Program officer workflow";
 
   let banner: string | null = null, bcls = "banner";
-  if (w.state === "po_draft" && role === "po") banner = "Click any box to check it against its guideline quote and edit it. Boxes marked Changed differ from the live version.";
+  if (w.state === "po_draft" && role === "po") banner = "Edit the rules in the table. Fix every row marked Edit required and look at each Check; the flow is redrawn from the table. Changed means it differs from the live version.";
   if (w.state === "clinician" && role === "clinician") banner = "Click a box marked To review. Approve it, or request a change; you can't edit. The next box opens after each decision.";
   if (w.state === "po_revise" && role === "po") banner = "Boxes marked Change requested carry the clinician's feedback and an AI suggestion. Open each one and accept, edit or discard it.";
   if (!banner && ["po_draft", "clinician", "po_revise"].includes(w.state)) { banner = "Read-only for your role. Editing is locked while it is with someone else."; bcls = "banner muted"; }
@@ -71,27 +71,21 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: Props) {
       {banner ? <div className={bcls}>{banner}</div> : null}
       <section className="panel">
         <div className="ph">
-          <h2>{view === "flow" ? "Rules" : "Rules (IR) · " + m.rules.length + " rules"}</h2>
+          <h2>{view === "flow" ? "Decision flow" : "Rules · " + m.rules.length}</h2>
           <div className="viewtgl" role="group" aria-label="View">
             {VIEWS.map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => pickView(k)}>{l}</button>)}
           </div>
         </div>
-        {view !== "flow"
+        {view === "table"
           ? <RuleTable w={w} canEdit={canEdit} checks={checks} sel={sel} onSelect={setSel} edit={act.edit} markers={mk} />
-          : <p className="note" style={{ margin: 0 }}>The flow below is read-only. Switch to Table to edit the rules.</p>}
+          : <>
+              <p className="note" style={{ margin: "0 0 8px" }}>Read-only, drawn from the rule table{canEdit ? "; your edits there show here straight away" : ""}. Click a box to see its details. Scroll to zoom, drag to pan.</p>
+              <Flow m={m} selected={sel} onSelect={setSel} markers={mk} tone={tone} label="Decision flow (read-only)" />
+            </>}
       </section>
 
       <div className="editgrid">
         <section className="panel">
-          {view !== "table" ? (
-            <>
-              <div className="ph">
-                <h2>Decision flow</h2>
-                <span className="ver">Read-only · drawn from the rule table{canEdit ? " · updates as you edit" : ""}</span>
-              </div>
-              <div className="flowro"><Flow m={m} selected={sel} onSelect={setSel} markers={mk} tone={tone} label="Decision flow (read-only)" /></div>
-            </>
-          ) : null}
           <Tray m={m} selected={sel} onSelect={setSel} markers={mk} />
           <div className="legend">
             <span><span className="badge changed">Changed</span> differs from live</span>
