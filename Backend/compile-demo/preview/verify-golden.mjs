@@ -294,9 +294,9 @@ const MUTATIONS = [
   { id: "m2b", what: "age band edge: age >= 12 emitted as > 12 in the 12-59 month fast-breathing band", from: "age_months  &gt;= 12) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and ( /data/q_breaths_per_minute/breaths_per_minute", to: "age_months  &gt; 12) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and ( /data/q_breaths_per_minute/breaths_per_minute" },
   {
     id: "m3",
-    what: "rule order: danger_sign checked before the age range rule (R1/R3 swapped). EQUIVALENT under minimal: the swap only matters for a child outside the age range with a danger sign, and the minimal flow asks such a child no danger-sign question (danger_sign stays no): the Q2 hazard made silent",
-    swapOutcome: true,
-    equivalentIn: ["minimal"],
+    what: "rule order: the out-of-range rule R2 checked before R1 (outside the age range AND a danger sign), so a child outside the age range with a danger sign gets the lower-urgency result. Not equivalent: the final model's R1 exists to prevent exactly this",
+    from: "if(( /data/outside_age_range  = 'yes' and  /data/danger_sign  = 'yes'), 'refer_urgent_outside_age_range', if( /data/outside_age_range  = 'yes', 'refer_outside_age_range', ",
+    to: "if( /data/outside_age_range  = 'yes', 'refer_outside_age_range', if(( /data/outside_age_range  = 'yes' and  /data/danger_sign  = 'yes'), 'refer_urgent_outside_age_range', ",
   },
   {
     id: "m4",

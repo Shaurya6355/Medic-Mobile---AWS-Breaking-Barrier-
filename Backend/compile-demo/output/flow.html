@@ -9,7 +9,7 @@ body{font-family:system-ui,sans-serif;margin:1.5em;color:#222;max-width:1400px}
 table{border-collapse:collapse;font-size:13px}th,td{border:1px solid #ccc;padding:3px 6px;text-align:left}
 section{margin-top:2em}
 </style></head><body>
-<div class="banner"><strong>Preview build, not approved.</strong> Synthetic data only. Model <code>cough_fast_breathing</code> v1, modelSha <code>3dcbacce7f6065dd4394c6cea1b1e4b268c607e8fc487d40ad4a67d804b22955</code>, flow derivation <code>flow-2-is_no</code>. Compiled form: flowMode <strong>minimal</strong>. Renders offline (mermaid 12.3.0 bundled next to this page).</div>
+<div class="banner"><strong>Preview build, not approved.</strong> Synthetic data only. Model <code>cough_fast_breathing</code> v1, modelSha <code>ade819699397846e36390e803232c81226724585d68b0d7c61deb6d0e1852deb</code>, flow derivation <code>flow-2-is_no</code>. Compiled form: flowMode <strong>minimal</strong>. Renders offline (mermaid 12.3.0 bundled next to this page).</div>
 <h1>Question flow</h1>
 <p>One question per screen; only questions that can still change the outcome are asked. Checked on every answer combination: same outcome as answering everything.</p>
 <div class="choice"><strong>Clinician's choice.</strong> The minimal flow never asks danger-sign questions once the outcome is decided, for example for a child outside 2 to 59 months (a 1-month-old with convulsions is referred without being asked about convulsions). <code>danger_signs_always</code> asks every danger-sign question in every case.</div>
@@ -21,22 +21,28 @@ section{margin-top:2em}
 <tr><td>g05</td><td>Exactly 12 months, 40 breaths</td><td>9: Child's age in months / Does the child have a cough? / For how many days has the child had the cough? / Has the child had convulsions? / Is the child not able to drink or feed anything? / Does the child vomit everything? / Look: does the child have chest indrawing? / Count the child's breaths in 1 minute / Look: is the child unusually sleepy or unconscious?</td><td>9</td><td>9</td></tr>
 <tr><td>g06</td><td>12 months, 39 breaths</td><td>9: Child's age in months / Does the child have a cough? / For how many days has the child had the cough? / Has the child had convulsions? / Is the child not able to drink or feed anything? / Does the child vomit everything? / Look: does the child have chest indrawing? / Count the child's breaths in 1 minute / Look: is the child unusually sleepy or unconscious?</td><td>9</td><td>9</td></tr>
 <tr><td>g07</td><td>59 months, 40 breaths</td><td>9: Child's age in months / Does the child have a cough? / For how many days has the child had the cough? / Has the child had convulsions? / Is the child not able to drink or feed anything? / Does the child vomit everything? / Look: does the child have chest indrawing? / Count the child's breaths in 1 minute / Look: is the child unusually sleepy or unconscious?</td><td>9</td><td>9</td></tr>
-<tr><td>g08</td><td>60 months, no cough</td><td>1: Child's age in months</td><td>7</td><td>7</td></tr>
-<tr><td>g09</td><td>1 month, no cough</td><td>1: Child's age in months</td><td>7</td><td>7</td></tr>
+<tr><td>g08</td><td>60 months, no cough</td><td>7: Child's age in months / Does the child have a cough? / Has the child had convulsions? / Is the child not able to drink or feed anything? / Does the child vomit everything? / Look: does the child have chest indrawing? / Look: is the child unusually sleepy or unconscious?</td><td>7</td><td>7</td></tr>
+<tr><td>g09</td><td>1 month, no cough</td><td>7: Child's age in months / Does the child have a cough? / Has the child had convulsions? / Is the child not able to drink or feed anything? / Does the child vomit everything? / Look: does the child have chest indrawing? / Look: is the child unusually sleepy or unconscious?</td><td>7</td><td>7</td></tr>
 <tr><td>g10</td><td>Cough 14 days, no fast breathing</td><td>5: Child's age in months / Does the child have a cough? / For how many days has the child had the cough? / Look: does the child have chest indrawing? / Count the child's breaths in 1 minute</td><td>9</td><td>9</td></tr>
 <tr><td>g11</td><td>Cough 14 days with fast breathing</td><td>5: Child's age in months / Does the child have a cough? / For how many days has the child had the cough? / Look: does the child have chest indrawing? / Count the child's breaths in 1 minute</td><td>9</td><td>9</td></tr>
 <tr><td>g12</td><td>Chest indrawing alone</td><td>6: Child's age in months / Does the child have a cough? / Has the child had convulsions? / Is the child not able to drink or feed anything? / Does the child vomit everything? / Look: does the child have chest indrawing?</td><td>7</td><td>7</td></tr>
 <tr><td>g13</td><td>No cough, convulsions</td><td>4: Child's age in months / Does the child have a cough? / Has the child had convulsions? / Look: does the child have chest indrawing?</td><td>7</td><td>7</td></tr>
 <tr><td>g14</td><td>No cough, no signs</td><td>7: Child's age in months / Does the child have a cough? / Has the child had convulsions? / Is the child not able to drink or feed anything? / Does the child vomit everything? / Look: does the child have chest indrawing? / Look: is the child unusually sleepy or unconscious?</td><td>7</td><td>7</td></tr>
-<tr><td>g15</td><td>KNOWN HAZARD: 1 month old with convulsions</td><td>1: Child's age in months</td><td>7</td><td>7</td></tr>
+<tr><td>g15</td><td>Outside the age range with a danger sign: 1 month old with convulsions</td><td>3: Child's age in months / Does the child have a cough? / Has the child had convulsions?</td><td>7</td><td>7</td></tr>
+<tr><td>g16</td><td>6 months, convulsions and 55 breaths (danger sign with fast breathing in an infant)</td><td>6: Child's age in months / Does the child have a cough? / For how many days has the child had the cough? / Has the child had convulsions? / Look: does the child have chest indrawing? / Count the child's breaths in 1 minute</td><td>9</td><td>9</td></tr>
+<tr><td>g17</td><td>Outside the age range with a danger sign: 1 month old with chest indrawing</td><td>6: Child's age in months / Does the child have a cough? / Has the child had convulsions? / Is the child not able to drink or feed anything? / Does the child vomit everything? / Look: does the child have chest indrawing?</td><td>7</td><td>7</td></tr>
+<tr><td>g18</td><td>60 months with convulsions (outside the age range, danger sign)</td><td>4: Child's age in months / Does the child have a cough? / For how many days has the child had the cough? / Has the child had convulsions?</td><td>8</td><td>9</td></tr>
+<tr><td>g19</td><td>1 month, cough 14 days (outside the age range, danger sign from long cough)</td><td>3: Child's age in months / Does the child have a cough? / For how many days has the child had the cough?</td><td>8</td><td>9</td></tr>
+<tr><td>g20</td><td>2 months, 49 breaths, no signs (youngest covered age)</td><td>9: Child's age in months / Does the child have a cough? / For how many days has the child had the cough? / Has the child had convulsions? / Is the child not able to drink or feed anything? / Does the child vomit everything? / Look: does the child have chest indrawing? / Count the child's breaths in 1 minute / Look: is the child unusually sleepy or unconscious?</td><td>9</td><td>9</td></tr>
 </tbody></table>
 
 <section id="minimal">
 <h2>minimal: only questions that can still change the outcome <span class="tag">compiled form</span></h2>
-<p>Average questions over the 6400-combination grid: <strong>3.19</strong> (all questions: 8.92). Mismatches against answering everything: 0 (tree), 0 (compiled form).</p>
-<ul><li>The form starts by asking "Child's age in months".</li><li>Always asked: "Child's age in months".</li><li>Asked only when the answer can still change the result: "Does the child have a cough?", "For how many days has the child had the cough?", "Has the child had convulsions?", "Is the child not able to drink or feed anything?", "Does the child vomit everything?", "Look: does the child have chest indrawing?", "Count the child's breaths in 1 minute", "Look: is the child unusually sleepy or unconscious?".</li></ul>
-<details><summary>How the form can end (53 ways)</summary>
-<h4>Refer to health facility: child is outside the age range this form covers</h4><ul><li>"Child's age in months" is under 2 months or 60 months or more</li></ul>
+<p>Average questions over the 6400-combination grid: <strong>4.67</strong> (all questions: 8.92). Mismatches against answering everything: 0 (tree), 0 (compiled form).</p>
+<ul><li>The form starts by asking "Child's age in months".</li><li>Always asked: "Child's age in months", "Does the child have a cough?".</li><li>Asked only when the answer can still change the result: "For how many days has the child had the cough?", "Has the child had convulsions?", "Is the child not able to drink or feed anything?", "Does the child vomit everything?", "Look: does the child have chest indrawing?", "Count the child's breaths in 1 minute", "Look: is the child unusually sleepy or unconscious?".</li></ul>
+<details><summary>How the form can end (65 ways)</summary>
+<h4>Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.</h4><ul><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is yes</li></ul>
+<h4>Outside this form's age range, no danger sign: refer to health facility</h4><ul><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is no</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is no</li></ul>
 <h4>Danger sign: refer urgently and give first dose of antibiotic</h4><ul><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li></ul>
 <h4>Danger sign: refer urgently</h4><ul><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 50 breaths per minute</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 50 breaths per minute</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 50 breaths per minute</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 50 breaths per minute, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 50 breaths per minute</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 40 breaths per minute</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 40 breaths per minute</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 40 breaths per minute</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 40 breaths per minute, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 40 breaths per minute</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is yes</li></ul>
 <h4>Fast breathing (pneumonia): treat at home and follow up in 3 days</h4><ul><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more, and "Look: is the child unusually sleepy or unconscious?" is no</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more, and "Look: is the child unusually sleepy or unconscious?" is no</li></ul>
@@ -45,174 +51,248 @@ section{margin-top:2em}
 </details>
 <div class="diagram"><pre class="mermaid">flowchart TD
   q0["Child's age in months"]
-  out_refer_outside_age_range(["Refer to health facility: child is outside the age range this form covers"])
-  q0 -- "under 2 months" --&gt; out_refer_outside_age_range
   q1["Does the child have a cough?"]
   q2["For how many days has the child had the cough?"]
   q3["Has the child had convulsions?"]
-  q4["Look: does the child have chest indrawing?"]
-  out_refer_urgent_with_antibiotic(["Danger sign: refer urgently and give first dose of antibiotic"])
-  q4 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q5["Count the child's breaths in 1 minute"]
-  out_refer_urgent(["Danger sign: refer urgently"])
-  q5 -- "under 50 breaths per minute" --&gt; out_refer_urgent
-  q5 -- "50 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
+  out_refer_urgent_outside_age_range(["Danger sign, outside this form's age range: refer urgently. Give no medicine from this form."])
+  q3 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q4["Is the child not able to drink or feed anything?"]
+  q4 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q5["Does the child vomit everything?"]
+  q5 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q6["Look: does the child have chest indrawing?"]
+  q6 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q7["Look: is the child unusually sleepy or unconscious?"]
+  q7 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  out_refer_outside_age_range(["Outside this form's age range, no danger sign: refer to health facility"])
+  q7 -- "no" --&gt; out_refer_outside_age_range
+  q6 -- "no" --&gt; q7
+  q5 -- "no" --&gt; q6
   q4 -- "no" --&gt; q5
-  q3 -- "yes" --&gt; q4
-  q6["Is the child not able to drink or feed anything?"]
-  q7["Look: does the child have chest indrawing?"]
-  q7 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q8["Count the child's breaths in 1 minute"]
-  q8 -- "under 50 breaths per minute" --&gt; out_refer_urgent
-  q8 -- "50 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
-  q7 -- "no" --&gt; q8
-  q6 -- "yes" --&gt; q7
-  q9["Does the child vomit everything?"]
-  q10["Look: does the child have chest indrawing?"]
-  q10 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q11["Count the child's breaths in 1 minute"]
-  q11 -- "under 50 breaths per minute" --&gt; out_refer_urgent
-  q11 -- "50 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
-  q10 -- "no" --&gt; q11
-  q9 -- "yes" --&gt; q10
-  q12["Look: does the child have chest indrawing?"]
-  q12 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q13["Count the child's breaths in 1 minute"]
-  q14["Look: is the child unusually sleepy or unconscious?"]
-  q14 -- "yes" --&gt; out_refer_urgent
-  out_cough_no_fast_breathing(["Cough without fast breathing or danger signs"])
-  q14 -- "no" --&gt; out_cough_no_fast_breathing
-  q13 -- "under 50 breaths per minute" --&gt; q14
-  q15["Look: is the child unusually sleepy or unconscious?"]
-  q15 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  out_treat_fast_breathing_at_home(["Fast breathing (pneumonia): treat at home and follow up in 3 days"])
-  q15 -- "no" --&gt; out_treat_fast_breathing_at_home
-  q13 -- "50 breaths per minute or more" --&gt; q15
-  q12 -- "no" --&gt; q13
-  q9 -- "no" --&gt; q12
-  q6 -- "no" --&gt; q9
-  q3 -- "no" --&gt; q6
+  q3 -- "no" --&gt; q4
   q2 -- "under 14 days" --&gt; q3
+  q2 -- "14 days or more" --&gt; out_refer_urgent_outside_age_range
+  q1 -- "yes" --&gt; q2
+  q8["Has the child had convulsions?"]
+  q8 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q9["Is the child not able to drink or feed anything?"]
+  q9 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q10["Does the child vomit everything?"]
+  q10 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q11["Look: does the child have chest indrawing?"]
+  q11 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q12["Look: is the child unusually sleepy or unconscious?"]
+  q12 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q12 -- "no" --&gt; out_refer_outside_age_range
+  q11 -- "no" --&gt; q12
+  q10 -- "no" --&gt; q11
+  q9 -- "no" --&gt; q10
+  q8 -- "no" --&gt; q9
+  q1 -- "no" --&gt; q8
+  q0 -- "under 2 months" --&gt; q1
+  q13["Does the child have a cough?"]
+  q14["For how many days has the child had the cough?"]
+  q15["Has the child had convulsions?"]
   q16["Look: does the child have chest indrawing?"]
+  out_refer_urgent_with_antibiotic(["Danger sign: refer urgently and give first dose of antibiotic"])
   q16 -- "yes" --&gt; out_refer_urgent_with_antibiotic
   q17["Count the child's breaths in 1 minute"]
+  out_refer_urgent(["Danger sign: refer urgently"])
   q17 -- "under 50 breaths per minute" --&gt; out_refer_urgent
   q17 -- "50 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
   q16 -- "no" --&gt; q17
-  q2 -- "14 days or more" --&gt; q16
-  q1 -- "yes" --&gt; q2
-  q18["Has the child had convulsions?"]
+  q15 -- "yes" --&gt; q16
+  q18["Is the child not able to drink or feed anything?"]
   q19["Look: does the child have chest indrawing?"]
   q19 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q19 -- "no" --&gt; out_refer_urgent
+  q20["Count the child's breaths in 1 minute"]
+  q20 -- "under 50 breaths per minute" --&gt; out_refer_urgent
+  q20 -- "50 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
+  q19 -- "no" --&gt; q20
   q18 -- "yes" --&gt; q19
-  q20["Is the child not able to drink or feed anything?"]
-  q21["Look: does the child have chest indrawing?"]
-  q21 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q21 -- "no" --&gt; out_refer_urgent
-  q20 -- "yes" --&gt; q21
-  q22["Does the child vomit everything?"]
-  q23["Look: does the child have chest indrawing?"]
-  q23 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q23 -- "no" --&gt; out_refer_urgent
-  q22 -- "yes" --&gt; q23
+  q21["Does the child vomit everything?"]
+  q22["Look: does the child have chest indrawing?"]
+  q22 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q23["Count the child's breaths in 1 minute"]
+  q23 -- "under 50 breaths per minute" --&gt; out_refer_urgent
+  q23 -- "50 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
+  q22 -- "no" --&gt; q23
+  q21 -- "yes" --&gt; q22
   q24["Look: does the child have chest indrawing?"]
   q24 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q25["Look: is the child unusually sleepy or unconscious?"]
-  q25 -- "yes" --&gt; out_refer_urgent
-  out_no_cough(["No cough: this form does not apply. Assess other problems."])
-  q25 -- "no" --&gt; out_no_cough
+  q25["Count the child's breaths in 1 minute"]
+  q26["Look: is the child unusually sleepy or unconscious?"]
+  q26 -- "yes" --&gt; out_refer_urgent
+  out_cough_no_fast_breathing(["Cough without fast breathing or danger signs"])
+  q26 -- "no" --&gt; out_cough_no_fast_breathing
+  q25 -- "under 50 breaths per minute" --&gt; q26
+  q27["Look: is the child unusually sleepy or unconscious?"]
+  q27 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  out_treat_fast_breathing_at_home(["Fast breathing (pneumonia): treat at home and follow up in 3 days"])
+  q27 -- "no" --&gt; out_treat_fast_breathing_at_home
+  q25 -- "50 breaths per minute or more" --&gt; q27
   q24 -- "no" --&gt; q25
-  q22 -- "no" --&gt; q24
-  q20 -- "no" --&gt; q22
-  q18 -- "no" --&gt; q20
-  q1 -- "no" --&gt; q18
-  q0 -- "2 to 11 months" --&gt; q1
-  q26["Does the child have a cough?"]
-  q27["For how many days has the child had the cough?"]
-  q28["Has the child had convulsions?"]
-  q29["Look: does the child have chest indrawing?"]
-  q29 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q30["Count the child's breaths in 1 minute"]
-  q30 -- "under 40 breaths per minute" --&gt; out_refer_urgent
-  q30 -- "40 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
-  q29 -- "no" --&gt; q30
-  q28 -- "yes" --&gt; q29
-  q31["Is the child not able to drink or feed anything?"]
-  q32["Look: does the child have chest indrawing?"]
-  q32 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q33["Count the child's breaths in 1 minute"]
-  q33 -- "under 40 breaths per minute" --&gt; out_refer_urgent
-  q33 -- "40 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
-  q32 -- "no" --&gt; q33
-  q31 -- "yes" --&gt; q32
+  q21 -- "no" --&gt; q24
+  q18 -- "no" --&gt; q21
+  q15 -- "no" --&gt; q18
+  q14 -- "under 14 days" --&gt; q15
+  q28["Look: does the child have chest indrawing?"]
+  q28 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q29["Count the child's breaths in 1 minute"]
+  q29 -- "under 50 breaths per minute" --&gt; out_refer_urgent
+  q29 -- "50 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
+  q28 -- "no" --&gt; q29
+  q14 -- "14 days or more" --&gt; q28
+  q13 -- "yes" --&gt; q14
+  q30["Has the child had convulsions?"]
+  q31["Look: does the child have chest indrawing?"]
+  q31 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q31 -- "no" --&gt; out_refer_urgent
+  q30 -- "yes" --&gt; q31
+  q32["Is the child not able to drink or feed anything?"]
+  q33["Look: does the child have chest indrawing?"]
+  q33 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q33 -- "no" --&gt; out_refer_urgent
+  q32 -- "yes" --&gt; q33
   q34["Does the child vomit everything?"]
   q35["Look: does the child have chest indrawing?"]
   q35 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q36["Count the child's breaths in 1 minute"]
-  q36 -- "under 40 breaths per minute" --&gt; out_refer_urgent
-  q36 -- "40 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
-  q35 -- "no" --&gt; q36
+  q35 -- "no" --&gt; out_refer_urgent
   q34 -- "yes" --&gt; q35
-  q37["Look: does the child have chest indrawing?"]
-  q37 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q38["Count the child's breaths in 1 minute"]
-  q39["Look: is the child unusually sleepy or unconscious?"]
-  q39 -- "yes" --&gt; out_refer_urgent
-  q39 -- "no" --&gt; out_cough_no_fast_breathing
-  q38 -- "under 40 breaths per minute" --&gt; q39
-  q40["Look: is the child unusually sleepy or unconscious?"]
-  q40 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q40 -- "no" --&gt; out_treat_fast_breathing_at_home
-  q38 -- "40 breaths per minute or more" --&gt; q40
-  q37 -- "no" --&gt; q38
-  q34 -- "no" --&gt; q37
-  q31 -- "no" --&gt; q34
-  q28 -- "no" --&gt; q31
-  q27 -- "under 14 days" --&gt; q28
+  q36["Look: does the child have chest indrawing?"]
+  q36 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q37["Look: is the child unusually sleepy or unconscious?"]
+  q37 -- "yes" --&gt; out_refer_urgent
+  out_no_cough(["No cough: this form does not apply. Assess other problems."])
+  q37 -- "no" --&gt; out_no_cough
+  q36 -- "no" --&gt; q37
+  q34 -- "no" --&gt; q36
+  q32 -- "no" --&gt; q34
+  q30 -- "no" --&gt; q32
+  q13 -- "no" --&gt; q30
+  q0 -- "2 to 11 months" --&gt; q13
+  q38["Does the child have a cough?"]
+  q39["For how many days has the child had the cough?"]
+  q40["Has the child had convulsions?"]
   q41["Look: does the child have chest indrawing?"]
   q41 -- "yes" --&gt; out_refer_urgent_with_antibiotic
   q42["Count the child's breaths in 1 minute"]
   q42 -- "under 40 breaths per minute" --&gt; out_refer_urgent
   q42 -- "40 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
   q41 -- "no" --&gt; q42
-  q27 -- "14 days or more" --&gt; q41
-  q26 -- "yes" --&gt; q27
-  q43["Has the child had convulsions?"]
+  q40 -- "yes" --&gt; q41
+  q43["Is the child not able to drink or feed anything?"]
   q44["Look: does the child have chest indrawing?"]
   q44 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q44 -- "no" --&gt; out_refer_urgent
+  q45["Count the child's breaths in 1 minute"]
+  q45 -- "under 40 breaths per minute" --&gt; out_refer_urgent
+  q45 -- "40 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
+  q44 -- "no" --&gt; q45
   q43 -- "yes" --&gt; q44
-  q45["Is the child not able to drink or feed anything?"]
-  q46["Look: does the child have chest indrawing?"]
-  q46 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q46 -- "no" --&gt; out_refer_urgent
-  q45 -- "yes" --&gt; q46
-  q47["Does the child vomit everything?"]
-  q48["Look: does the child have chest indrawing?"]
-  q48 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q48 -- "no" --&gt; out_refer_urgent
-  q47 -- "yes" --&gt; q48
+  q46["Does the child vomit everything?"]
+  q47["Look: does the child have chest indrawing?"]
+  q47 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q48["Count the child's breaths in 1 minute"]
+  q48 -- "under 40 breaths per minute" --&gt; out_refer_urgent
+  q48 -- "40 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
+  q47 -- "no" --&gt; q48
+  q46 -- "yes" --&gt; q47
   q49["Look: does the child have chest indrawing?"]
   q49 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q50["Look: is the child unusually sleepy or unconscious?"]
-  q50 -- "yes" --&gt; out_refer_urgent
-  q50 -- "no" --&gt; out_no_cough
+  q50["Count the child's breaths in 1 minute"]
+  q51["Look: is the child unusually sleepy or unconscious?"]
+  q51 -- "yes" --&gt; out_refer_urgent
+  q51 -- "no" --&gt; out_cough_no_fast_breathing
+  q50 -- "under 40 breaths per minute" --&gt; q51
+  q52["Look: is the child unusually sleepy or unconscious?"]
+  q52 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q52 -- "no" --&gt; out_treat_fast_breathing_at_home
+  q50 -- "40 breaths per minute or more" --&gt; q52
   q49 -- "no" --&gt; q50
-  q47 -- "no" --&gt; q49
-  q45 -- "no" --&gt; q47
-  q43 -- "no" --&gt; q45
-  q26 -- "no" --&gt; q43
-  q0 -- "12 to 59 months" --&gt; q26
-  q0 -- "60 months or more" --&gt; out_refer_outside_age_range</pre></div>
+  q46 -- "no" --&gt; q49
+  q43 -- "no" --&gt; q46
+  q40 -- "no" --&gt; q43
+  q39 -- "under 14 days" --&gt; q40
+  q53["Look: does the child have chest indrawing?"]
+  q53 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q54["Count the child's breaths in 1 minute"]
+  q54 -- "under 40 breaths per minute" --&gt; out_refer_urgent
+  q54 -- "40 breaths per minute or more" --&gt; out_refer_urgent_with_antibiotic
+  q53 -- "no" --&gt; q54
+  q39 -- "14 days or more" --&gt; q53
+  q38 -- "yes" --&gt; q39
+  q55["Has the child had convulsions?"]
+  q56["Look: does the child have chest indrawing?"]
+  q56 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q56 -- "no" --&gt; out_refer_urgent
+  q55 -- "yes" --&gt; q56
+  q57["Is the child not able to drink or feed anything?"]
+  q58["Look: does the child have chest indrawing?"]
+  q58 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q58 -- "no" --&gt; out_refer_urgent
+  q57 -- "yes" --&gt; q58
+  q59["Does the child vomit everything?"]
+  q60["Look: does the child have chest indrawing?"]
+  q60 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q60 -- "no" --&gt; out_refer_urgent
+  q59 -- "yes" --&gt; q60
+  q61["Look: does the child have chest indrawing?"]
+  q61 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q62["Look: is the child unusually sleepy or unconscious?"]
+  q62 -- "yes" --&gt; out_refer_urgent
+  q62 -- "no" --&gt; out_no_cough
+  q61 -- "no" --&gt; q62
+  q59 -- "no" --&gt; q61
+  q57 -- "no" --&gt; q59
+  q55 -- "no" --&gt; q57
+  q38 -- "no" --&gt; q55
+  q0 -- "12 to 59 months" --&gt; q38
+  q63["Does the child have a cough?"]
+  q64["For how many days has the child had the cough?"]
+  q65["Has the child had convulsions?"]
+  q65 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q66["Is the child not able to drink or feed anything?"]
+  q66 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q67["Does the child vomit everything?"]
+  q67 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q68["Look: does the child have chest indrawing?"]
+  q68 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q69["Look: is the child unusually sleepy or unconscious?"]
+  q69 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q69 -- "no" --&gt; out_refer_outside_age_range
+  q68 -- "no" --&gt; q69
+  q67 -- "no" --&gt; q68
+  q66 -- "no" --&gt; q67
+  q65 -- "no" --&gt; q66
+  q64 -- "under 14 days" --&gt; q65
+  q64 -- "14 days or more" --&gt; out_refer_urgent_outside_age_range
+  q63 -- "yes" --&gt; q64
+  q70["Has the child had convulsions?"]
+  q70 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q71["Is the child not able to drink or feed anything?"]
+  q71 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q72["Does the child vomit everything?"]
+  q72 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q73["Look: does the child have chest indrawing?"]
+  q73 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q74["Look: is the child unusually sleepy or unconscious?"]
+  q74 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q74 -- "no" --&gt; out_refer_outside_age_range
+  q73 -- "no" --&gt; q74
+  q72 -- "no" --&gt; q73
+  q71 -- "no" --&gt; q72
+  q70 -- "no" --&gt; q71
+  q63 -- "no" --&gt; q70
+  q0 -- "60 months or more" --&gt; q63</pre></div>
 </section>
 
 <section id="danger_signs_always">
 <h2>danger_signs_always: as minimal, but every danger-sign question is always asked</h2>
 <p>Average questions over the 6400-combination grid: <strong>8.20</strong> (all questions: 8.92). Mismatches against answering everything: 0 (tree), 0 (compiled form).</p>
 <ul><li>The form starts by asking "Child's age in months".</li><li>Always asked: "Child's age in months", "Does the child have a cough?", "Has the child had convulsions?", "Is the child not able to drink or feed anything?", "Does the child vomit everything?", "Look: does the child have chest indrawing?", "Look: is the child unusually sleepy or unconscious?".</li><li>Asked only when the answer can still change the result: "For how many days has the child had the cough?", "Count the child's breaths in 1 minute".</li><li>Never skipped on purpose: "Does the child have a cough?", "For how many days has the child had the cough?", "Has the child had convulsions?", "Is the child not able to drink or feed anything?", "Does the child vomit everything?", "Look: does the child have chest indrawing?", "Look: is the child unusually sleepy or unconscious?".</li></ul>
-<details><summary>How the form can end (54 ways)</summary>
-<h4>Refer to health facility: child is outside the age range this form covers</h4><ul><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no</li></ul>
+<details><summary>How the form can end (65 ways)</summary>
+<h4>Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.</h4><ul><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is yes</li></ul>
+<h4>Outside this form's age range, no danger sign: refer to health facility</h4><ul><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is no</li><li>"Child's age in months" is under 2 months or 60 months or more, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is no</li></ul>
 <h4>Danger sign: refer urgently and give first dose of antibiotic</h4><ul><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is yes</li></ul>
 <h4>Danger sign: refer urgently</h4><ul><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 50 breaths per minute</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 50 breaths per minute</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 50 breaths per minute</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 50 breaths per minute, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 50 breaths per minute</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 40 breaths per minute</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 40 breaths per minute</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 40 breaths per minute</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 40 breaths per minute, and "Look: is the child unusually sleepy or unconscious?" is yes</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is 14 days or more, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is under 40 breaths per minute</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is yes, and "Look: does the child have chest indrawing?" is no</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is no, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Look: is the child unusually sleepy or unconscious?" is yes</li></ul>
 <h4>Fast breathing (pneumonia): treat at home and follow up in 3 days</h4><ul><li>"Child's age in months" is 2 to 11 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 50 breaths per minute or more, and "Look: is the child unusually sleepy or unconscious?" is no</li><li>"Child's age in months" is 12 to 59 months, and "Does the child have a cough?" is yes, and "For how many days has the child had the cough?" is under 14 days, and "Has the child had convulsions?" is no, and "Is the child not able to drink or feed anything?" is no, and "Does the child vomit everything?" is no, and "Look: does the child have chest indrawing?" is no, and "Count the child's breaths in 1 minute" is 40 breaths per minute or more, and "Look: is the child unusually sleepy or unconscious?" is no</li></ul>
@@ -228,325 +308,448 @@ section{margin-top:2em}
   q5["Does the child vomit everything?"]
   q6["Look: does the child have chest indrawing?"]
   q7["Look: is the child unusually sleepy or unconscious?"]
-  out_refer_outside_age_range(["Refer to health facility: child is outside the age range this form covers"])
-  q7 -- "any answer" --&gt; out_refer_outside_age_range
+  out_refer_urgent_outside_age_range(["Danger sign, outside this form's age range: refer urgently. Give no medicine from this form."])
+  q7 -- "any answer" --&gt; out_refer_urgent_outside_age_range
   q6 -- "any answer" --&gt; q7
   q5 -- "any answer" --&gt; q6
   q4 -- "any answer" --&gt; q5
-  q3 -- "any answer" --&gt; q4
-  q2 -- "any answer" --&gt; q3
-  q1 -- "yes" --&gt; q2
-  q8["Has the child had convulsions?"]
-  q9["Is the child not able to drink or feed anything?"]
-  q10["Does the child vomit everything?"]
-  q11["Look: does the child have chest indrawing?"]
-  q12["Look: is the child unusually sleepy or unconscious?"]
-  q12 -- "any answer" --&gt; out_refer_outside_age_range
-  q11 -- "any answer" --&gt; q12
+  q3 -- "yes" --&gt; q4
+  q8["Is the child not able to drink or feed anything?"]
+  q9["Does the child vomit everything?"]
+  q10["Look: does the child have chest indrawing?"]
+  q11["Look: is the child unusually sleepy or unconscious?"]
+  q11 -- "any answer" --&gt; out_refer_urgent_outside_age_range
   q10 -- "any answer" --&gt; q11
   q9 -- "any answer" --&gt; q10
-  q8 -- "any answer" --&gt; q9
-  q1 -- "no" --&gt; q8
-  q0 -- "under 2 months" --&gt; q1
-  q13["Does the child have a cough?"]
-  q14["For how many days has the child had the cough?"]
-  q15["Has the child had convulsions?"]
-  q16["Is the child not able to drink or feed anything?"]
-  q17["Does the child vomit everything?"]
-  q18["Look: does the child have chest indrawing?"]
-  q19["Look: is the child unusually sleepy or unconscious?"]
-  out_refer_urgent_with_antibiotic(["Danger sign: refer urgently and give first dose of antibiotic"])
-  q19 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q18 -- "yes" --&gt; q19
-  q20["Count the child's breaths in 1 minute"]
-  q21["Look: is the child unusually sleepy or unconscious?"]
-  out_refer_urgent(["Danger sign: refer urgently"])
-  q21 -- "any answer" --&gt; out_refer_urgent
-  q20 -- "under 50 breaths per minute" --&gt; q21
-  q22["Look: is the child unusually sleepy or unconscious?"]
-  q22 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q20 -- "50 breaths per minute or more" --&gt; q22
-  q18 -- "no" --&gt; q20
-  q17 -- "any answer" --&gt; q18
-  q16 -- "any answer" --&gt; q17
+  q8 -- "yes" --&gt; q9
+  q12["Does the child vomit everything?"]
+  q13["Look: does the child have chest indrawing?"]
+  q14["Look: is the child unusually sleepy or unconscious?"]
+  q14 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q13 -- "any answer" --&gt; q14
+  q12 -- "yes" --&gt; q13
+  q15["Look: does the child have chest indrawing?"]
+  q16["Look: is the child unusually sleepy or unconscious?"]
+  q16 -- "any answer" --&gt; out_refer_urgent_outside_age_range
   q15 -- "yes" --&gt; q16
-  q23["Is the child not able to drink or feed anything?"]
-  q24["Does the child vomit everything?"]
-  q25["Look: does the child have chest indrawing?"]
-  q26["Look: is the child unusually sleepy or unconscious?"]
-  q26 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q25 -- "yes" --&gt; q26
-  q27["Count the child's breaths in 1 minute"]
-  q28["Look: is the child unusually sleepy or unconscious?"]
-  q28 -- "any answer" --&gt; out_refer_urgent
-  q27 -- "under 50 breaths per minute" --&gt; q28
-  q29["Look: is the child unusually sleepy or unconscious?"]
-  q29 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q27 -- "50 breaths per minute or more" --&gt; q29
-  q25 -- "no" --&gt; q27
+  q17["Look: is the child unusually sleepy or unconscious?"]
+  q17 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  out_refer_outside_age_range(["Outside this form's age range, no danger sign: refer to health facility"])
+  q17 -- "no" --&gt; out_refer_outside_age_range
+  q15 -- "no" --&gt; q17
+  q12 -- "no" --&gt; q15
+  q8 -- "no" --&gt; q12
+  q3 -- "no" --&gt; q8
+  q2 -- "under 14 days" --&gt; q3
+  q18["Has the child had convulsions?"]
+  q19["Is the child not able to drink or feed anything?"]
+  q20["Does the child vomit everything?"]
+  q21["Look: does the child have chest indrawing?"]
+  q22["Look: is the child unusually sleepy or unconscious?"]
+  q22 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q21 -- "any answer" --&gt; q22
+  q20 -- "any answer" --&gt; q21
+  q19 -- "any answer" --&gt; q20
+  q18 -- "any answer" --&gt; q19
+  q2 -- "14 days or more" --&gt; q18
+  q1 -- "yes" --&gt; q2
+  q23["Has the child had convulsions?"]
+  q24["Is the child not able to drink or feed anything?"]
+  q25["Does the child vomit everything?"]
+  q26["Look: does the child have chest indrawing?"]
+  q27["Look: is the child unusually sleepy or unconscious?"]
+  q27 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q26 -- "any answer" --&gt; q27
+  q25 -- "any answer" --&gt; q26
   q24 -- "any answer" --&gt; q25
   q23 -- "yes" --&gt; q24
-  q30["Does the child vomit everything?"]
-  q31["Look: does the child have chest indrawing?"]
-  q32["Look: is the child unusually sleepy or unconscious?"]
-  q32 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q31 -- "yes" --&gt; q32
-  q33["Count the child's breaths in 1 minute"]
+  q28["Is the child not able to drink or feed anything?"]
+  q29["Does the child vomit everything?"]
+  q30["Look: does the child have chest indrawing?"]
+  q31["Look: is the child unusually sleepy or unconscious?"]
+  q31 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q30 -- "any answer" --&gt; q31
+  q29 -- "any answer" --&gt; q30
+  q28 -- "yes" --&gt; q29
+  q32["Does the child vomit everything?"]
+  q33["Look: does the child have chest indrawing?"]
   q34["Look: is the child unusually sleepy or unconscious?"]
-  q34 -- "any answer" --&gt; out_refer_urgent
-  q33 -- "under 50 breaths per minute" --&gt; q34
-  q35["Look: is the child unusually sleepy or unconscious?"]
-  q35 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q33 -- "50 breaths per minute or more" --&gt; q35
-  q31 -- "no" --&gt; q33
-  q30 -- "yes" --&gt; q31
-  q36["Look: does the child have chest indrawing?"]
+  q34 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q33 -- "any answer" --&gt; q34
+  q32 -- "yes" --&gt; q33
+  q35["Look: does the child have chest indrawing?"]
+  q36["Look: is the child unusually sleepy or unconscious?"]
+  q36 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q35 -- "yes" --&gt; q36
   q37["Look: is the child unusually sleepy or unconscious?"]
-  q37 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q36 -- "yes" --&gt; q37
-  q38["Count the child's breaths in 1 minute"]
-  q39["Look: is the child unusually sleepy or unconscious?"]
-  q39 -- "yes" --&gt; out_refer_urgent
-  out_cough_no_fast_breathing(["Cough without fast breathing or danger signs"])
-  q39 -- "no" --&gt; out_cough_no_fast_breathing
-  q38 -- "under 50 breaths per minute" --&gt; q39
-  q40["Look: is the child unusually sleepy or unconscious?"]
-  q40 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  out_treat_fast_breathing_at_home(["Fast breathing (pneumonia): treat at home and follow up in 3 days"])
-  q40 -- "no" --&gt; out_treat_fast_breathing_at_home
-  q38 -- "50 breaths per minute or more" --&gt; q40
-  q36 -- "no" --&gt; q38
-  q30 -- "no" --&gt; q36
-  q23 -- "no" --&gt; q30
-  q15 -- "no" --&gt; q23
-  q14 -- "under 14 days" --&gt; q15
-  q41["Has the child had convulsions?"]
-  q42["Is the child not able to drink or feed anything?"]
-  q43["Does the child vomit everything?"]
-  q44["Look: does the child have chest indrawing?"]
-  q45["Look: is the child unusually sleepy or unconscious?"]
-  q45 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q44 -- "yes" --&gt; q45
-  q46["Count the child's breaths in 1 minute"]
+  q37 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q37 -- "no" --&gt; out_refer_outside_age_range
+  q35 -- "no" --&gt; q37
+  q32 -- "no" --&gt; q35
+  q28 -- "no" --&gt; q32
+  q23 -- "no" --&gt; q28
+  q1 -- "no" --&gt; q23
+  q0 -- "under 2 months" --&gt; q1
+  q38["Does the child have a cough?"]
+  q39["For how many days has the child had the cough?"]
+  q40["Has the child had convulsions?"]
+  q41["Is the child not able to drink or feed anything?"]
+  q42["Does the child vomit everything?"]
+  q43["Look: does the child have chest indrawing?"]
+  q44["Look: is the child unusually sleepy or unconscious?"]
+  out_refer_urgent_with_antibiotic(["Danger sign: refer urgently and give first dose of antibiotic"])
+  q44 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q43 -- "yes" --&gt; q44
+  q45["Count the child's breaths in 1 minute"]
+  q46["Look: is the child unusually sleepy or unconscious?"]
+  out_refer_urgent(["Danger sign: refer urgently"])
+  q46 -- "any answer" --&gt; out_refer_urgent
+  q45 -- "under 50 breaths per minute" --&gt; q46
   q47["Look: is the child unusually sleepy or unconscious?"]
-  q47 -- "any answer" --&gt; out_refer_urgent
-  q46 -- "under 50 breaths per minute" --&gt; q47
-  q48["Look: is the child unusually sleepy or unconscious?"]
-  q48 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q46 -- "50 breaths per minute or more" --&gt; q48
-  q44 -- "no" --&gt; q46
-  q43 -- "any answer" --&gt; q44
+  q47 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q45 -- "50 breaths per minute or more" --&gt; q47
+  q43 -- "no" --&gt; q45
   q42 -- "any answer" --&gt; q43
   q41 -- "any answer" --&gt; q42
-  q14 -- "14 days or more" --&gt; q41
-  q13 -- "yes" --&gt; q14
-  q49["Has the child had convulsions?"]
-  q50["Is the child not able to drink or feed anything?"]
-  q51["Does the child vomit everything?"]
-  q52["Look: does the child have chest indrawing?"]
+  q40 -- "yes" --&gt; q41
+  q48["Is the child not able to drink or feed anything?"]
+  q49["Does the child vomit everything?"]
+  q50["Look: does the child have chest indrawing?"]
+  q51["Look: is the child unusually sleepy or unconscious?"]
+  q51 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q50 -- "yes" --&gt; q51
+  q52["Count the child's breaths in 1 minute"]
   q53["Look: is the child unusually sleepy or unconscious?"]
-  q53 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q52 -- "yes" --&gt; q53
+  q53 -- "any answer" --&gt; out_refer_urgent
+  q52 -- "under 50 breaths per minute" --&gt; q53
   q54["Look: is the child unusually sleepy or unconscious?"]
-  q54 -- "any answer" --&gt; out_refer_urgent
-  q52 -- "no" --&gt; q54
-  q51 -- "any answer" --&gt; q52
-  q50 -- "any answer" --&gt; q51
-  q49 -- "yes" --&gt; q50
-  q55["Is the child not able to drink or feed anything?"]
-  q56["Does the child vomit everything?"]
-  q57["Look: does the child have chest indrawing?"]
-  q58["Look: is the child unusually sleepy or unconscious?"]
-  q58 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q57 -- "yes" --&gt; q58
+  q54 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q52 -- "50 breaths per minute or more" --&gt; q54
+  q50 -- "no" --&gt; q52
+  q49 -- "any answer" --&gt; q50
+  q48 -- "yes" --&gt; q49
+  q55["Does the child vomit everything?"]
+  q56["Look: does the child have chest indrawing?"]
+  q57["Look: is the child unusually sleepy or unconscious?"]
+  q57 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q56 -- "yes" --&gt; q57
+  q58["Count the child's breaths in 1 minute"]
   q59["Look: is the child unusually sleepy or unconscious?"]
   q59 -- "any answer" --&gt; out_refer_urgent
-  q57 -- "no" --&gt; q59
-  q56 -- "any answer" --&gt; q57
+  q58 -- "under 50 breaths per minute" --&gt; q59
+  q60["Look: is the child unusually sleepy or unconscious?"]
+  q60 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q58 -- "50 breaths per minute or more" --&gt; q60
+  q56 -- "no" --&gt; q58
   q55 -- "yes" --&gt; q56
-  q60["Does the child vomit everything?"]
   q61["Look: does the child have chest indrawing?"]
   q62["Look: is the child unusually sleepy or unconscious?"]
   q62 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
   q61 -- "yes" --&gt; q62
-  q63["Look: is the child unusually sleepy or unconscious?"]
-  q63 -- "any answer" --&gt; out_refer_urgent
-  q61 -- "no" --&gt; q63
-  q60 -- "yes" --&gt; q61
-  q64["Look: does the child have chest indrawing?"]
+  q63["Count the child's breaths in 1 minute"]
+  q64["Look: is the child unusually sleepy or unconscious?"]
+  q64 -- "yes" --&gt; out_refer_urgent
+  out_cough_no_fast_breathing(["Cough without fast breathing or danger signs"])
+  q64 -- "no" --&gt; out_cough_no_fast_breathing
+  q63 -- "under 50 breaths per minute" --&gt; q64
   q65["Look: is the child unusually sleepy or unconscious?"]
-  q65 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q64 -- "yes" --&gt; q65
-  q66["Look: is the child unusually sleepy or unconscious?"]
-  q66 -- "yes" --&gt; out_refer_urgent
-  out_no_cough(["No cough: this form does not apply. Assess other problems."])
-  q66 -- "no" --&gt; out_no_cough
-  q64 -- "no" --&gt; q66
-  q60 -- "no" --&gt; q64
-  q55 -- "no" --&gt; q60
-  q49 -- "no" --&gt; q55
-  q13 -- "no" --&gt; q49
-  q0 -- "2 to 11 months" --&gt; q13
-  q67["Does the child have a cough?"]
-  q68["For how many days has the child had the cough?"]
-  q69["Has the child had convulsions?"]
-  q70["Is the child not able to drink or feed anything?"]
-  q71["Does the child vomit everything?"]
-  q72["Look: does the child have chest indrawing?"]
+  q65 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  out_treat_fast_breathing_at_home(["Fast breathing (pneumonia): treat at home and follow up in 3 days"])
+  q65 -- "no" --&gt; out_treat_fast_breathing_at_home
+  q63 -- "50 breaths per minute or more" --&gt; q65
+  q61 -- "no" --&gt; q63
+  q55 -- "no" --&gt; q61
+  q48 -- "no" --&gt; q55
+  q40 -- "no" --&gt; q48
+  q39 -- "under 14 days" --&gt; q40
+  q66["Has the child had convulsions?"]
+  q67["Is the child not able to drink or feed anything?"]
+  q68["Does the child vomit everything?"]
+  q69["Look: does the child have chest indrawing?"]
+  q70["Look: is the child unusually sleepy or unconscious?"]
+  q70 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q69 -- "yes" --&gt; q70
+  q71["Count the child's breaths in 1 minute"]
+  q72["Look: is the child unusually sleepy or unconscious?"]
+  q72 -- "any answer" --&gt; out_refer_urgent
+  q71 -- "under 50 breaths per minute" --&gt; q72
   q73["Look: is the child unusually sleepy or unconscious?"]
   q73 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q72 -- "yes" --&gt; q73
-  q74["Count the child's breaths in 1 minute"]
-  q75["Look: is the child unusually sleepy or unconscious?"]
-  q75 -- "any answer" --&gt; out_refer_urgent
-  q74 -- "under 40 breaths per minute" --&gt; q75
-  q76["Look: is the child unusually sleepy or unconscious?"]
-  q76 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q74 -- "40 breaths per minute or more" --&gt; q76
-  q72 -- "no" --&gt; q74
-  q71 -- "any answer" --&gt; q72
-  q70 -- "any answer" --&gt; q71
-  q69 -- "yes" --&gt; q70
-  q77["Is the child not able to drink or feed anything?"]
-  q78["Does the child vomit everything?"]
-  q79["Look: does the child have chest indrawing?"]
-  q80["Look: is the child unusually sleepy or unconscious?"]
-  q80 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q79 -- "yes" --&gt; q80
-  q81["Count the child's breaths in 1 minute"]
-  q82["Look: is the child unusually sleepy or unconscious?"]
-  q82 -- "any answer" --&gt; out_refer_urgent
-  q81 -- "under 40 breaths per minute" --&gt; q82
+  q71 -- "50 breaths per minute or more" --&gt; q73
+  q69 -- "no" --&gt; q71
+  q68 -- "any answer" --&gt; q69
+  q67 -- "any answer" --&gt; q68
+  q66 -- "any answer" --&gt; q67
+  q39 -- "14 days or more" --&gt; q66
+  q38 -- "yes" --&gt; q39
+  q74["Has the child had convulsions?"]
+  q75["Is the child not able to drink or feed anything?"]
+  q76["Does the child vomit everything?"]
+  q77["Look: does the child have chest indrawing?"]
+  q78["Look: is the child unusually sleepy or unconscious?"]
+  q78 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q77 -- "yes" --&gt; q78
+  q79["Look: is the child unusually sleepy or unconscious?"]
+  q79 -- "any answer" --&gt; out_refer_urgent
+  q77 -- "no" --&gt; q79
+  q76 -- "any answer" --&gt; q77
+  q75 -- "any answer" --&gt; q76
+  q74 -- "yes" --&gt; q75
+  q80["Is the child not able to drink or feed anything?"]
+  q81["Does the child vomit everything?"]
+  q82["Look: does the child have chest indrawing?"]
   q83["Look: is the child unusually sleepy or unconscious?"]
   q83 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q81 -- "40 breaths per minute or more" --&gt; q83
-  q79 -- "no" --&gt; q81
-  q78 -- "any answer" --&gt; q79
-  q77 -- "yes" --&gt; q78
-  q84["Does the child vomit everything?"]
-  q85["Look: does the child have chest indrawing?"]
-  q86["Look: is the child unusually sleepy or unconscious?"]
-  q86 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q85 -- "yes" --&gt; q86
-  q87["Count the child's breaths in 1 minute"]
+  q82 -- "yes" --&gt; q83
+  q84["Look: is the child unusually sleepy or unconscious?"]
+  q84 -- "any answer" --&gt; out_refer_urgent
+  q82 -- "no" --&gt; q84
+  q81 -- "any answer" --&gt; q82
+  q80 -- "yes" --&gt; q81
+  q85["Does the child vomit everything?"]
+  q86["Look: does the child have chest indrawing?"]
+  q87["Look: is the child unusually sleepy or unconscious?"]
+  q87 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q86 -- "yes" --&gt; q87
   q88["Look: is the child unusually sleepy or unconscious?"]
   q88 -- "any answer" --&gt; out_refer_urgent
-  q87 -- "under 40 breaths per minute" --&gt; q88
-  q89["Look: is the child unusually sleepy or unconscious?"]
-  q89 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q87 -- "40 breaths per minute or more" --&gt; q89
-  q85 -- "no" --&gt; q87
-  q84 -- "yes" --&gt; q85
-  q90["Look: does the child have chest indrawing?"]
+  q86 -- "no" --&gt; q88
+  q85 -- "yes" --&gt; q86
+  q89["Look: does the child have chest indrawing?"]
+  q90["Look: is the child unusually sleepy or unconscious?"]
+  q90 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q89 -- "yes" --&gt; q90
   q91["Look: is the child unusually sleepy or unconscious?"]
-  q91 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q90 -- "yes" --&gt; q91
-  q92["Count the child's breaths in 1 minute"]
-  q93["Look: is the child unusually sleepy or unconscious?"]
-  q93 -- "yes" --&gt; out_refer_urgent
-  q93 -- "no" --&gt; out_cough_no_fast_breathing
-  q92 -- "under 40 breaths per minute" --&gt; q93
-  q94["Look: is the child unusually sleepy or unconscious?"]
-  q94 -- "yes" --&gt; out_refer_urgent_with_antibiotic
-  q94 -- "no" --&gt; out_treat_fast_breathing_at_home
-  q92 -- "40 breaths per minute or more" --&gt; q94
-  q90 -- "no" --&gt; q92
-  q84 -- "no" --&gt; q90
-  q77 -- "no" --&gt; q84
-  q69 -- "no" --&gt; q77
-  q68 -- "under 14 days" --&gt; q69
-  q95["Has the child had convulsions?"]
-  q96["Is the child not able to drink or feed anything?"]
-  q97["Does the child vomit everything?"]
-  q98["Look: does the child have chest indrawing?"]
-  q99["Look: is the child unusually sleepy or unconscious?"]
-  q99 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q98 -- "yes" --&gt; q99
-  q100["Count the child's breaths in 1 minute"]
+  q91 -- "yes" --&gt; out_refer_urgent
+  out_no_cough(["No cough: this form does not apply. Assess other problems."])
+  q91 -- "no" --&gt; out_no_cough
+  q89 -- "no" --&gt; q91
+  q85 -- "no" --&gt; q89
+  q80 -- "no" --&gt; q85
+  q74 -- "no" --&gt; q80
+  q38 -- "no" --&gt; q74
+  q0 -- "2 to 11 months" --&gt; q38
+  q92["Does the child have a cough?"]
+  q93["For how many days has the child had the cough?"]
+  q94["Has the child had convulsions?"]
+  q95["Is the child not able to drink or feed anything?"]
+  q96["Does the child vomit everything?"]
+  q97["Look: does the child have chest indrawing?"]
+  q98["Look: is the child unusually sleepy or unconscious?"]
+  q98 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q97 -- "yes" --&gt; q98
+  q99["Count the child's breaths in 1 minute"]
+  q100["Look: is the child unusually sleepy or unconscious?"]
+  q100 -- "any answer" --&gt; out_refer_urgent
+  q99 -- "under 40 breaths per minute" --&gt; q100
   q101["Look: is the child unusually sleepy or unconscious?"]
-  q101 -- "any answer" --&gt; out_refer_urgent
-  q100 -- "under 40 breaths per minute" --&gt; q101
-  q102["Look: is the child unusually sleepy or unconscious?"]
-  q102 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q100 -- "40 breaths per minute or more" --&gt; q102
-  q98 -- "no" --&gt; q100
-  q97 -- "any answer" --&gt; q98
+  q101 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q99 -- "40 breaths per minute or more" --&gt; q101
+  q97 -- "no" --&gt; q99
   q96 -- "any answer" --&gt; q97
   q95 -- "any answer" --&gt; q96
-  q68 -- "14 days or more" --&gt; q95
-  q67 -- "yes" --&gt; q68
-  q103["Has the child had convulsions?"]
-  q104["Is the child not able to drink or feed anything?"]
-  q105["Does the child vomit everything?"]
-  q106["Look: does the child have chest indrawing?"]
+  q94 -- "yes" --&gt; q95
+  q102["Is the child not able to drink or feed anything?"]
+  q103["Does the child vomit everything?"]
+  q104["Look: does the child have chest indrawing?"]
+  q105["Look: is the child unusually sleepy or unconscious?"]
+  q105 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q104 -- "yes" --&gt; q105
+  q106["Count the child's breaths in 1 minute"]
   q107["Look: is the child unusually sleepy or unconscious?"]
-  q107 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q106 -- "yes" --&gt; q107
+  q107 -- "any answer" --&gt; out_refer_urgent
+  q106 -- "under 40 breaths per minute" --&gt; q107
   q108["Look: is the child unusually sleepy or unconscious?"]
-  q108 -- "any answer" --&gt; out_refer_urgent
-  q106 -- "no" --&gt; q108
-  q105 -- "any answer" --&gt; q106
-  q104 -- "any answer" --&gt; q105
-  q103 -- "yes" --&gt; q104
-  q109["Is the child not able to drink or feed anything?"]
-  q110["Does the child vomit everything?"]
-  q111["Look: does the child have chest indrawing?"]
-  q112["Look: is the child unusually sleepy or unconscious?"]
-  q112 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q111 -- "yes" --&gt; q112
+  q108 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q106 -- "40 breaths per minute or more" --&gt; q108
+  q104 -- "no" --&gt; q106
+  q103 -- "any answer" --&gt; q104
+  q102 -- "yes" --&gt; q103
+  q109["Does the child vomit everything?"]
+  q110["Look: does the child have chest indrawing?"]
+  q111["Look: is the child unusually sleepy or unconscious?"]
+  q111 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q110 -- "yes" --&gt; q111
+  q112["Count the child's breaths in 1 minute"]
   q113["Look: is the child unusually sleepy or unconscious?"]
   q113 -- "any answer" --&gt; out_refer_urgent
-  q111 -- "no" --&gt; q113
-  q110 -- "any answer" --&gt; q111
+  q112 -- "under 40 breaths per minute" --&gt; q113
+  q114["Look: is the child unusually sleepy or unconscious?"]
+  q114 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q112 -- "40 breaths per minute or more" --&gt; q114
+  q110 -- "no" --&gt; q112
   q109 -- "yes" --&gt; q110
-  q114["Does the child vomit everything?"]
   q115["Look: does the child have chest indrawing?"]
   q116["Look: is the child unusually sleepy or unconscious?"]
   q116 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
   q115 -- "yes" --&gt; q116
-  q117["Look: is the child unusually sleepy or unconscious?"]
-  q117 -- "any answer" --&gt; out_refer_urgent
-  q115 -- "no" --&gt; q117
-  q114 -- "yes" --&gt; q115
-  q118["Look: does the child have chest indrawing?"]
+  q117["Count the child's breaths in 1 minute"]
+  q118["Look: is the child unusually sleepy or unconscious?"]
+  q118 -- "yes" --&gt; out_refer_urgent
+  q118 -- "no" --&gt; out_cough_no_fast_breathing
+  q117 -- "under 40 breaths per minute" --&gt; q118
   q119["Look: is the child unusually sleepy or unconscious?"]
-  q119 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
-  q118 -- "yes" --&gt; q119
-  q120["Look: is the child unusually sleepy or unconscious?"]
-  q120 -- "yes" --&gt; out_refer_urgent
-  q120 -- "no" --&gt; out_no_cough
-  q118 -- "no" --&gt; q120
-  q114 -- "no" --&gt; q118
-  q109 -- "no" --&gt; q114
-  q103 -- "no" --&gt; q109
-  q67 -- "no" --&gt; q103
-  q0 -- "12 to 59 months" --&gt; q67
-  q121["Does the child have a cough?"]
-  q122["For how many days has the child had the cough?"]
-  q123["Has the child had convulsions?"]
-  q124["Is the child not able to drink or feed anything?"]
-  q125["Does the child vomit everything?"]
-  q126["Look: does the child have chest indrawing?"]
+  q119 -- "yes" --&gt; out_refer_urgent_with_antibiotic
+  q119 -- "no" --&gt; out_treat_fast_breathing_at_home
+  q117 -- "40 breaths per minute or more" --&gt; q119
+  q115 -- "no" --&gt; q117
+  q109 -- "no" --&gt; q115
+  q102 -- "no" --&gt; q109
+  q94 -- "no" --&gt; q102
+  q93 -- "under 14 days" --&gt; q94
+  q120["Has the child had convulsions?"]
+  q121["Is the child not able to drink or feed anything?"]
+  q122["Does the child vomit everything?"]
+  q123["Look: does the child have chest indrawing?"]
+  q124["Look: is the child unusually sleepy or unconscious?"]
+  q124 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q123 -- "yes" --&gt; q124
+  q125["Count the child's breaths in 1 minute"]
+  q126["Look: is the child unusually sleepy or unconscious?"]
+  q126 -- "any answer" --&gt; out_refer_urgent
+  q125 -- "under 40 breaths per minute" --&gt; q126
   q127["Look: is the child unusually sleepy or unconscious?"]
-  q127 -- "any answer" --&gt; out_refer_outside_age_range
-  q126 -- "any answer" --&gt; q127
-  q125 -- "any answer" --&gt; q126
-  q124 -- "any answer" --&gt; q125
-  q123 -- "any answer" --&gt; q124
+  q127 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q125 -- "40 breaths per minute or more" --&gt; q127
+  q123 -- "no" --&gt; q125
   q122 -- "any answer" --&gt; q123
-  q121 -- "yes" --&gt; q122
+  q121 -- "any answer" --&gt; q122
+  q120 -- "any answer" --&gt; q121
+  q93 -- "14 days or more" --&gt; q120
+  q92 -- "yes" --&gt; q93
   q128["Has the child had convulsions?"]
   q129["Is the child not able to drink or feed anything?"]
   q130["Does the child vomit everything?"]
   q131["Look: does the child have chest indrawing?"]
   q132["Look: is the child unusually sleepy or unconscious?"]
-  q132 -- "any answer" --&gt; out_refer_outside_age_range
-  q131 -- "any answer" --&gt; q132
+  q132 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q131 -- "yes" --&gt; q132
+  q133["Look: is the child unusually sleepy or unconscious?"]
+  q133 -- "any answer" --&gt; out_refer_urgent
+  q131 -- "no" --&gt; q133
   q130 -- "any answer" --&gt; q131
   q129 -- "any answer" --&gt; q130
-  q128 -- "any answer" --&gt; q129
-  q121 -- "no" --&gt; q128
-  q0 -- "60 months or more" --&gt; q121</pre></div>
+  q128 -- "yes" --&gt; q129
+  q134["Is the child not able to drink or feed anything?"]
+  q135["Does the child vomit everything?"]
+  q136["Look: does the child have chest indrawing?"]
+  q137["Look: is the child unusually sleepy or unconscious?"]
+  q137 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q136 -- "yes" --&gt; q137
+  q138["Look: is the child unusually sleepy or unconscious?"]
+  q138 -- "any answer" --&gt; out_refer_urgent
+  q136 -- "no" --&gt; q138
+  q135 -- "any answer" --&gt; q136
+  q134 -- "yes" --&gt; q135
+  q139["Does the child vomit everything?"]
+  q140["Look: does the child have chest indrawing?"]
+  q141["Look: is the child unusually sleepy or unconscious?"]
+  q141 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q140 -- "yes" --&gt; q141
+  q142["Look: is the child unusually sleepy or unconscious?"]
+  q142 -- "any answer" --&gt; out_refer_urgent
+  q140 -- "no" --&gt; q142
+  q139 -- "yes" --&gt; q140
+  q143["Look: does the child have chest indrawing?"]
+  q144["Look: is the child unusually sleepy or unconscious?"]
+  q144 -- "any answer" --&gt; out_refer_urgent_with_antibiotic
+  q143 -- "yes" --&gt; q144
+  q145["Look: is the child unusually sleepy or unconscious?"]
+  q145 -- "yes" --&gt; out_refer_urgent
+  q145 -- "no" --&gt; out_no_cough
+  q143 -- "no" --&gt; q145
+  q139 -- "no" --&gt; q143
+  q134 -- "no" --&gt; q139
+  q128 -- "no" --&gt; q134
+  q92 -- "no" --&gt; q128
+  q0 -- "12 to 59 months" --&gt; q92
+  q146["Does the child have a cough?"]
+  q147["For how many days has the child had the cough?"]
+  q148["Has the child had convulsions?"]
+  q149["Is the child not able to drink or feed anything?"]
+  q150["Does the child vomit everything?"]
+  q151["Look: does the child have chest indrawing?"]
+  q152["Look: is the child unusually sleepy or unconscious?"]
+  q152 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q151 -- "any answer" --&gt; q152
+  q150 -- "any answer" --&gt; q151
+  q149 -- "any answer" --&gt; q150
+  q148 -- "yes" --&gt; q149
+  q153["Is the child not able to drink or feed anything?"]
+  q154["Does the child vomit everything?"]
+  q155["Look: does the child have chest indrawing?"]
+  q156["Look: is the child unusually sleepy or unconscious?"]
+  q156 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q155 -- "any answer" --&gt; q156
+  q154 -- "any answer" --&gt; q155
+  q153 -- "yes" --&gt; q154
+  q157["Does the child vomit everything?"]
+  q158["Look: does the child have chest indrawing?"]
+  q159["Look: is the child unusually sleepy or unconscious?"]
+  q159 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q158 -- "any answer" --&gt; q159
+  q157 -- "yes" --&gt; q158
+  q160["Look: does the child have chest indrawing?"]
+  q161["Look: is the child unusually sleepy or unconscious?"]
+  q161 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q160 -- "yes" --&gt; q161
+  q162["Look: is the child unusually sleepy or unconscious?"]
+  q162 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q162 -- "no" --&gt; out_refer_outside_age_range
+  q160 -- "no" --&gt; q162
+  q157 -- "no" --&gt; q160
+  q153 -- "no" --&gt; q157
+  q148 -- "no" --&gt; q153
+  q147 -- "under 14 days" --&gt; q148
+  q163["Has the child had convulsions?"]
+  q164["Is the child not able to drink or feed anything?"]
+  q165["Does the child vomit everything?"]
+  q166["Look: does the child have chest indrawing?"]
+  q167["Look: is the child unusually sleepy or unconscious?"]
+  q167 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q166 -- "any answer" --&gt; q167
+  q165 -- "any answer" --&gt; q166
+  q164 -- "any answer" --&gt; q165
+  q163 -- "any answer" --&gt; q164
+  q147 -- "14 days or more" --&gt; q163
+  q146 -- "yes" --&gt; q147
+  q168["Has the child had convulsions?"]
+  q169["Is the child not able to drink or feed anything?"]
+  q170["Does the child vomit everything?"]
+  q171["Look: does the child have chest indrawing?"]
+  q172["Look: is the child unusually sleepy or unconscious?"]
+  q172 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q171 -- "any answer" --&gt; q172
+  q170 -- "any answer" --&gt; q171
+  q169 -- "any answer" --&gt; q170
+  q168 -- "yes" --&gt; q169
+  q173["Is the child not able to drink or feed anything?"]
+  q174["Does the child vomit everything?"]
+  q175["Look: does the child have chest indrawing?"]
+  q176["Look: is the child unusually sleepy or unconscious?"]
+  q176 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q175 -- "any answer" --&gt; q176
+  q174 -- "any answer" --&gt; q175
+  q173 -- "yes" --&gt; q174
+  q177["Does the child vomit everything?"]
+  q178["Look: does the child have chest indrawing?"]
+  q179["Look: is the child unusually sleepy or unconscious?"]
+  q179 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q178 -- "any answer" --&gt; q179
+  q177 -- "yes" --&gt; q178
+  q180["Look: does the child have chest indrawing?"]
+  q181["Look: is the child unusually sleepy or unconscious?"]
+  q181 -- "any answer" --&gt; out_refer_urgent_outside_age_range
+  q180 -- "yes" --&gt; q181
+  q182["Look: is the child unusually sleepy or unconscious?"]
+  q182 -- "yes" --&gt; out_refer_urgent_outside_age_range
+  q182 -- "no" --&gt; out_refer_outside_age_range
+  q180 -- "no" --&gt; q182
+  q177 -- "no" --&gt; q180
+  q173 -- "no" --&gt; q177
+  q168 -- "no" --&gt; q173
+  q146 -- "no" --&gt; q168
+  q0 -- "60 months or more" --&gt; q146</pre></div>
 </section>
 <script src="mermaid.min.js"></script>
 <script>

@@ -1,8 +1,8 @@
 # Compile demo report
 
 Model: `cough_fast_breathing` v1 (fixture `Backend/tests/fixtures/logic/v1.json`)  
-modelSha: `3dcbacce7f6065dd4394c6cea1b1e4b268c607e8fc487d40ad4a67d804b22955`  
-Build: **preview**, form version `preview-3dcbacce`: preview build, not approved, not deployable.  
+modelSha: `ade819699397846e36390e803232c81226724585d68b0d7c61deb6d0e1852deb`  
+Build: **preview**, form version `preview-ade81969`: preview build, not approved, not deployable.  
 cht-conf: 6.6.1 (npm, compile-demo/tools). Python for xls2xform-medic: `/opt/homebrew/bin/python3.13`.  
 Overall: **PASS**
 
@@ -10,8 +10,8 @@ Synthetic data only. The settings used (`compile-demo/settings.demo.json`) are d
 
 ## 0. Question flow
 
-flowMode: **minimal** (flow derivation version `flow-2-is_no`). Average questions asked over the 6400-combination grid: **3.19** (all questions: 8.92).
-Flow tree: 105 nodes, 54 leaves. Always asked: age_months. Sometimes skipped: cough, cough_days, convulsions, not_able_to_drink_or_feed, vomits_everything, chest_indrawing, breaths_per_minute, unusually_sleepy. Never asked: none. verifyFlow before emitting: 0 tree / 0 compiled mismatches, 0 sequence differences (the compile refuses on any mismatch).
+flowMode: **minimal** (flow derivation version `flow-2-is_no`). Average questions asked over the 6400-combination grid: **4.67** (all questions: 8.92).
+Flow tree: 153 nodes, 78 leaves. Always asked: age_months, cough. Sometimes skipped: cough_days, convulsions, not_able_to_drink_or_feed, vomits_everything, chest_indrawing, breaths_per_minute, unusually_sleepy. Never asked: none. verifyFlow before emitting: 0 tree / 0 compiled mismatches, 0 sequence differences (the compile refuses on any mismatch).
 Diagram and plain sentences for minimal and danger_signs_always: [flow.md](flow.md), [flow.html](flow.html) (offline).
 The minimal flow never asks danger-sign questions of a child outside the age range (the outcome is already decided); `--flow=danger_signs_always` asks them always. The clinician chooses.
 
@@ -20,22 +20,22 @@ The minimal flow never asks danger-sign questions of a child outside the age ran
 | file | bytes | sha256 |
 | --- | --- | --- |
 | project/.eslintrc | 106 | `69900468e911f75d4c15ff56b504da43d2d76a7489847e076c6d5cd1868354e7` |
-| project/README.md | 2462 | `9b1e88cf28f62727118f95d3e1bb6202ef884b1170b3735d590527bd9467cb9c` |
+| project/README.md | 2664 | `c1b557549023ae9d9a13cc796028928411e8cffb609ddd8b3c990ba607f5fcce` |
 | project/app_settings/base_settings.json | 48 | `e2d2dbd149367821f4c64ad15a1ee28ffc8a29b60651208781b4b3aba33b57e5` |
 | project/contact-summary.templated.js | 63 | `22b31b3000a60f1f5dda4d0cc8d885fdb081870d3908247ff7e353414a262e6e` |
 | project/forms/app/cough_fast_breathing.properties.json | 202 | `341d653852d2d29324f5d8e5f04b658136dd254df33846c4b094aef9579664ea` |
-| project/forms/app/cough_fast_breathing.xlsx | 10472 | `9915aa917725f813ab42e55cd8c87efd79ad85778ff9cc999213791473a252ac` |
+| project/forms/app/cough_fast_breathing.xlsx | 10648 | `d6a06eea2c357bb5774a182720eeb0879f67ac76451e78ea1caab57bec927d9f` |
 | project/package.json | 245 | `7da897f481c6ca033b1ac7ba5e5377955688d0f2909d55637318063116c7441c` |
-| project/sourcemap.json | 10779 | `c740e8b6d24fa927f65f02272a21eff4ba937247590c5af22eda0e1b5cdf47e3` |
+| project/sourcemap.json | 11998 | `b8f74d8b5534b46b81fb4a801cdb43f2e1b84c4e03d4050007e39c4908f73d77` |
 | project/targets.js | 21 | `4707cce5979ba8f9408b54b0f076b033f630f1d29476e110730be212556a9cae` |
-| project/tasks.js | 1752 | `f66ce75e638dea7a04d5f0970c6f17cd126b1a3425f0c5fad7a422769f373f75` |
+| project/tasks.js | 1752 | `194be1ad3611c398a574a7b667071216aae8aa26c3ea9800655e3d8413329d97` |
 | project/translations/messages-en.properties | 140 | `869524bf9ac92e18c20cddbf882c1837d003e6b0ef20249ccbc55e3d7d9be61c` |
 
 Files added by cht-conf:
 
 | file | bytes | sha256 |
 | --- | --- | --- |
-| project/forms/app/cough_fast_breathing.xml | 25264 | `c6d6c7fb5cc40af65bb667f243d2682fd4b34f657406be33295d3f4b9ace0d37` |
+| project/forms/app/cough_fast_breathing.xml | 29863 | `3f6d958695ee4eb4937492086bcf77b7b33bee82de31ef6fcf7ca9e4b926cd71` |
 | project/app_settings.json | 7976 | `d82d349c37ebc74b57f1282aa6ffcb6c9b8d3643fdce6daca653b445e8865ad7` |
 
 - Generated XForm: `compile-demo/output/project/forms/app/cough_fast_breathing.xml` (instanceID present: true, outcome bind present: true)
@@ -61,7 +61,7 @@ contact summary, base settings -> app_settings.json). Flags: `--source=<project>
 
 ```text
 $ cht '--source=<repo>/Backend/compile-demo/output/project' --skip-dependency-check --skip-version-check --skip-git-check convert-app-forms
-# exit 0 in 719 ms
+# exit 0 in 401 ms
 # ---- stdout
 INFO Processing config in project. 
 INFO Actions:
@@ -77,7 +77,7 @@ INFO convert-app-forms complete.
 
 ```text
 $ cht '--source=<repo>/Backend/compile-demo/output/project' --skip-dependency-check --skip-version-check --skip-git-check validate-app-forms
-# exit 0 in 270 ms
+# exit 0 in 210 ms
 # ---- stdout
 INFO Processing config in project. 
 INFO Actions:
@@ -97,13 +97,13 @@ INFO Actions:
      - compile-app-settings 
 INFO Starting action: compile-app-settings… 
 INFO Packaging contact-summary 
-INFO asset ./contact-summary.js 2.08 KiB [compared for emit] [minimized] (name: main)
+INFO asset ./contact-summary.js 2.08 KiB [emitted] [compared for emit] [minimized] (name: main)
 ../../tools/node_modules/cht-conf/src/contact-summary/lib.js 203 bytes [built] [code generated]
 ./contact-summary.templated.js 63 bytes [built] [code generated]
 ../../tools/node_modules/cht-conf/src/contact-summary/contact-summary-emitter.js 3.51 KiB [built] [code generated]
-webpack 5.112.2 compiled successfully in 348 ms 
+webpack 5.112.2 compiled successfully in 274 ms 
 INFO Packaging nools 
-INFO asset ./nools.js 5.46 KiB [compared for emit] [minimized] (name: main)
+INFO asset ./nools.js 5.46 KiB [emitted] [minimized] (name: main)
 modules by path ../../tools/node_modules/cht-conf/src/nools/*.js 11.1 KiB
   ../../tools/node_modules/cht-conf/src/nools/lib.js 328 bytes [built] [code generated]
   ../../tools/node_modules/cht-conf/src/nools/task-emitter.js 5.27 KiB [built] [code generated]
@@ -113,7 +113,7 @@ modules by path ../../tools/node_modules/cht-conf/src/nools/*.js 11.1 KiB
 modules by path ./*.js 1.73 KiB
   ./tasks.js 1.71 KiB [built] [code generated]
   ./targets.js 21 bytes [built] [code generated]
-webpack 5.112.2 compiled successfully in 93 ms 
+webpack 5.112.2 compiled successfully in 101 ms 
 WARN Setting purge configuration to empty object as purge.js and purging.js files were not found. 
 INFO compile-app-settings complete. 
 
@@ -151,35 +151,37 @@ The first two only need a version number, so this run also executed them directl
 | begin group | q_age_months |  |  |  | field-list |  |  |  |  |
 | integer | age_months | Child's age in months | yes |  |  | . >= 0 and . <= 120 | Enter age in whole months. |  |  |
 | end group | q_age_months |  |  |  |  |  |  |  |  |
-| begin group | q_cough |  |  | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60)) | field-list |  |  |  |  |
-| select_one yes_no | cough | Does the child have a cough? | yes | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60)) |  |  |  |  |  |
+| begin group | q_cough |  |  |  | field-list |  |  |  |  |
+| select_one yes_no | cough | Does the child have a cough? | yes |  |  |  |  |  |  |
 | end group | q_cough |  |  |  |  |  |  |  |  |
-| begin group | q_cough_days |  |  | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes') | field-list |  |  |  |  |
-| integer | cough_days | For how many days has the child had the cough? | yes | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes') |  | . >= 0 and . <= 365 | Enter a number of days. |  |  |
+| begin group | q_cough_days |  |  | ${cough} = 'yes' | field-list |  |  |  |  |
+| integer | cough_days | For how many days has the child had the cough? | yes | ${cough} = 'yes' |  | . >= 0 and . <= 365 | Enter a number of days. |  |  |
 | end group | q_cough_days |  |  |  |  |  |  |  |  |
-| begin group | q_convulsions |  |  | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) | field-list |  |  |  |  |
-| select_one yes_no | convulsions | Has the child had convulsions? | yes | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) |  |  |  |  |  |
+| begin group | q_convulsions |  |  | (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14))) | field-list |  |  |  |  |
+| select_one yes_no | convulsions | Has the child had convulsions? | yes | (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14))) |  |  |  |  |  |
 | end group | q_convulsions |  |  |  |  |  |  |  |  |
-| begin group | q_not_able_to_drink_or_feed |  |  | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${convulsions} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) | field-list |  |  |  |  |
-| select_one yes_no | not_able_to_drink_or_feed | Is the child not able to drink or feed anything? | yes | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${convulsions} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) |  |  |  |  |  |
+| begin group | q_not_able_to_drink_or_feed |  |  | (${convulsions} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) | field-list |  |  |  |  |
+| select_one yes_no | not_able_to_drink_or_feed | Is the child not able to drink or feed anything? | yes | (${convulsions} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) |  |  |  |  |  |
 | end group | q_not_able_to_drink_or_feed |  |  |  |  |  |  |  |  |
-| begin group | q_vomits_everything |  |  | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) | field-list |  |  |  |  |
-| select_one yes_no | vomits_everything | Does the child vomit everything? | yes | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) |  |  |  |  |  |
+| begin group | q_vomits_everything |  |  | (${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) | field-list |  |  |  |  |
+| select_one yes_no | vomits_everything | Does the child vomit everything? | yes | (${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) |  |  |  |  |  |
 | end group | q_vomits_everything |  |  |  |  |  |  |  |  |
-| begin group | q_chest_indrawing |  |  | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60)) | field-list |  |  |  |  |
-| select_one yes_no | chest_indrawing | Look: does the child have chest indrawing? | yes | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60)) |  |  |  |  |  |
+| begin group | q_chest_indrawing |  |  | (((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'no' and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'no' and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'no' and ${convulsions} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14) and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14) and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14) and ${convulsions} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes' and (${cough_days} != '' and ${cough_days} >= 14)) or (${cough} = 'no' and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'no') or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14) and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'no')) | field-list |  |  |  |  |
+| select_one yes_no | chest_indrawing | Look: does the child have chest indrawing? | yes | (((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'no' and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'no' and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'no' and ${convulsions} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14) and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14) and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14) and ${convulsions} = 'yes') or ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes' and (${cough_days} != '' and ${cough_days} >= 14)) or (${cough} = 'no' and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'no') or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14) and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'no')) |  |  |  |  |  |
 | end group | q_chest_indrawing |  |  |  |  |  |  |  |  |
 | begin group | q_breaths_per_minute |  |  | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes' and ${chest_indrawing} = 'no') | field-list |  |  |  |  |
 | integer | breaths_per_minute | Count the child's breaths in 1 minute | yes | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${cough} = 'yes' and ${chest_indrawing} = 'no') |  | . >= 10 and . <= 120 | Recount. Enter breaths in one full minute. |  |  |
 | end group | q_breaths_per_minute |  |  |  |  |  |  |  |  |
-| begin group | q_unusually_sleepy |  |  | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'no' and ${chest_indrawing} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) | field-list |  |  |  |  |
-| select_one yes_no | unusually_sleepy | Look: is the child unusually sleepy or unconscious? | yes | ((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 60) and ${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'no' and ${chest_indrawing} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) |  |  |  |  |  |
+| begin group | q_unusually_sleepy |  |  | (${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'no' and ${chest_indrawing} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) | field-list |  |  |  |  |
+| select_one yes_no | unusually_sleepy | Look: is the child unusually sleepy or unconscious? | yes | (${convulsions} = 'no' and ${not_able_to_drink_or_feed} = 'no' and ${vomits_everything} = 'no' and ${chest_indrawing} = 'no' and (${cough} = 'no' or (${cough} = 'yes' and (${cough_days} != '' and ${cough_days} < 14)))) |  |  |  |  |  |
 | end group | q_unusually_sleepy |  |  |  |  |  |  |  |  |
+| calculate | outside_age_range |  |  |  |  |  |  | if(((${age_months} != '' and ${age_months} < 2) or (${age_months} != '' and ${age_months} >= 60)), 'yes', 'no') |  |
 | calculate | fast_breathing |  |  |  |  |  |  | if((${cough} = 'yes' and (((${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 12) and (${breaths_per_minute} != '' and ${breaths_per_minute} >= 50)) or ((${age_months} != '' and ${age_months} >= 12) and (${age_months} != '' and ${age_months} < 60) and (${breaths_per_minute} != '' and ${breaths_per_minute} >= 40)))), 'yes', 'no') |  |
 | calculate | danger_sign |  |  |  |  |  |  | if(((${cough} = 'yes' and (${cough_days} != '' and ${cough_days} >= 14)) or ${convulsions} = 'yes' or ${not_able_to_drink_or_feed} = 'yes' or ${vomits_everything} = 'yes' or ${chest_indrawing} = 'yes' or ${unusually_sleepy} = 'yes'), 'yes', 'no') |  |
-| calculate | outcome |  |  |  |  |  |  | if(((${age_months} != '' and ${age_months} < 2) or (${age_months} != '' and ${age_months} >= 60)), 'refer_outside_age_range', if((${danger_sign} = 'yes' and (${fast_breathing} = 'yes' or ${chest_indrawing} = 'yes')), 'refer_urgent_with_antibiotic', if(${danger_sign} = 'yes', 'refer_urgent', if(${fast_breathing} = 'yes', 'treat_fast_breathing_at_home', if(${cough} = 'yes', 'cough_no_fast_breathing', 'no_cough'))))) |  |
+| calculate | outcome |  |  |  |  |  |  | if((${outside_age_range} = 'yes' and ${danger_sign} = 'yes'), 'refer_urgent_outside_age_range', if(${outside_age_range} = 'yes', 'refer_outside_age_range', if((${danger_sign} = 'yes' and (${fast_breathing} = 'yes' or ${chest_indrawing} = 'yes')), 'refer_urgent_with_antibiotic', if(${danger_sign} = 'yes', 'refer_urgent', if(${fast_breathing} = 'yes', 'treat_fast_breathing_at_home', if(${cough} = 'yes', 'cough_no_fast_breathing', 'no_cough')))))) |  |
 | begin group | results | Result |  |  | field-list |  |  |  |  |
-| note | outcome_refer_outside_age_range | Refer to health facility: child is outside the age range this form covers<br>Refer child to health facility, write a referral note, and follow up child on return. |  | ${outcome} = 'refer_outside_age_range' |  |  |  |  |  |
+| note | outcome_refer_urgent_outside_age_range | Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.<br>Explain why the child needs to go to the health facility. Write a referral note and help arrange transport.<br>Do not give medicine from this form. The guideline gives no doses outside 2 months up to 5 years. |  | ${outcome} = 'refer_urgent_outside_age_range' |  |  |  |  |  |
+| note | outcome_refer_outside_age_range | Outside this form's age range, no danger sign: refer to health facility<br>Refer child to health facility, write a referral note, and follow up child on return. |  | ${outcome} = 'refer_outside_age_range' |  |  |  |  |  |
 | note | outcome_refer_urgent_with_antibiotic | Danger sign: refer urgently and give first dose of antibiotic<br>Give first dose of oral antibiotic (amoxicillin tablet, 250 mg).<br>Explain why the child needs to go to the health facility. Write a referral note and help arrange transport. |  | ${outcome} = 'refer_urgent_with_antibiotic' |  |  |  |  |  |
 | note | outcome_refer_urgent_with_antibiotic_dose_1_1 | Age 2 to under 12 months: 1 tablet |  | ${outcome} = 'refer_urgent_with_antibiotic' and (${age_months} != '' and ${age_months} >= 2) and (${age_months} != '' and ${age_months} < 12) |  |  |  |  |  |
 | note | outcome_refer_urgent_with_antibiotic_dose_1_2 | Age 12 to under 60 months: 2 tablets |  | ${outcome} = 'refer_urgent_with_antibiotic' and (${age_months} != '' and ${age_months} >= 12) and (${age_months} != '' and ${age_months} < 60) |  |  |  |  |  |
@@ -202,12 +204,12 @@ Settings sheet:
 
 | form_title | form_id | version | default_language | style |
 | --- | --- | --- | --- | --- |
-| Cough and fast breathing (demo preview) | cough_fast_breathing | preview-3dcbacce | en | pages |
+| Cough and fast breathing (demo preview) | cough_fast_breathing | preview-ade81969 | en | pages |
 
 ## 5. Generated tasks.js
 
 ```js
-// Generated by the logic-model compiler from cough_fast_breathing (modelSha 3dcbacce). Do not edit by hand.
+// Generated by the logic-model compiler from cough_fast_breathing (modelSha ade81969). Do not edit by hand.
 const FORM_ID = 'cough_fast_breathing';
 
 function getField(report, path) {
@@ -276,11 +278,13 @@ module.exports = [
 
 | item | reason |
 | --- | --- |
+| outcomes.refer_urgent_outside_age_range.follow_up | needs a return date (no trigger defined) |
 | outcomes.refer_outside_age_range.follow_up | needs a return date (no trigger defined) |
 | outcomes.refer_urgent_with_antibiotic.follow_up | needs a return date (no trigger defined) |
 | outcomes.refer_urgent.follow_up | needs a return date (no trigger defined) |
 
 - TEAM_DEFAULT_USED: outcomes.treat_fast_breathing_at_home.follow_up.task_window_days_after_due is null; used settings.taskWindowDays = 7 (open question Q5)
+- NOT_COMPILED: outcomes.refer_urgent_outside_age_range.follow_up: needs a return date (no trigger defined)
 - NOT_COMPILED: outcomes.refer_outside_age_range.follow_up: needs a return date (no trigger defined)
 - NOT_COMPILED: outcomes.refer_urgent_with_antibiotic.follow_up: needs a return date (no trigger defined)
 - NOT_COMPILED: outcomes.refer_urgent.follow_up: needs a return date (no trigger defined)
@@ -312,11 +316,11 @@ The cht-conf outputs (XForm, app_settings.json) are not part of this comparison.
 
 Overall: **PASS**. Details: [VERIFY.md](VERIFY.md). Form preview: `preview/index.html` (or `npm run compile:preview`). Screenshots: `screenshots/`.
 
-- flowMode minimal: average questions asked 3.19 per grid point (all questions 8.92).
-- Golden cases typed into the real form (enketo-core 7.2.5, CHT config), only the screens that appear: 15/15 pass.
+- flowMode minimal: average questions asked 4.67 per grid point (all questions 8.92).
+- Golden cases typed into the real form (enketo-core 7.2.5, CHT config), only the screens that appear: 20/20 pass.
 - Edit scenarios with stale hidden values: 4/4 pass.
 - Differential grid vs interpreter: 6400 points, 0 mismatches.
 - Partial answers (informational): 6400 points, 0 mismatches.
-- Mutation self-check (flowMode minimal): 4/4 planted bugs caught (plus 3 equivalent mutants correctly not flagged).
+- Mutation self-check: not run this time.
 
 <!-- verify:end -->

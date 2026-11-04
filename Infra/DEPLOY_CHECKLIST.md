@@ -13,7 +13,7 @@ Run by a human with sandbox credentials. Nothing here has been run on real AWS y
 ## Deploy
 - [ ] `cd Infra && npm install`
 - [ ] `npx cdk bootstrap aws://<ACCOUNT_ID>/us-west-2` (once per account)
-- [ ] `npx cdk deploy --all -c modelId=<model-id> -c uiOrigins=<ui-url>`
+- [ ] `npx cdk deploy --all -c modelId=<model-id> -c uiOrigins=<ui-url>` (several origins: a comma separated list or a JSON array string; a typo fails the synth instead of falling back to localhost)
 - [ ] If the Docker build fails, copy the error text and stop; do not retry blindly.
 - [ ] Save the stack outputs: API URL, bucket, queue URL, table names.
 

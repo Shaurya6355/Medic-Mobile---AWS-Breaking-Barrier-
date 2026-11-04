@@ -4,9 +4,32 @@
     "n": 3,
     "parent": 2,
     "author": "demo-clinician-tomas",
-    "createdAt": 1793782840000,
+    "authorRole": "clinician",
+    "createdAt": 1793782842000,
     "artifactKey": "runs/pipeline-demo/versions/v3-<uuid>.json",
-    "bodySha256": "70fbcc9f45bff164bd76b11602dd0b018bcbea18ad642ae86e9ba9525a7b77f2"
+    "bodySha256": "1962ab45d488214376e76bbb09ad44d50a6bf5b1c55ed1a0b7189972894c7b94",
+    "signatures": [
+      {
+        "runId": "pipeline-demo",
+        "n": 3,
+        "modelSha": "a4c0e9d27b45be13530375ca9dfd443647fc7cac14c5d3816c71162df16d0f59",
+        "role": "program_officer",
+        "userId": "demo-officer-amara",
+        "signedAt": 1793782849000,
+        "settingsSha": "60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939"
+      },
+      {
+        "runId": "pipeline-demo",
+        "n": 3,
+        "modelSha": "a4c0e9d27b45be13530375ca9dfd443647fc7cac14c5d3816c71162df16d0f59",
+        "role": "clinician",
+        "userId": "demo-clinician-tomas",
+        "signedAt": 1793782854000,
+        "settingsSha": "60147227c1ea77a526bf795f928196da71d67074f10fcdcea84b82f71c19b939"
+      }
+    ],
+    "status": "locked",
+    "lockedAt": 1793782854000
   },
   "model": {
     "schema_version": "1.0",
@@ -255,6 +278,31 @@
     ],
     "derived": [
       {
+        "id": "outside_age_range",
+        "label": "Outside the age range this guideline covers",
+        "definition": {
+          "any": [
+            {
+              "field": "age_months",
+              "op": "less_than",
+              "value": 2
+            },
+            {
+              "field": "age_months",
+              "op": "at_least",
+              "value": 60
+            }
+          ]
+        },
+        "origin": "guideline",
+        "source": [
+          {
+            "page": 3,
+            "quote": "(child age 2 months up to 5 years)"
+          }
+        ]
+      },
+      {
         "id": "fast_breathing",
         "label": "Fast breathing",
         "definition": {
@@ -378,9 +426,53 @@
     ],
     "outcomes": [
       {
-        "id": "outside_age_range",
+        "id": "refer_urgent_outside_age_range",
         "severity": 1,
-        "title": "Refer to health facility: the child's age is outside the range this form covers",
+        "title": "Danger sign, outside this form's age range: refer urgently. Give no medicine from this form.",
+        "actions": [
+          {
+            "text": "REFER URGENTLY TO HEALTH FACILITY",
+            "origin": "guideline",
+            "source": [
+              {
+                "page": 6,
+                "quote": "REFER URGENTLY\nTO HEALTH\nFACILITY"
+              }
+            ]
+          },
+          {
+            "text": "Write a referral note.",
+            "origin": "guideline",
+            "source": [
+              {
+                "page": 7,
+                "quote": "Write a referral note."
+              }
+            ]
+          },
+          {
+            "text": "Do not give medicine from this form. The guideline gives no doses outside the age range this form covers.",
+            "origin": "team"
+          }
+        ],
+        "follow_up": {
+          "kind": "on_return",
+          "due_in_days": null,
+          "task_window_days_after_due": null,
+          "origin": "guideline",
+          "source": [
+            {
+              "page": 7,
+              "quote": "FOLLOW UP child on return at least once\na week until child is well."
+            }
+          ]
+        },
+        "origin": "team"
+      },
+      {
+        "id": "refer_outside_age_range",
+        "severity": 2,
+        "title": "Outside this form's age range, no danger sign: refer to health facility",
         "actions": [
           {
             "text": "REFER URGENTLY TO HEALTH FACILITY",
@@ -762,25 +854,33 @@
         "id": "R1",
         "priority": 1,
         "when": {
-          "any": [
+          "all": [
             {
-              "field": "age_months",
-              "op": "less_than",
-              "value": 2
+              "field": "outside_age_range",
+              "op": "is_yes"
             },
             {
-              "field": "age_months",
-              "op": "at_least",
-              "value": 60
+              "field": "danger_sign",
+              "op": "is_yes"
             }
           ]
         },
-        "outcome": "outside_age_range",
+        "outcome": "refer_urgent_outside_age_range",
         "origin": "team"
       },
       {
         "id": "R2",
         "priority": 2,
+        "when": {
+          "field": "outside_age_range",
+          "op": "is_yes"
+        },
+        "outcome": "refer_outside_age_range",
+        "origin": "team"
+      },
+      {
+        "id": "R3",
+        "priority": 3,
         "when": {
           "all": [
             {
@@ -815,8 +915,8 @@
         ]
       },
       {
-        "id": "R3",
-        "priority": 3,
+        "id": "R4",
+        "priority": 4,
         "when": {
           "field": "danger_sign",
           "op": "is_yes"
@@ -831,8 +931,8 @@
         ]
       },
       {
-        "id": "R4",
-        "priority": 4,
+        "id": "R5",
+        "priority": 5,
         "when": {
           "field": "fast_breathing",
           "op": "is_yes"
@@ -851,8 +951,8 @@
         ]
       },
       {
-        "id": "R5",
-        "priority": 5,
+        "id": "R6",
+        "priority": 6,
         "when": {
           "field": "cough",
           "op": "is_yes"
@@ -861,8 +961,8 @@
         "origin": "team"
       },
       {
-        "id": "R6",
-        "priority": 6,
+        "id": "R7",
+        "priority": 7,
         "when": "otherwise",
         "outcome": "no_cough",
         "origin": "team"
@@ -986,10 +1086,12 @@
       },
       {
         "id": "Q9",
-        "question": "The guideline covers children from 2 months up to 60 months. Rule R1 (added by the team) refers every other child to a health facility as the most urgent result. Is that the right handling?",
+        "question": "The guideline covers children from 2 months up to 60 months only. We refer out-of-range children urgently if they have a danger sign (R1) and routinely otherwise (R2), with no medicine. Is that right?",
         "affects": [
           "R1",
-          "outside_age_range"
+          "R2",
+          "refer_urgent_outside_age_range",
+          "refer_outside_age_range"
         ],
         "route_to": "clinician",
         "status": "resolved",
@@ -997,9 +1099,9 @@
       },
       {
         "id": "Q10",
-        "question": "When no other rule applies, the form shows \"no_cough\" (rule R6, added by the team). Is that the right result for those children?",
+        "question": "When no other rule applies, the form shows \"no_cough\" (rule R7, added by the team). Is that the right result for those children?",
         "affects": [
-          "R6",
+          "R7",
           "no_cough"
         ],
         "route_to": "clinician",
@@ -1018,11 +1120,11 @@
       },
       {
         "id": "Q12",
-        "question": "These items rest only on a passage the draft chose to cite, not on a cut-off or a question taken from the guideline, so they are marked as the team's: R2, R3, R4. Please check that each one does what the guideline says.",
+        "question": "These items rest only on a passage the draft chose to cite, not on a cut-off or a question taken from the guideline, so they are marked as the team's: R3, R4, R5. Please check that each one does what the guideline says.",
         "affects": [
-          "R2",
           "R3",
-          "R4"
+          "R4",
+          "R5"
         ],
         "route_to": "clinician",
         "status": "resolved",
@@ -1030,11 +1132,11 @@
       },
       {
         "id": "Q13",
-        "question": "These items have no supporting quote from the guideline and are the team's wording or choice: cough_no_fast_breathing, no_cough, R5. Please confirm or correct them.",
+        "question": "These items have no supporting quote from the guideline and are the team's wording or choice: cough_no_fast_breathing, no_cough, R6. Please confirm or correct them.",
         "affects": [
           "cough_no_fast_breathing",
           "no_cough",
-          "R5"
+          "R6"
         ],
         "route_to": "program_officer",
         "status": "resolved",

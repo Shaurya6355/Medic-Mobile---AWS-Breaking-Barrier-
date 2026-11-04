@@ -16,15 +16,18 @@ const f = (tag: string, severity: "blocking" | "warning" | "info", check: string
   });
 
 describe("runChecks", () => {
-  it("v1 against the real booklet with a matching file blocks on the open questions, the two severity inversions and the numbers its quotes do not carry", () => {
+  it("v1 against the real booklet with a matching file blocks on the open questions and the numbers its quotes do not carry (no severity inversion any more)", () => {
     // with the proposed test cases, which pin the overlap of the two equally urgent referrals (red team 1, URGENT_OVERLAP_UNTESTED)
     const r = runChecks({ ...matchedCtx(), goldenCases: goldenCases() });
     expect(r.status).toBe("fail");
     const codes = r.findings.filter((x) => x.severity === "blocking").map((x) => x.code);
-    expect(codes.filter((c) => c === "SEVERITY_INVERSION")).toHaveLength(2);
+    expect(codes).not.toContain("SEVERITY_INVERSION");
+    expect(codes).not.toContain("AGE_GAP");
+    expect(codes.filter((c) => c === "UNGROUNDED_NUMBER")).toHaveLength(17);
+    expect(codes.filter((c) => c === "NUMBER_IN_TEXT_UNSUPPORTED")).toHaveLength(3);
     expect(codes.filter((c) => c === "OPEN_QUESTION")).toHaveLength(6);
     // red team 2: NUMBER_IN_TEXT_UNSUPPORTED for the "250 mg" in v1's antibiotic action texts, which their quotes do not carry
-    expect(new Set(codes)).toEqual(new Set(["SEVERITY_INVERSION", "OPEN_QUESTION", "UNGROUNDED_NUMBER", "NUMBER_IN_TEXT_UNSUPPORTED"]));
+    expect(new Set(codes)).toEqual(new Set(["OPEN_QUESTION", "UNGROUNDED_NUMBER", "NUMBER_IN_TEXT_UNSUPPORTED"]));
     expect(r.ranChecks.slice(0, 5)).toEqual(["schemaReferences", "guidelineFile", "quoteGrounding", "numberGrounding", "inclusivityWording"]);
   });
   it("with the file and quote checks alone, v1 against the real booklet passes", () => {
@@ -74,7 +77,7 @@ describe("runChecks", () => {
     expect(r.findings.map((x) => x.params["kinds"])).toEqual(["X_C", "X_B", "X_D", "X_A"]);
   });
   it("gives identical ids and order for the same input twice", () => {
-    const run = () => runChecks(realCtx((m) => { m.rules[1].source[0].quote = "invented words"; m.outcomes[3].follow_up.due_in_days = 9; }));
+    const run = () => runChecks(realCtx((m) => { m.rules[2].source[0].quote = "invented words"; m.outcomes[4].follow_up.due_in_days = 9; }));
     const a = run();
     const b = run();
     expect(a.findings.length).toBeGreaterThan(1);

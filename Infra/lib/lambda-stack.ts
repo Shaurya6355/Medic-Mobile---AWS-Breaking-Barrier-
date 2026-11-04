@@ -12,7 +12,7 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 import * as path from "node:path";
-import { DEFAULT_MODEL_ID, DEFAULT_UI_ORIGINS, PROJECT_TAG_KEY, PROJECT_TAG_VALUE } from "./data-stack";
+import { DEFAULT_MODEL_ID, PROJECT_TAG_KEY, PROJECT_TAG_VALUE, resolveUiOrigins } from "./data-stack";
 
 // Lambda hard limit is 15 minutes. LEASE_MS must exceed it so a live invocation is never taken over.
 const FUNCTION_TIMEOUT = Duration.minutes(15);
@@ -62,12 +62,7 @@ export class OrchestratorLambdaStack extends Stack {
   constructor(scope: Construct, id: string, props: OrchestratorLambdaStackProps) {
     super(scope, id, props);
 
-    const ctxOrigins = this.node.tryGetContext("uiOrigins") as unknown;
-    const uiOrigins =
-      Array.isArray(ctxOrigins) && ctxOrigins.length > 0 ? (ctxOrigins as string[]) : DEFAULT_UI_ORIGINS;
-    if (uiOrigins.includes("*")) {
-      throw new Error("context uiOrigins must list explicit origins; a wildcard is not allowed");
-    }
+    const uiOrigins = resolveUiOrigins(this.node.tryGetContext("uiOrigins"));
     const ctxModel = this.node.tryGetContext("modelId") as unknown;
     const modelId = typeof ctxModel === "string" && ctxModel !== "" ? ctxModel : DEFAULT_MODEL_ID;
     const ctxBackend = this.node.tryGetContext("modelBackend") as unknown;

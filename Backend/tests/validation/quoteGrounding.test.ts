@@ -50,7 +50,7 @@ describe("quoteGrounding on the real booklet", () => {
   });
 
   it("flags a page that is not in the document", () => {
-    const fs = quoteGrounding(realCtx((m) => { m.derived[0].source[0].page = 99; }));
+    const fs = quoteGrounding(realCtx((m) => { m.derived[1].source[0].page = 99; }));
     expect(fs).toHaveLength(1);
     expect(fs[0]!.code).toBe("SOURCE_PAGE_MISSING");
     expect(fs[0]!.severity).toBe("blocking");
@@ -61,11 +61,11 @@ describe("quoteGrounding on the real booklet", () => {
   it("names every kind of item", () => {
     const bad = "words that are not in the booklet";
     const kindOf = (mutate: (m: any) => void) => quoteGrounding(realCtx(mutate)).map((f) => f.subjects[0]!.kind);
-    expect(kindOf((m) => { m.derived[1].source[0].quote = bad; })).toEqual(["derived"]);
-    expect(kindOf((m) => { m.outcomes[1].source[0].quote = bad; })).toEqual(["outcome"]);
-    expect(kindOf((m) => { m.outcomes[1].actions[0].source[0].quote = bad; })).toEqual(["action"]);
-    expect(kindOf((m) => { m.outcomes[1].follow_up.source[0].quote = bad; })).toEqual(["follow_up"]);
-    expect(kindOf((m) => { m.rules[1].source[0].quote = bad; })).toEqual(["rule"]);
+    expect(kindOf((m) => { m.derived[2].source[0].quote = bad; })).toEqual(["derived"]);
+    expect(kindOf((m) => { m.outcomes[2].source[0].quote = bad; })).toEqual(["outcome"]);
+    expect(kindOf((m) => { m.outcomes[2].actions[0].source[0].quote = bad; })).toEqual(["action"]);
+    expect(kindOf((m) => { m.outcomes[2].follow_up.source[0].quote = bad; })).toEqual(["follow_up"]);
+    expect(kindOf((m) => { m.rules[2].source[0].quote = bad; })).toEqual(["rule"]);
     expect(kindOf((m) => { m.scope.source[0].quote = bad; })).toEqual(["scope"]);
     expect(kindOf((m) => { m.open_questions[0].source[0].quote = bad; })).toEqual(["open_question"]);
   });
@@ -92,7 +92,7 @@ describe("quoteGrounding on the real booklet", () => {
   });
 
   it("is deterministic", () => {
-    const run = () => quoteGrounding(realCtx((m) => { m.rules[1].source[0].quote = "invented"; })).map((f) => f.id);
+    const run = () => quoteGrounding(realCtx((m) => { m.rules[2].source[0].quote = "invented"; })).map((f) => f.id);
     expect(run()).toEqual(run());
   });
 });
@@ -137,7 +137,7 @@ describe("quoteGrounding hardening (red team 2)", () => {
     expect(fs[0]!.message).toMatch(/not/i);
   });
   it("A7: a quote cut in the middle of a number is not found", () => {
-    expect(quoteGrounding(realCtx((m) => { m.derived[0].source[0] = { page: 8, quote: "0 breaths or more per minute" }; })).map((f) => f.code)).toEqual(["HALLUCINATED_CITATION"]);
+    expect(quoteGrounding(realCtx((m) => { m.derived[1].source[0] = { page: 8, quote: "0 breaths or more per minute" }; })).map((f) => f.code)).toEqual(["HALLUCINATED_CITATION"]);
   });
   it("A22: a quote joined from two blocks of the real page 7 is not found", () => {
     expect(quoteGrounding(realCtx((m) => { m.questions[0].source[0] = { page: 7, quote: "Write a referral note.\n Arrange transportation" }; })).map((f) => f.code)).toEqual(["HALLUCINATED_CITATION"]);

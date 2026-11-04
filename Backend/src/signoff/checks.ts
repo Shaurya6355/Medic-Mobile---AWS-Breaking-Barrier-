@@ -27,7 +27,7 @@ export type { CheckInputs, CheckInputsProvider } from "./checkInputs.js";
  */
 
 /** Bump whenever a check changes what it finds: older cached findings are then never served. */
-export const CHECKS_VERSION = "dec020-1";
+export const CHECKS_VERSION = "dec020-4";
 
 export interface StoreIo {
   store: Store;

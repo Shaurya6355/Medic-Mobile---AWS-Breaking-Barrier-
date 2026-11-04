@@ -73,9 +73,10 @@ export async function writeFlowOutputs({ model, outDir, previewDir, compiledMode
     "computed from the rule table by code (it is not part of the signed model) and checked on every one of the",
     `${modes[0].v.points} answer combinations of the exact grid: the short form gives the same outcome as answering everything.`,
     "",
-    "**Clinician's choice.** The minimal flow never asks danger-sign questions once the outcome is already decided, for",
-    "example for a child outside 2 to 59 months: a 1-month-old with convulsions is referred (outside the age range) without",
-    "anyone being asked about convulsions. `danger_signs_always` asks every danger-sign question in every case for that reason.",
+    "**Clinician's choice.** The minimal flow never asks a question once the outcome is already decided. Under the final",
+    "model a child outside 2 to 59 months is still asked about cough and the danger signs (rule R1 refers a child outside the",
+    "age range with a danger sign urgently), so a 1-month-old with convulsions is asked about convulsions and referred urgently.",
+    "`danger_signs_always` asks every danger-sign question in every case.",
     "",
     "| flow mode | average questions (grid) | average questions (15 golden cases) | always asked | sometimes skipped | never asked | tree nodes / leaves | mismatches (tree / compiled) |",
     "| --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -126,7 +127,7 @@ section{margin-top:2em}
 <div class="banner"><strong>Preview build, not approved.</strong> Synthetic data only. Model <code>${esc(model.meta.pathway_id)}</code> v${esc(model.meta.version)}, modelSha <code>${esc(modelSha)}</code>, flow derivation <code>${esc(FLOW_DERIVATION_VERSION)}</code>. Compiled form: flowMode <strong>${esc(compiledMode)}</strong>. Renders offline (mermaid ${esc(JSON.parse(readFileSync(join(previewDir, "node_modules", "mermaid", "package.json"), "utf8")).version)} bundled next to this page).</div>
 <h1>Question flow</h1>
 <p>One question per screen; only questions that can still change the outcome are asked. Checked on every answer combination: same outcome as answering everything.</p>
-<div class="choice"><strong>Clinician's choice.</strong> The minimal flow never asks danger-sign questions once the outcome is decided, for example for a child outside 2 to 59 months (a 1-month-old with convulsions is referred without being asked about convulsions). <code>danger_signs_always</code> asks every danger-sign question in every case.</div>
+<div class="choice"><strong>Clinician's choice.</strong> The minimal flow never asks a question once the outcome is decided. Under the final model a child outside 2 to 59 months is still asked about cough and the danger signs (rule R1 refers such a child with a danger sign urgently). <code>danger_signs_always</code> asks every danger-sign question in every case.</div>
 <table><thead><tr><th>case</th><th>description</th><th>minimal</th><th>danger_signs_always</th><th>full</th></tr></thead><tbody>
 ${goldenRows.map((r) => `<tr><td>${esc(r.id)}</td><td>${esc(r.description)}</td><td>${r.minimal.length}: ${esc(r.minimal.map((id) => qLabel.get(id)).join(" / "))}</td><td>${r.danger.length}</td><td>${r.full.length}</td></tr>`).join("\n")}
 </tbody></table>

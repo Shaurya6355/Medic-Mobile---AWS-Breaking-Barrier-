@@ -13,14 +13,14 @@ describe("compileReady", () => {
   it("without settings nothing is reported", () => {
     expect(compileReady(matchedCtx())).toEqual([]);
   });
-  it("v1.json with the demo settings builds: 3 on-return follow-ups are not compiled, 1 window uses the team default", () => {
+  it("v1.json with the demo settings builds: 4 on-return follow-ups are not compiled, 1 window uses the team default", () => {
     const fs = run();
     expect(fs.filter((f) => f.severity === "blocking")).toEqual([]);
-    expect(fs.map((f) => f.code).sort()).toEqual(["FOLLOWUP_NOT_COMPILED", "FOLLOWUP_NOT_COMPILED", "FOLLOWUP_NOT_COMPILED", "TEAM_DEFAULT_WINDOW"]);
+    expect(fs.map((f) => f.code).sort()).toEqual(["FOLLOWUP_NOT_COMPILED", "FOLLOWUP_NOT_COMPILED", "FOLLOWUP_NOT_COMPILED", "FOLLOWUP_NOT_COMPILED", "TEAM_DEFAULT_WINDOW"]);
   });
   it("on-return follow-ups are information for the clinician: how will the return date be known", () => {
     const f = run().filter((x) => x.code === "FOLLOWUP_NOT_COMPILED");
-    expect(f.map((x) => x.subjects[0]!.id).sort()).toEqual(["refer_outside_age_range", "refer_urgent", "refer_urgent_with_antibiotic"]);
+    expect(f.map((x) => x.subjects[0]!.id).sort()).toEqual(["refer_outside_age_range", "refer_urgent", "refer_urgent_outside_age_range", "refer_urgent_with_antibiotic"]);
     expect(f[0]!.severity).toBe("info");
     expect(f[0]!.decidedBy).toBe("clinician");
     expect(f[0]!.audience[0]).toBe("clinician");

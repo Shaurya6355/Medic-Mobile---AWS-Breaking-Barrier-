@@ -54,10 +54,11 @@ const SourceField = z
   .union([SourceSchema, z.array(SourceSchema).min(1).max(MAX_SOURCES)])
   .transform((s): Source[] => (Array.isArray(s) ? s : [s]));
 
-const Origin = z.enum(["guideline", "team"]);
+const Origin = z.enum(["guideline", "team", "clinician"]);
+export type Origin = z.output<typeof Origin>;
 
-/** origin "guideline" needs at least one source; origin "team" may omit it. */
-function needsSource<T extends { origin: "guideline" | "team"; source?: Source[] | undefined }>(
+/** origin "guideline" needs at least one source; origin "team" and "clinician" may omit it. */
+function needsSource<T extends { origin: Origin; source?: Source[] | undefined }>(
   v: T,
   ctx: z.RefinementCtx,
 ): void {

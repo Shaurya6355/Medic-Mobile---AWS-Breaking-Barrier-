@@ -18,7 +18,7 @@ const params = {
   outcome: "x", target: "x", derived: "d", later: "l", limits: "age: 0 to 120 months",
   expected: "a number", got: "the number 2.5", problem: "it is answered yes or no", where: "w", id: "x", kinds: "rule, question",
   path: "questions[0]", issue: "Required", check: "quoteGrounding", error: "boom", what: "quotes",
-  title: "Caring for the sick child", edition: "July 2014", lo: 2, hi: 60,
+  range: "60 up to 62 months", title: "Caring for the sick child", edition: "July 2014", lo: 2, hi: 60,
   count: 3, child: 'a child aged 1 month ("Has the child had convulsions?" yes; all other yes-or-no questions answered no)', winner: "R3", why: "hidden",
   hasFollowUp: true, always: "yes", guard: '"Does the child have a cough?" is answered yes', answer: "50 breaths per minute",
   firstRule: "R1", overriddenRule: "R2", firstOutcome: "Outside the covered ages: refer", overriddenOutcome: "Danger sign: refer urgently", openQuestion: "Q2",
@@ -35,7 +35,7 @@ const params = {
 const LOGIC_CODES = [
   "TABLE_NOT_CLOSED", "UNCOVERED_ANSWERS", "NOT_PROVEN", "SHADOWED_RULE", "UNREACHABLE_RULE", "UNREACHABLE_OUTCOME", "QUESTION_NEVER_SHOWN", "DERIVED_CONSTANT",
   "DEAD_INPUT", "USE_BEFORE_ASK", "SEVERITY_INVERSION", "SEVERITY_EXCEPTION_APPROVED", "REQUIRED_QUESTION_OPTIONAL", "UNMEASURABLE_NOT_SUPPORTED",
-  "AGE_GAP", "AGE_OVERLAP", "DOSE_BANDS_MISMATCH", "BOUNDARY_SHOWN",
+  "AGE_GAP", "AGE_OVERLAP", "OUTSIDE_AGE_BANDS_MISMATCH", "DOSE_BANDS_MISMATCH", "BOUNDARY_SHOWN",
 ];
 
 const NEW_CODES = [
@@ -103,7 +103,7 @@ describe("messages", () => {
     }
   });
   it("puts the decision with the clinician for clinical findings and routes them there for the program officer", () => {
-    for (const c of ["SEVERITY_INVERSION", "SHADOWED_RULE", "AGE_GAP", "DOSE_BANDS_MISMATCH", "UNREACHABLE_RULE"]) {
+    for (const c of ["SEVERITY_INVERSION", "SHADOWED_RULE", "AGE_GAP", "OUTSIDE_AGE_BANDS_MISMATCH", "DOSE_BANDS_MISMATCH", "UNREACHABLE_RULE"]) {
       expect(render(c, params, "clinician"), c).toMatch(/clinician decides/);
       expect(render(c, params, "program_officer"), c).toMatch(/program officer (asks|sends)/);
     }

@@ -23,7 +23,7 @@ AWS CDK v2 (TypeScript) for the data layer (`OrchestratorDataStack`), Lambda hos
 | `modelId` | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | Bedrock inference profile ID |
 | `region` | `AWS_REGION`, else `us-west-2` | Target region |
 
-Example: `npx cdk synth -c 'uiOrigins=["https://app.example.org"]'`. `CDK_DEFAULT_REGION` is ignored on purpose, because the CDK CLI fills it with us-east-1 when no profile region is set.
+`uiOrigins` can be set in `cdk.json` as an array, or on the command line as one origin, a comma separated list or a JSON array string: `npx cdk synth -c uiOrigins=https://app.example.org` or `-c 'uiOrigins=["https://a.example","https://b.example"]'`. An entry must be `http(s)://host` with no path; a wildcard or a malformed value fails the synth (it never silently falls back to localhost). Only an unset or empty value gives the localhost default. `CDK_DEFAULT_REGION` is ignored on purpose, because the CDK CLI fills it with us-east-1 when no profile region is set.
 
 ## Commands
 
@@ -113,9 +113,11 @@ Extra context keys: `prices` (object or JSON string; becomes `PRICES_JSON`). `ui
 1. Start Docker locally: the image is built (and pushed to the bootstrap ECR repository) at deploy time. `cdk synth` and the tests only hash the Backend folder and need no Docker.
 2. `aws sso login --profile <your profile>` and export the profile.
 3. `AWS_REGION=us-west-2 npx cdk bootstrap` (once per account/region).
-4. First deploy the stacks without a production CORS origin to obtain the generated `WEBURL` and `APIURL` outputs.
-5. Deploy again with `AWS_REGION=us-west-2 npx cdk deploy --all -c 'uiOrigins=["https://<cloudfront-domain>"]'`.
-6. Build the frontend against `APIURL`, upload `Frontend/dist` to `WEBASSETBUCKET`, and use `WEBURL` as the browser URL.
+<<<<<<< HEAD
+4. `AWS_REGION=us-west-2 npx cdk deploy --all`.
+5. Read `APIURL`, `FUNCTIONNAME`, and `WEBURL` from the outputs. Set the UI origin with `-c uiOrigins=https://app.example.org` on every synth/deploy (or once in `cdk.json`), and check synthesized CORS `AllowOrigins` before deploying.
+6. With the generated CloudFront hostname, deploy again with `AWS_REGION=us-west-2 npx cdk deploy --all -c 'uiOrigins=["https://<cloudfront-domain>"]'`.
+7. Build the frontend against `APIURL`, upload `Frontend/dist` to `WEBASSETBUCKET`, and use `WEBURL` as the browser URL.
 
 CI (`.github/workflows/ci.yml`) runs Infra `tsc`, tests and `cdk synth` with a dummy account and no credentials; it never deploys.
 

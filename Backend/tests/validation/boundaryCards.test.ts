@@ -15,7 +15,7 @@ describe("boundaryCards", () => {
     expect(c.label).toBe("Count the child's breaths in 1 minute");
     expect(c.cases.map((x) => x.value)).toEqual([49, 50, 51]);
     expect(c.cases.map((x) => x.outcome)).toEqual(["cough_no_fast_breathing", "treat_fast_breathing_at_home", "treat_fast_breathing_at_home"]);
-    expect(c.cases.map((x) => x.rule)).toEqual(["R5", "R4", "R4"]);
+    expect(c.cases.map((x) => x.rule)).toEqual(["R6", "R5", "R5"]);
     expect(c.cases.map((x) => x.derived["fast_breathing"])).toEqual([false, true, true]);
   });
   it("shows exactly 12 months landing in the older band", () => {
@@ -46,8 +46,35 @@ describe("boundaryCards", () => {
     expect(f12.params["bandsMeet"]).toBe(true);
     expect(f12.message).toMatch(/two age bands meet/);
     expect(f12.message).toContain("Q1");
+    // 60 months: the fast-breathing bands end where the out-of-range value starts, so the bands do meet there
     const f60 = fs.find((f) => f.params["threshold"] === 60)!;
-    expect(f60.params["bandsMeet"]).toBe(false);
+    expect(f60.params["bandsMeet"]).toBe(true);
+    expect(f60.message).toMatch(/exactly 60 months is counted in the older band/);
+  });
+  it("names an open question only at the cut-off it is about (Q1 is about 12 months, not 2 or 60)", () => {
+    const fs = boundaryCardsCheck(matchedCtx()).filter((f) => f.params["question"] === "Child's age in months");
+    const q = (t: number) => fs.find((f) => f.params["threshold"] === t)!.params["openQuestion"];
+    expect(q(12)).toBe("Q1");
+    expect(q(2)).toBe("");
+    expect(q(60)).toBe("");
+    expect(fs.find((f) => f.params["threshold"] === 2)!.message).not.toMatch(/open question/);
+  });
+  it("shows the cough-days cut-off for a child inside the covered ages, not for an out-of-range child the age rules would catch first", () => {
+    const c = boundaryCards(v1Copy()).find((x) => x.field === "cough_days")!;
+    const age = c.baseline["age_months"] as number;
+    expect(age).toBeGreaterThanOrEqual(2);
+    expect(age).toBeLessThan(60);
+    expect(c.cases.map((x) => x.outcome)).toEqual(["cough_no_fast_breathing", "refer_urgent", "refer_urgent"]);
+  });
+  it("still shows every age for the age cut-offs themselves (1, 2 and 3 months)", () => {
+    const c = boundaryCards(v1Copy()).find((x) => x.field === "age_months" && x.threshold === 2)!;
+    expect(c.cases.map((x) => x.outcome)).toEqual(["refer_outside_age_range", "no_cough", "no_cough"]);
+  });
+  it("writes 1 month, not 1 months", () => {
+    const f = boundaryCardsCheck(matchedCtx()).find((x) => x.params["threshold"] === 2 && x.params["question"] === "Child's age in months")!;
+    expect(f.message).toContain("1 month gives");
+    expect(f.message).not.toContain("1 months");
+    expect(f.message).toContain("2 months gives");
   });
   it("skips a threshold that lies outside the entry limits instead of inventing cases", () => {
     const cards = boundaryCards(v1Copy((m) => { m.rules[1].when = { all: [{ field: "danger_sign", op: "is_yes" }, { field: "breaths_per_minute", op: "at_least", value: 500 }] }; }));

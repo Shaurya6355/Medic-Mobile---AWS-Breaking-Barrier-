@@ -368,7 +368,7 @@
   ],
   "outcomes": [
     {
-      "id": "outside_age_range",
+      "id": "refer_outside_age_range",
       "severity": 1,
       "title": "Refer to health facility: the child's age is outside the range this form covers",
       "actions": [
@@ -765,7 +765,7 @@
           }
         ]
       },
-      "outcome": "outside_age_range",
+      "outcome": "refer_outside_age_range",
       "origin": "team"
     },
     {
@@ -971,7 +971,7 @@
       "question": "The guideline covers children from 2 months up to 60 months. Rule R1 (added by the team) refers every other child to a health facility as the most urgent result. Is that the right handling?",
       "affects": [
         "R1",
-        "outside_age_range"
+        "refer_outside_age_range"
       ],
       "route_to": "program_officer",
       "status": "open"
