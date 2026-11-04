@@ -175,5 +175,23 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
       expect(bad).toHaveLength(1);
       expect(bad[0]!.reason).toBeInstanceOf(Conflict);
     });
+
+    it("updateRun with an undefined value clears the field", async () => {
+      const s = await makeStore();
+      await s.createRun(run("r1"));
+      await s.acquireLease("r1", "a", 1000, 1000);
+      const updated = await s.updateRun("r1", { lease: undefined });
+      expect(updated.lease).toBeUndefined();
+      expect((await s.getRun("r1"))!.lease).toBeUndefined();
+      expect(await s.acquireLease("r1", "b", 100, 1100)).toBe(true);
+    });
+
+    it("updateStep with an undefined value clears the field", async () => {
+      const s = await makeStore();
+      await s.createRun(run("r1"));
+      await s.appendStep({ ...step("r1", "extract", 1), error: "boom" });
+      await s.updateStep("r1", "extract", 1, { error: undefined });
+      expect((await s.listSteps("r1"))[0]!.error).toBeUndefined();
+    });
   });
 }

@@ -74,6 +74,31 @@ describe("DynamoStore command shapes", () => {
     expect(upd.ExpressionAttributeValues).toMatchObject({ ":parent": 1, ":n": 2 });
   });
 
+  it("updateRun and updateStep turn undefined values into REMOVE clauses", async () => {
+    mock.on(UpdateCommand).resolves({ Attributes: { runId: "r1", state: "created", createdAt: 1 } });
+    await make().updateRun("r1", { lease: undefined, state: "ingesting" });
+    const run = mock.commandCalls(UpdateCommand)[0]!.args[0].input;
+    expect(run.UpdateExpression).toMatch(/^SET #f\d = :f\d REMOVE #f\d$/);
+    const removed = /REMOVE (#f\d)/.exec(run.UpdateExpression!)![1]!;
+    expect(run.ExpressionAttributeNames![removed]).toBe("lease");
+    expect(Object.keys(run.ExpressionAttributeValues ?? {})).toHaveLength(1);
+    await make().updateStep("r1", "x", 1, { error: undefined });
+    const st = mock.commandCalls(UpdateCommand)[1]!.args[0].input;
+    expect(st.UpdateExpression).toMatch(/^REMOVE #f0$/);
+    expect(st.ExpressionAttributeNames).toEqual({ "#f0": "error" });
+    expect(st.ExpressionAttributeValues).toBeUndefined();
+  });
+
+  it("addVersion rethrows cancellations that are not chain conflicts", async () => {
+    const v = { runId: "r1", n: 2, parent: 1, author: "u", createdAt: 1, artifactKey: "k" };
+    mock.on(TransactWriteCommand).rejects(new TransactionCanceledException({ message: "t", $metadata: {}, CancellationReasons: [{ Code: "ThrottlingError" }, { Code: "None" }] }));
+    const err = await make().addVersion(v).catch((e: unknown) => e);
+    expect(err).not.toBeInstanceOf(Conflict);
+    expect((err as Error).name).toBe("TransactionCanceledException");
+    mock.on(TransactWriteCommand).rejects(new TransactionCanceledException({ message: "t", $metadata: {}, CancellationReasons: [{ Code: "TransactionConflict" }] }));
+    await expect(make().addVersion(v)).rejects.toBeInstanceOf(Conflict);
+  });
+
   it("addVersion maps cancelled transaction to Conflict and rejects bad chain locally", async () => {
     mock.on(TransactWriteCommand).rejects(new TransactionCanceledException({ message: "c", $metadata: {}, CancellationReasons: [{ Code: "ConditionalCheckFailed" }] }));
     await expect(make().addVersion({ runId: "r1", n: 2, parent: 1, author: "u", createdAt: 1, artifactKey: "k" })).rejects.toBeInstanceOf(Conflict);

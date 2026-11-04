@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { ConditionalCheckFailedException, TransactionCanceledException } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
   GetCommand,
@@ -55,7 +54,38 @@ const stripKeys = <T>(item: Record<string, unknown>, ...keys: string[]): T => {
   return copy as T;
 };
 
-const isConditionFailure = (e: unknown): boolean => e instanceof ConditionalCheckFailedException;
+const isConditionFailure = (e: unknown): boolean => e instanceof Error && e.name === "ConditionalCheckFailedException";
+
+const isChainConflict = (e: unknown): boolean => {
+  if (!(e instanceof Error) || e.name !== "TransactionCanceledException") return false;
+  const reasons = (e as { CancellationReasons?: { Code?: string }[] }).CancellationReasons ?? [];
+  return reasons.some((r) => r.Code === "ConditionalCheckFailed" || r.Code === "TransactionConflict");
+};
+
+// SET for defined values, REMOVE for keys explicitly set to undefined.
+function buildUpdate(patch: Record<string, unknown>, skip: readonly string[]): {
+  UpdateExpression?: string;
+  names: Record<string, string>;
+  values: Record<string, unknown>;
+} {
+  const names: Record<string, string> = {};
+  const values: Record<string, unknown> = {};
+  const sets: string[] = [];
+  const removes: string[] = [];
+  Object.entries(patch)
+    .filter(([k]) => !skip.includes(k))
+    .forEach(([k, v], i) => {
+      names[`#f${i}`] = k;
+      if (v === undefined) {
+        removes.push(`#f${i}`);
+      } else {
+        values[`:f${i}`] = clean({ v }).v;
+        sets.push(`#f${i} = :f${i}`);
+      }
+    });
+  const parts = [sets.length > 0 ? `SET ${sets.join(", ")}` : "", removes.length > 0 ? `REMOVE ${removes.join(", ")}` : ""].filter(Boolean);
+  return { UpdateExpression: parts.length > 0 ? parts.join(" ") : undefined, names, values };
+}
 
 export class DynamoStore implements Store {
   private auditSeq = 0;
@@ -113,15 +143,7 @@ export class DynamoStore implements Store {
   }
 
   async updateRun(id: string, patch: Partial<Run>, expectedState?: RunState): Promise<Run> {
-    const fields = Object.entries(clean(patch)).filter(([k]) => k !== "runId");
-    const names: Record<string, string> = {};
-    const values: Record<string, unknown> = {};
-    const sets: string[] = [];
-    fields.forEach(([k, v], i) => {
-      names[`#f${i}`] = k;
-      values[`:f${i}`] = v;
-      sets.push(`#f${i} = :f${i}`);
-    });
+    const { UpdateExpression, names, values } = buildUpdate(patch as Record<string, unknown>, ["runId"]);
     let condition = "attribute_exists(runId)";
     if (expectedState !== undefined) {
       names["#state"] = "state";
@@ -133,7 +155,7 @@ export class DynamoStore implements Store {
         new UpdateCommand({
           TableName: this.tables.runs,
           Key: { runId: id },
-          UpdateExpression: sets.length > 0 ? `SET ${sets.join(", ")}` : undefined,
+          UpdateExpression,
           ConditionExpression: condition,
           ExpressionAttributeNames: Object.keys(names).length > 0 ? names : undefined,
           ExpressionAttributeValues: Object.keys(values).length > 0 ? values : undefined,
@@ -159,21 +181,13 @@ export class DynamoStore implements Store {
   }
 
   async updateStep(runId: string, step: string, attempt: number, patch: Partial<StepRecord>): Promise<void> {
-    const fields = Object.entries(clean(patch)).filter(([k]) => !["runId", "step", "attempt"].includes(k));
-    const names: Record<string, string> = {};
-    const values: Record<string, unknown> = {};
-    const sets: string[] = [];
-    fields.forEach(([k, v], i) => {
-      names[`#f${i}`] = k;
-      values[`:f${i}`] = v;
-      sets.push(`#f${i} = :f${i}`);
-    });
+    const { UpdateExpression, names, values } = buildUpdate(patch as Record<string, unknown>, ["runId", "step", "attempt"]);
     try {
       await this.doc.send(
         new UpdateCommand({
           TableName: this.tables.steps,
           Key: { runId, sk: `${step}#${pad(attempt, 6)}` },
-          UpdateExpression: sets.length > 0 ? `SET ${sets.join(", ")}` : undefined,
+          UpdateExpression,
           ConditionExpression: "attribute_exists(runId)",
           ExpressionAttributeNames: Object.keys(names).length > 0 ? names : undefined,
           ExpressionAttributeValues: Object.keys(values).length > 0 ? values : undefined,
@@ -231,7 +245,7 @@ export class DynamoStore implements Store {
     try {
       await this.doc.send(new TransactWriteCommand({ TransactItems: [pointer, versionPut] }));
     } catch (e) {
-      if (e instanceof TransactionCanceledException) {
+      if (isChainConflict(e)) {
         throw new Conflict(`Version chain violation for ${v.runId}: n=${v.n} parent=${v.parent}`);
       }
       throw e;
