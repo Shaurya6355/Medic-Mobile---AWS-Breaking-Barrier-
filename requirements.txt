@@ -1,0 +1,3 @@
+# Python dependencies for Backend/extraction (run_extraction.py). prepare_input.py uses only the
+# standard library plus the poppler tools (pdftoppm, pdftotext) installed on the system.
+boto3>=1.34,<2
