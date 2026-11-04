@@ -1,0 +1,12 @@
+$ cht '--source=<repo>/Backend/compile-demo/output/project' --skip-dependency-check --skip-version-check --skip-git-check validate-app-forms
+# exit 0 in 270 ms
+# ---- stdout
+INFO Processing config in project. 
+INFO Actions:
+     - validate-app-forms 
+INFO Starting action: validate-app-forms… 
+INFO Validating form: cough_fast_breathing.xml… 
+WARN Some validations have been skipped because they require a CHT instance. 
+INFO validate-app-forms complete. 
+
+# ---- stderr

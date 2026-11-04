@@ -1,0 +1,4 @@
+# cht-conf validations that need a CHT instance, run directly with apiVersion 5.3.0 (assumed)
+deprecated-appearance: errors=[] warnings=[]
+deprecated-tel-type: errors=[] warnings=[]
+# can-generate-xform needs the CHT API (forms validate endpoint) and was NOT run.

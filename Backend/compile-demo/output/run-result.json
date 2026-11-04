@@ -1,0 +1,137 @@
+{
+  "status": "pass",
+  "flow": {
+    "mode": "minimal",
+    "derivationVersion": "flow-2-is_no",
+    "nodes": 105,
+    "leaves": 54,
+    "maxDepth": 9,
+    "questionsAlwaysAsked": [
+      "age_months"
+    ],
+    "questionsSometimesSkipped": [
+      "cough",
+      "cough_days",
+      "convulsions",
+      "not_able_to_drink_or_feed",
+      "vomits_everything",
+      "chest_indrawing",
+      "breaths_per_minute",
+      "unusually_sleepy"
+    ],
+    "neverAsked": [],
+    "points": 6400,
+    "avgQuestions": 3.19125,
+    "avgQuestionsFullForm": 8.92,
+    "treeMismatches": 0,
+    "compiledMismatches": 0,
+    "sequenceDifferences": 0
+  },
+  "chtConfVersion": "6.6.1",
+  "python": {
+    "chosen": "/opt/homebrew/bin/python3.13",
+    "probes": [
+      {
+        "python": "/opt/homebrew/bin/python3",
+        "version": "Python 3.15.2",
+        "ok": false,
+        "detail": "ValueError: Cannot use capturing groups in re.Scanner"
+      },
+      {
+        "python": "/opt/homebrew/bin/python3.13",
+        "version": "Python 3.13.5",
+        "ok": true,
+        "detail": "Ok!"
+      }
+    ]
+  },
+  "chtLauncher": {
+    "args": [
+      "--preserve-symlinks",
+      "--preserve-symlinks-main",
+      "<tmp>/cht-tools/node_modules/cht-conf/src/bin/index.js"
+    ],
+    "whitespaceSymlink": "<tmp>/cht-tools"
+  },
+  "steps": [
+    {
+      "action": "convert-app-forms",
+      "status": "pass",
+      "exit": 0,
+      "log": "<repo>/Backend/compile-demo/output/logs/1-convert-app-forms.log",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "action": "validate-app-forms",
+      "status": "pass",
+      "exit": 0,
+      "log": "<repo>/Backend/compile-demo/output/logs/2-validate-app-forms.log",
+      "errors": [],
+      "warnings": [
+        "WARN Some validations have been skipped because they require a CHT instance. "
+      ]
+    },
+    {
+      "action": "compile-app-settings",
+      "status": "pass",
+      "exit": 0,
+      "log": "<repo>/Backend/compile-demo/output/logs/3-compile-app-settings.log",
+      "errors": [],
+      "warnings": [
+        "WARN Setting purge configuration to empty object as purge.js and purging.js files were not found. "
+      ]
+    }
+  ],
+  "extraValidations": [
+    {
+      "name": "deprecated-appearance",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "deprecated-tel-type",
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "outputs": [
+    {
+      "path": "forms/app/cough_fast_breathing.xml",
+      "exists": true,
+      "bytes": 25264,
+      "sha256": "c6d6c7fb5cc40af65bb667f243d2682fd4b34f657406be33295d3f4b9ace0d37"
+    },
+    {
+      "path": "app_settings.json",
+      "exists": true,
+      "bytes": 7976,
+      "sha256": "d82d349c37ebc74b57f1282aa6ffcb6c9b8d3643fdce6daca653b445e8865ad7"
+    }
+  ],
+  "xmlFacts": {
+    "hasInstanceId": true,
+    "hasOutcomeBind": true,
+    "version": "1.0"
+  },
+  "appSettingsSummary": {
+    "keys": [
+      "contact_summary",
+      "locale",
+      "locale_outgoing",
+      "purge",
+      "tasks"
+    ],
+    "tasksIsDeclarative": true,
+    "tasksRulesBytes": 5587,
+    "targets": {
+      "enabled": true,
+      "items": []
+    },
+    "contactSummaryBytes": 2173
+  },
+  "determinism": {
+    "fileShaMismatches": [],
+    "sheetContentsEqual": true
+  }
+}

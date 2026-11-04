@@ -1,0 +1,1302 @@
+{
+  "ok": true,
+  "flowMode": "minimal",
+  "avgQuestions": 3.19125,
+  "goldenAvgScreens": 6.2,
+  "formSha256": "c6d6c7fb5cc40af65bb667f243d2682fd4b34f657406be33295d3f4b9ace0d37",
+  "golden": [
+    {
+      "id": "g01",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "skipped": [],
+      "expected_skipped": [],
+      "description": "6 months, 52 breaths",
+      "expected": "treat_fast_breathing_at_home",
+      "interpreter": "treat_fast_breathing_at_home",
+      "form": "treat_fast_breathing_at_home",
+      "form_fast_breathing": "yes",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "yes",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_treat_fast_breathing_at_home",
+        "outcome_treat_fast_breathing_at_home_dose_1_1"
+      ],
+      "expected_notes": [
+        "outcome_treat_fast_breathing_at_home",
+        "outcome_treat_fast_breathing_at_home_dose_1_1"
+      ],
+      "note_text": [
+        "Fast breathing (pneumonia): treat at home and follow up in 3 days\nGive oral antibiotic (amoxicillin tablet, 250 mg) twice daily for 5 days. Help the caregiver give the first dose now.\nAdvise to return immediately if the child cannot drink or feed, becomes sicker, or has blood in stool.",
+        "Age 2 to under 12 months: 1 tablet (total 10 tablets)"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g02",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "skipped": [],
+      "expected_skipped": [],
+      "description": "6 months, exactly 50 breaths",
+      "expected": "treat_fast_breathing_at_home",
+      "interpreter": "treat_fast_breathing_at_home",
+      "form": "treat_fast_breathing_at_home",
+      "form_fast_breathing": "yes",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "yes",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_treat_fast_breathing_at_home",
+        "outcome_treat_fast_breathing_at_home_dose_1_1"
+      ],
+      "expected_notes": [
+        "outcome_treat_fast_breathing_at_home",
+        "outcome_treat_fast_breathing_at_home_dose_1_1"
+      ],
+      "note_text": [
+        "Fast breathing (pneumonia): treat at home and follow up in 3 days\nGive oral antibiotic (amoxicillin tablet, 250 mg) twice daily for 5 days. Help the caregiver give the first dose now.\nAdvise to return immediately if the child cannot drink or feed, becomes sicker, or has blood in stool.",
+        "Age 2 to under 12 months: 1 tablet (total 10 tablets)"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g03",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "skipped": [],
+      "expected_skipped": [],
+      "description": "6 months, 49 breaths",
+      "expected": "cough_no_fast_breathing",
+      "interpreter": "cough_no_fast_breathing",
+      "form": "cough_no_fast_breathing",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_cough_no_fast_breathing"
+      ],
+      "expected_notes": [
+        "outcome_cough_no_fast_breathing"
+      ],
+      "note_text": [
+        "Cough without fast breathing or danger signs\nAdvise the caregiver to give more fluids and continue feeding. Advise when to return."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g04",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "skipped": [],
+      "expected_skipped": [],
+      "description": "11 months, 45 breaths",
+      "expected": "cough_no_fast_breathing",
+      "interpreter": "cough_no_fast_breathing",
+      "form": "cough_no_fast_breathing",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_cough_no_fast_breathing"
+      ],
+      "expected_notes": [
+        "outcome_cough_no_fast_breathing"
+      ],
+      "note_text": [
+        "Cough without fast breathing or danger signs\nAdvise the caregiver to give more fluids and continue feeding. Advise when to return."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g05",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "skipped": [],
+      "expected_skipped": [],
+      "description": "Exactly 12 months, 40 breaths",
+      "expected": "treat_fast_breathing_at_home",
+      "interpreter": "treat_fast_breathing_at_home",
+      "form": "treat_fast_breathing_at_home",
+      "form_fast_breathing": "yes",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "yes",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_treat_fast_breathing_at_home",
+        "outcome_treat_fast_breathing_at_home_dose_1_2"
+      ],
+      "expected_notes": [
+        "outcome_treat_fast_breathing_at_home",
+        "outcome_treat_fast_breathing_at_home_dose_1_2"
+      ],
+      "note_text": [
+        "Fast breathing (pneumonia): treat at home and follow up in 3 days\nGive oral antibiotic (amoxicillin tablet, 250 mg) twice daily for 5 days. Help the caregiver give the first dose now.\nAdvise to return immediately if the child cannot drink or feed, becomes sicker, or has blood in stool.",
+        "Age 12 to under 60 months: 2 tablets (total 20 tablets)"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g06",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "skipped": [],
+      "expected_skipped": [],
+      "description": "12 months, 39 breaths",
+      "expected": "cough_no_fast_breathing",
+      "interpreter": "cough_no_fast_breathing",
+      "form": "cough_no_fast_breathing",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_cough_no_fast_breathing"
+      ],
+      "expected_notes": [
+        "outcome_cough_no_fast_breathing"
+      ],
+      "note_text": [
+        "Cough without fast breathing or danger signs\nAdvise the caregiver to give more fluids and continue feeding. Advise when to return."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g07",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "skipped": [],
+      "expected_skipped": [],
+      "description": "59 months, 40 breaths",
+      "expected": "treat_fast_breathing_at_home",
+      "interpreter": "treat_fast_breathing_at_home",
+      "form": "treat_fast_breathing_at_home",
+      "form_fast_breathing": "yes",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "yes",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_treat_fast_breathing_at_home",
+        "outcome_treat_fast_breathing_at_home_dose_1_2"
+      ],
+      "expected_notes": [
+        "outcome_treat_fast_breathing_at_home",
+        "outcome_treat_fast_breathing_at_home_dose_1_2"
+      ],
+      "note_text": [
+        "Fast breathing (pneumonia): treat at home and follow up in 3 days\nGive oral antibiotic (amoxicillin tablet, 250 mg) twice daily for 5 days. Help the caregiver give the first dose now.\nAdvise to return immediately if the child cannot drink or feed, becomes sicker, or has blood in stool.",
+        "Age 12 to under 60 months: 2 tablets (total 20 tablets)"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g08",
+      "screens": [
+        "age_months"
+      ],
+      "expected_screens": [
+        "age_months"
+      ],
+      "tree_screens": [
+        "age_months"
+      ],
+      "skipped": [
+        "chest_indrawing",
+        "convulsions",
+        "cough",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "expected_skipped": [
+        "chest_indrawing",
+        "convulsions",
+        "cough",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "description": "60 months, no cough",
+      "expected": "refer_outside_age_range",
+      "interpreter": "refer_outside_age_range",
+      "form": "refer_outside_age_range",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_refer_outside_age_range"
+      ],
+      "expected_notes": [
+        "outcome_refer_outside_age_range"
+      ],
+      "note_text": [
+        "Refer to health facility: child is outside the age range this form covers\nRefer child to health facility, write a referral note, and follow up child on return."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
+      ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g09",
+      "screens": [
+        "age_months"
+      ],
+      "expected_screens": [
+        "age_months"
+      ],
+      "tree_screens": [
+        "age_months"
+      ],
+      "skipped": [
+        "chest_indrawing",
+        "convulsions",
+        "cough",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "expected_skipped": [
+        "chest_indrawing",
+        "convulsions",
+        "cough",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "description": "1 month, no cough",
+      "expected": "refer_outside_age_range",
+      "interpreter": "refer_outside_age_range",
+      "form": "refer_outside_age_range",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_refer_outside_age_range"
+      ],
+      "expected_notes": [
+        "outcome_refer_outside_age_range"
+      ],
+      "note_text": [
+        "Refer to health facility: child is outside the age range this form covers\nRefer child to health facility, write a referral note, and follow up child on return."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
+      ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g10",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "chest_indrawing",
+        "breaths_per_minute"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "chest_indrawing",
+        "breaths_per_minute"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "chest_indrawing",
+        "breaths_per_minute"
+      ],
+      "skipped": [
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "expected_skipped": [
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "description": "Cough 14 days, no fast breathing",
+      "expected": "refer_urgent",
+      "interpreter": "refer_urgent",
+      "form": "refer_urgent",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "yes",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "yes",
+      "notes": [
+        "outcome_refer_urgent"
+      ],
+      "expected_notes": [
+        "outcome_refer_urgent"
+      ],
+      "note_text": [
+        "Danger sign: refer urgently\nExplain why the child needs to go to the health facility. Write a referral note and help arrange transport."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "unusually_sleepy"
+      ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g11",
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "chest_indrawing",
+        "breaths_per_minute"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "chest_indrawing",
+        "breaths_per_minute"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "chest_indrawing",
+        "breaths_per_minute"
+      ],
+      "skipped": [
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "expected_skipped": [
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "description": "Cough 14 days with fast breathing",
+      "expected": "refer_urgent_with_antibiotic",
+      "interpreter": "refer_urgent_with_antibiotic",
+      "form": "refer_urgent_with_antibiotic",
+      "form_fast_breathing": "yes",
+      "form_danger_sign": "yes",
+      "interp_fast_breathing": "yes",
+      "interp_danger_sign": "yes",
+      "notes": [
+        "outcome_refer_urgent_with_antibiotic",
+        "outcome_refer_urgent_with_antibiotic_dose_1_2"
+      ],
+      "expected_notes": [
+        "outcome_refer_urgent_with_antibiotic",
+        "outcome_refer_urgent_with_antibiotic_dose_1_2"
+      ],
+      "note_text": [
+        "Danger sign: refer urgently and give first dose of antibiotic\nGive first dose of oral antibiotic (amoxicillin tablet, 250 mg).\nExplain why the child needs to go to the health facility. Write a referral note and help arrange transport.",
+        "Age 12 to under 60 months: 2 tablets"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "unusually_sleepy"
+      ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g12",
+      "screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing"
+      ],
+      "skipped": [
+        "unusually_sleepy"
+      ],
+      "expected_skipped": [
+        "unusually_sleepy"
+      ],
+      "description": "Chest indrawing alone",
+      "expected": "refer_urgent_with_antibiotic",
+      "interpreter": "refer_urgent_with_antibiotic",
+      "form": "refer_urgent_with_antibiotic",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "yes",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "yes",
+      "notes": [
+        "outcome_refer_urgent_with_antibiotic",
+        "outcome_refer_urgent_with_antibiotic_dose_1_2"
+      ],
+      "expected_notes": [
+        "outcome_refer_urgent_with_antibiotic",
+        "outcome_refer_urgent_with_antibiotic_dose_1_2"
+      ],
+      "note_text": [
+        "Danger sign: refer urgently and give first dose of antibiotic\nGive first dose of oral antibiotic (amoxicillin tablet, 250 mg).\nExplain why the child needs to go to the health facility. Write a referral note and help arrange transport.",
+        "Age 12 to under 60 months: 2 tablets"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "unusually_sleepy"
+      ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g13",
+      "screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "chest_indrawing"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "chest_indrawing"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "chest_indrawing"
+      ],
+      "skipped": [
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "expected_skipped": [
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "description": "No cough, convulsions",
+      "expected": "refer_urgent",
+      "interpreter": "refer_urgent",
+      "form": "refer_urgent",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "yes",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "yes",
+      "notes": [
+        "outcome_refer_urgent"
+      ],
+      "expected_notes": [
+        "outcome_refer_urgent"
+      ],
+      "note_text": [
+        "Danger sign: refer urgently\nExplain why the child needs to go to the health facility. Write a referral note and help arrange transport."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "unusually_sleepy"
+      ],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g14",
+      "screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
+      ],
+      "tree_screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
+      ],
+      "skipped": [],
+      "expected_skipped": [],
+      "description": "No cough, no signs",
+      "expected": "no_cough",
+      "interpreter": "no_cough",
+      "form": "no_cough",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_no_cough"
+      ],
+      "expected_notes": [
+        "outcome_no_cough"
+      ],
+      "note_text": [
+        "No cough: this form does not apply. Assess other problems.\nContinue with the other parts of the sick child assessment."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [],
+      "errors": [],
+      "pass": true
+    },
+    {
+      "id": "g15",
+      "screens": [
+        "age_months"
+      ],
+      "expected_screens": [
+        "age_months"
+      ],
+      "tree_screens": [
+        "age_months"
+      ],
+      "skipped": [
+        "chest_indrawing",
+        "convulsions",
+        "cough",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "expected_skipped": [
+        "chest_indrawing",
+        "convulsions",
+        "cough",
+        "not_able_to_drink_or_feed",
+        "unusually_sleepy",
+        "vomits_everything"
+      ],
+      "description": "KNOWN HAZARD: 1 month old with convulsions",
+      "expected": "refer_outside_age_range",
+      "interpreter": "refer_outside_age_range",
+      "form": "refer_outside_age_range",
+      "form_fast_breathing": "no",
+      "form_danger_sign": "no",
+      "interp_fast_breathing": "no",
+      "interp_danger_sign": "no",
+      "notes": [
+        "outcome_refer_outside_age_range"
+      ],
+      "expected_notes": [
+        "outcome_refer_outside_age_range"
+      ],
+      "note_text": [
+        "Refer to health facility: child is outside the age range this form covers\nRefer child to health facility, write a referral note, and follow up child on return."
+      ],
+      "advanced": true,
+      "submitted": true,
+      "not_shown": [
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
+      ],
+      "errors": [],
+      "pass": true
+    }
+  ],
+  "edits": [
+    {
+      "id": "e1",
+      "description": "Cough 20 days (danger sign) entered, then cough changed to no: hidden cough_days keeps 20",
+      "first": {
+        "age_months": 24,
+        "cough": true,
+        "cough_days": 20,
+        "convulsions": false,
+        "not_able_to_drink_or_feed": false,
+        "vomits_everything": false,
+        "chest_indrawing": false,
+        "unusually_sleepy": false,
+        "breaths_per_minute": 30
+      },
+      "change": {
+        "cough": false
+      },
+      "interpreter": "no_cough",
+      "form": "no_cough",
+      "fb": [
+        "no",
+        "no"
+      ],
+      "ds": [
+        "no",
+        "no"
+      ],
+      "notes": [
+        "outcome_no_cough"
+      ],
+      "expected_notes": [
+        "outcome_no_cough"
+      ],
+      "screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "pass": true
+    },
+    {
+      "id": "e2",
+      "description": "52 breaths at 6 months (fast) entered, then cough changed to no: hidden breaths keep 52",
+      "first": {
+        "age_months": 6,
+        "cough": true,
+        "cough_days": 3,
+        "convulsions": false,
+        "not_able_to_drink_or_feed": false,
+        "vomits_everything": false,
+        "chest_indrawing": false,
+        "unusually_sleepy": false,
+        "breaths_per_minute": 52
+      },
+      "change": {
+        "cough": false
+      },
+      "interpreter": "no_cough",
+      "form": "no_cough",
+      "fb": [
+        "no",
+        "no"
+      ],
+      "ds": [
+        "no",
+        "no"
+      ],
+      "notes": [
+        "outcome_no_cough"
+      ],
+      "expected_notes": [
+        "outcome_no_cough"
+      ],
+      "screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "unusually_sleepy"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "pass": true
+    },
+    {
+      "id": "e3",
+      "description": "Cough no first, then cough yes with 3 days and 45 breaths at 24 months",
+      "first": {
+        "age_months": 24,
+        "cough": false,
+        "convulsions": false,
+        "not_able_to_drink_or_feed": false,
+        "vomits_everything": false,
+        "chest_indrawing": false,
+        "unusually_sleepy": false
+      },
+      "change": {
+        "cough": true,
+        "cough_days": 3,
+        "breaths_per_minute": 45
+      },
+      "interpreter": "treat_fast_breathing_at_home",
+      "form": "treat_fast_breathing_at_home",
+      "fb": [
+        "yes",
+        "yes"
+      ],
+      "ds": [
+        "no",
+        "no"
+      ],
+      "notes": [
+        "outcome_treat_fast_breathing_at_home",
+        "outcome_treat_fast_breathing_at_home_dose_1_2"
+      ],
+      "expected_notes": [
+        "outcome_treat_fast_breathing_at_home",
+        "outcome_treat_fast_breathing_at_home_dose_1_2"
+      ],
+      "screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "expected_screens": [
+        "age_months",
+        "cough",
+        "cough_days",
+        "convulsions",
+        "not_able_to_drink_or_feed",
+        "vomits_everything",
+        "chest_indrawing",
+        "breaths_per_minute",
+        "unusually_sleepy"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "pass": true
+    },
+    {
+      "id": "e4",
+      "description": "Fast breathing at 6 months, then age corrected to 70 months",
+      "first": {
+        "age_months": 6,
+        "cough": true,
+        "cough_days": 3,
+        "convulsions": false,
+        "not_able_to_drink_or_feed": false,
+        "vomits_everything": false,
+        "chest_indrawing": false,
+        "unusually_sleepy": false,
+        "breaths_per_minute": 52
+      },
+      "change": {
+        "age_months": 70
+      },
+      "interpreter": "refer_outside_age_range",
+      "form": "refer_outside_age_range",
+      "fb": [
+        "no",
+        "no"
+      ],
+      "ds": [
+        "no",
+        "no"
+      ],
+      "notes": [
+        "outcome_refer_outside_age_range"
+      ],
+      "expected_notes": [
+        "outcome_refer_outside_age_range"
+      ],
+      "screens": [
+        "age_months"
+      ],
+      "expected_screens": [
+        "age_months"
+      ],
+      "advanced": true,
+      "submitted": true,
+      "pass": true
+    }
+  ],
+  "grid": {
+    "points": 6400,
+    "exact": true,
+    "mismatches": 0,
+    "firstMismatches": [],
+    "perOutcome": {
+      "refer_outside_age_range": 3200,
+      "refer_urgent_with_antibiotic": 2344,
+      "refer_urgent": 804,
+      "cough_no_fast_breathing": 24,
+      "treat_fast_breathing_at_home": 24,
+      "no_cough": 4
+    }
+  },
+  "partial": {
+    "points": 6400,
+    "mismatches": 0,
+    "firstMismatches": []
+  },
+  "mutations": [
+    {
+      "id": "m1",
+      "what": "fast-breathing boundary off by one: breaths >= 50 emitted as > 50",
+      "from": "breaths_per_minute  &gt;= 50",
+      "to": "breaths_per_minute  &gt; 50",
+      "equivalent": false,
+      "mismatches": 128,
+      "example": {
+        "answers": {
+          "age_months": 2,
+          "cough": true,
+          "cough_days": 0,
+          "convulsions": true,
+          "not_able_to_drink_or_feed": true,
+          "vomits_everything": true,
+          "chest_indrawing": false,
+          "breaths_per_minute": 50,
+          "unusually_sleepy": true
+        },
+        "diffs": [
+          "outcome form=refer_urgent interpreter=refer_urgent_with_antibiotic",
+          "fast_breathing form=no interpreter(shown)=yes",
+          "notes form=outcome_refer_urgent expected=outcome_refer_urgent_with_antibiotic+outcome_refer_urgent_with_antibiotic_dose_1_1"
+        ]
+      },
+      "verdict": "CAUGHT",
+      "pass": true
+    },
+    {
+      "id": "m2",
+      "what": "age band edge: age < 12 emitted as <= 12 in fast_breathing (EQUIVALENT mutant: at 12 months with 50+ breaths the 12-59 band, 40+, already holds, so no answer changes and no test can catch it)",
+      "from": "age_months  &lt; 12) and ( /data/q_breaths_per_minute/breaths_per_minute",
+      "to": "age_months  &lt;= 12) and ( /data/q_breaths_per_minute/breaths_per_minute",
+      "equivalentIn": [
+        "full",
+        "minimal",
+        "danger_signs_always"
+      ],
+      "equivalent": true,
+      "mismatches": 0,
+      "verdict": "EQUIVALENT (no change, as expected)",
+      "pass": true
+    },
+    {
+      "id": "m2b",
+      "what": "age band edge: age >= 12 emitted as > 12 in the 12-59 month fast-breathing band",
+      "from": "age_months  &gt;= 12) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and ( /data/q_breaths_per_minute/breaths_per_minute",
+      "to": "age_months  &gt; 12) and ( /data/q_age_months/age_months  != '' and  /data/q_age_months/age_months  &lt; 60) and ( /data/q_breaths_per_minute/breaths_per_minute",
+      "equivalent": false,
+      "mismatches": 256,
+      "example": {
+        "answers": {
+          "age_months": 12,
+          "cough": true,
+          "cough_days": 0,
+          "convulsions": true,
+          "not_able_to_drink_or_feed": true,
+          "vomits_everything": true,
+          "chest_indrawing": false,
+          "breaths_per_minute": 40,
+          "unusually_sleepy": true
+        },
+        "diffs": [
+          "outcome form=refer_urgent interpreter=refer_urgent_with_antibiotic",
+          "fast_breathing form=no interpreter(shown)=yes",
+          "notes form=outcome_refer_urgent expected=outcome_refer_urgent_with_antibiotic+outcome_refer_urgent_with_antibiotic_dose_1_2"
+        ]
+      },
+      "verdict": "CAUGHT",
+      "pass": true
+    },
+    {
+      "id": "m3",
+      "what": "rule order: danger_sign checked before the age range rule (R1/R3 swapped). EQUIVALENT under minimal: the swap only matters for a child outside the age range with a danger sign, and the minimal flow asks such a child no danger-sign question (danger_sign stays no): the Q2 hazard made silent",
+      "swapOutcome": true,
+      "equivalentIn": [
+        "minimal"
+      ],
+      "equivalent": true,
+      "mismatches": 0,
+      "verdict": "EQUIVALENT (no change, as expected)",
+      "pass": true
+    },
+    {
+      "id": "m4",
+      "what": "flow is_no emitted with the wrong value: convulsions = 'no' emitted as = 'yes' in every relevance (drink, vomit, sleepy screens follow the wrong answer)",
+      "fromAll": "/data/q_convulsions/convulsions  = 'no'",
+      "toAll": "/data/q_convulsions/convulsions  = 'yes'",
+      "needsFlow": true,
+      "equivalent": false,
+      "mismatches": 1664,
+      "example": {
+        "answers": {
+          "age_months": 2,
+          "cough": true,
+          "cough_days": 0,
+          "convulsions": true,
+          "not_able_to_drink_or_feed": true,
+          "vomits_everything": true,
+          "chest_indrawing": true,
+          "breaths_per_minute": 10,
+          "unusually_sleepy": true
+        },
+        "diffs": [
+          "shown form=age_months+cough+cough_days+convulsions+not_able_to_drink_or_feed+chest_indrawing flow=age_months+cough+cough_days+convulsions+chest_indrawing"
+        ]
+      },
+      "verdict": "CAUGHT",
+      "pass": true
+    },
+    {
+      "id": "m5",
+      "what": "flow is_no emitted so that blank counts as no: cough/convulsions/... = 'no' emitted as != 'yes'. EQUIVALENT for v1: every is_no atom sits next to the conditions that show its question, so the question is answered whenever the atom is read",
+      "regexAll": "/ (\\/data\\/q_[a-z_]+\\/[a-z_]+)  = 'no'/g",
+      "replace": " $1  != 'yes'",
+      "needsFlow": true,
+      "equivalentIn": [
+        "minimal",
+        "danger_signs_always"
+      ],
+      "equivalent": true,
+      "mismatches": 0,
+      "verdict": "EQUIVALENT (no change, as expected)",
+      "pass": true
+    },
+    {
+      "id": "m6",
+      "what": "flow threshold off by one: cough_days < 14 emitted as < 13 in the relevance of the danger-sign screens (a child coughing 13 days is not asked about convulsions)",
+      "fromAll": "cough_days  &lt; 14",
+      "toAll": "cough_days  &lt; 13",
+      "needsFlow": true,
+      "equivalent": false,
+      "mismatches": 768,
+      "example": {
+        "answers": {
+          "age_months": 2,
+          "cough": true,
+          "cough_days": 13,
+          "convulsions": true,
+          "not_able_to_drink_or_feed": true,
+          "vomits_everything": true,
+          "chest_indrawing": true,
+          "breaths_per_minute": 10,
+          "unusually_sleepy": true
+        },
+        "diffs": [
+          "shown form=age_months+cough+cough_days+chest_indrawing flow=age_months+cough+cough_days+convulsions+chest_indrawing"
+        ]
+      },
+      "verdict": "CAUGHT",
+      "pass": true
+    }
+  ],
+  "browserProblems": []
+}

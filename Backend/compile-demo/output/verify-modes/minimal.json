@@ -1,0 +1,16 @@
+{
+  "mode": "minimal",
+  "ok": true,
+  "modelSha": "3dcbacce7f6065dd4394c6cea1b1e4b268c607e8fc487d40ad4a67d804b22955",
+  "formSha256": "c6d6c7fb5cc40af65bb667f243d2682fd4b34f657406be33295d3f4b9ace0d37",
+  "avgQuestions": 3.19125,
+  "goldenAvgScreens": 6.2,
+  "golden": "15/15",
+  "edits": "4/4",
+  "gridPoints": 6400,
+  "gridMismatches": 0,
+  "shownMismatches": 0,
+  "partialMismatches": 0,
+  "mutation": "4/4 caught, 3 equivalent as expected",
+  "seconds": 1157.7
+}
