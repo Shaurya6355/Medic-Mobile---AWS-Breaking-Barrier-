@@ -49,7 +49,7 @@ Route names and request/response shapes are defined only in `src/contract/` (`ro
 
 ## Docker
 
-`docker build -t orchestrator .` from this folder. The image installs `poppler-utils` and `python3` for ingest, runs as the non-root `node` user and contains no credentials; supply AWS credentials through the runtime (for example an instance or task role).
+`docker build -t orchestrator .` from this folder. The Dockerfile is written to install `poppler-utils` and `python3` for ingest, to run as the non-root `node` user and to copy no credentials into the image; supply AWS credentials through the runtime (for example an instance or task role). The image has not been built or scanned, so none of this has been verified.
 
 ## Not verified / known gaps
 
@@ -62,5 +62,6 @@ Route names and request/response shapes are defined only in `src/contract/` (`ro
 - Ingest kills `prepare_input.py` after 5 minutes (`DEFAULT_EXEC_TIMEOUT_MS` in `src/steps/ingest.ts`; pass `createDefaultExec({ timeoutMs })` to change it). A very long PDF can exceed this; the step then fails non-transiently.
 - The logic model schema is a placeholder (`acceptAnyObjectValidator`); the check steps that run on save are not registered yet.
 - The upload queue MUST have a redrive policy with a dead-letter queue and a `maxReceiveCount` (suggested: 5). This is infrastructure the IaC must create; this repo does not. When `onUploaded` throws, the consumer leaves the message on the queue so SQS redelivers it, and without a dead-letter queue a poison message is redelivered forever. A poison message looks like a message that keeps reappearing with the same run ID in the "onUploaded failed" log, for example a stray `runs/<id>/input/guideline.pdf` upload for a run that does not exist, or an event that arrives before the run row is written.
+- A run stuck in `created` (its upload event failed every delivery and went to the dead-letter queue) has no automatic recovery: the resume sweep does not start runs in `created`. Replay the upload event, for example by redriving it from the dead-letter queue, once the cause is fixed.
 - The SQS visibility timeout (default 900 s here) and `LEASE_MS` must BOTH exceed the longest single step. Redelivery of a message whose run is already running or finished is harmless, because the engine ignores a start for a run that is no longer `created`.
 - If the process is killed mid-run (SIGKILL), the run keeps the dead process's lease until it expires. Every process runs `resumeAll` once at startup and then on a periodic resume sweep every `min(60 s, LEASE_MS / 2)`; the sweep picks the run up once the dead owner's lease has expired, so recovery can take up to `LEASE_MS` (plus one sweep interval) after the kill. Succeeded steps are not re-run; the interrupted step's running record is marked abandoned and the step runs again.
