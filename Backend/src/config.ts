@@ -13,6 +13,7 @@ export interface Config {
   leaseMs: number;
   maxPages: number;
   sqsConcurrency: number;
+  shutdownTimeoutMs: number;
   pythonBin: string;
   ingestScript: string;
   extractPrompt: string;
@@ -69,6 +70,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     leaseMs: positiveInt(env, "LEASE_MS", 900000),
     maxPages: positiveInt(env, "MAX_PAGES", 200),
     sqsConcurrency: positiveInt(env, "SQS_CONCURRENCY", 4),
+    shutdownTimeoutMs: positiveInt(env, "SHUTDOWN_TIMEOUT_MS", 25000),
     pythonBin: str(env, "PYTHON_BIN", "python3"),
     ingestScript: str(env, "INGEST_SCRIPT", path.join(extractionDir, "prepare_input.py")),
     extractPrompt: str(env, "EXTRACT_PROMPT", path.join(extractionDir, "final_prompt.txt")),

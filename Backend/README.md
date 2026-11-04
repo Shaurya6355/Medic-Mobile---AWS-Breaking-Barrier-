@@ -31,12 +31,17 @@ npm run dev           # tsx watch src/index.ts
 | LEASE_MS | 900000 | Run lease duration; must exceed the longest single step |
 | MAX_PAGES | 200 | Maximum page number accepted when creating a run |
 | SQS_CONCURRENCY | 4 | Messages processed in parallel |
+| SHUTDOWN_TIMEOUT_MS | 25000 | On SIGTERM/SIGINT, how long to wait for in-flight upload handling before closing the server and exiting 0 |
 | PYTHON_BIN | python3 | Python executable for ingest |
 | INGEST_SCRIPT | extraction/prepare_input.py next to the build | Ingest script path |
 | EXTRACT_PROMPT | extraction/final_prompt.txt next to the build | Extraction system prompt path |
 | PRICES_JSON | none | JSON map of model ID to `{inPerMTok, outPerMTok}` for cost metrics |
 
 Startup fails with a list of the names of any missing required variables.
+
+## Shutdown
+
+On SIGTERM or SIGINT the process stops polling SQS and the resume sweep, waits up to `SHUTDOWN_TIMEOUT_MS` for in-flight upload handling to finish, closes the HTTP server (waiting at most 5 s) and exits 0 even if work is still running. A pipeline cut off this way keeps its lease; the periodic resume sweep of a later process resumes it once the lease has expired (up to `LEASE_MS` later). Set the container stop grace period above `SHUTDOWN_TIMEOUT_MS` plus 5 s.
 
 ## HTTP API
 

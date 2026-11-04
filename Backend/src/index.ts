@@ -9,6 +9,7 @@ import { S3ArtifactStore } from "./artifacts/s3ArtifactStore.js";
 import { loadConfig } from "./config.js";
 import { Orchestrator } from "./engine/engine.js";
 import { startResumeSweep } from "./engine/sweep.js";
+import { withDeadline } from "./shutdown.js";
 import { createStrandsModelClient } from "./model/strands.js";
 import { createExtractStep } from "./steps/extract.js";
 import { createFillLogicStep } from "./steps/fillLogic.js";
@@ -18,6 +19,7 @@ import { DynamoStore } from "./store/dynamoStore.js";
 import { startQueueConsumer } from "./trigger/queueConsumer.js";
 
 const PRESIGN_EXPIRES_SECONDS = 900;
+const SERVER_CLOSE_TIMEOUT_MS = 5000;
 
 const resumeSweepIntervalMs = (leaseMs: number): number => Math.max(1, Math.min(60000, Math.floor(leaseMs / 2)));
 
@@ -89,12 +91,18 @@ async function main(): Promise<void> {
     log("shutting down", { signal });
     abort.abort();
     stopSweep?.();
-    void Promise.all([consumer, app.close()])
-      .then(() => process.exit(0))
-      .catch((e: unknown) => {
-        log("shutdown error", { error: e instanceof Error ? e.message : String(e) });
-        process.exit(1);
-      });
+    const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+    // Do not wait for whole pipelines: give in-flight work SHUTDOWN_TIMEOUT_MS, then
+    // exit. Interrupted runs keep their lease and the resume sweep of a later
+    // process picks them up once it expires.
+    void withDeadline(consumer, cfg.shutdownTimeoutMs)
+      .then((drained) => {
+        if (!drained) log("shutdown deadline reached; in-flight runs left for the resume sweep", { timeoutMs: cfg.shutdownTimeoutMs });
+      })
+      .catch((e: unknown) => log("shutdown error", { error: errText(e) }))
+      .then(() => withDeadline(app.close(), SERVER_CLOSE_TIMEOUT_MS))
+      .catch((e: unknown) => log("server close error", { error: errText(e) }))
+      .finally(() => process.exit(0));
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
