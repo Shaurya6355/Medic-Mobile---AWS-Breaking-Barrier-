@@ -39,6 +39,8 @@ export const API_ROUTES: readonly string[] = [
   // The clinician's rejection with a comment (AR-06, RR-02; DEC-020). Same DynamoDB actions as a signature.
   "POST /runs/{id}/versions/{n}/reject",
   "POST /runs/{id}/resume",
+  // Timing and cost of a run. Read-only: reads the same step records as GET /runs/{id}.
+  "GET /runs/{id}/metrics",
 ];
 
 export interface OrchestratorLambdaStackProps extends StackProps {

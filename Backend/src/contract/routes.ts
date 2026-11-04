@@ -14,6 +14,8 @@ const pattern = {
   // The clinician's rejection with a comment (AR-06, RR-02; DEC-020).
   reject: "/runs/:id/versions/:n/reject",
   resume: "/runs/:id/resume",
+  // Timing and cost of a run: per step, per model call, cumulative, with AWS extras estimated.
+  metrics: "/runs/:id/metrics",
   ping: "/ping",
   invocations: "/invocations",
   events: "/events",
@@ -32,6 +34,7 @@ const proxiable = [
   pattern.sign,
   pattern.reject,
   pattern.resume,
+  pattern.metrics,
 ] as const;
 
 export const routes = {
@@ -46,6 +49,7 @@ export const routes = {
   sign: (id: string, n: number, role: string) => `/runs/${id}/versions/${n}/signatures/${role}`,
   reject: (id: string, n: number) => `/runs/${id}/versions/${n}/reject`,
   resume: (id: string) => `/runs/${id}/resume`,
+  metrics: (id: string) => `/runs/${id}/metrics`,
   ping: () => "/ping",
   invocations: () => "/invocations",
   events: () => "/events",

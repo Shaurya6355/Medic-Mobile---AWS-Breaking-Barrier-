@@ -5,6 +5,8 @@ import type { ZodType } from "zod";
 import { artifactKey, inputPdfKey, NotFound } from "../artifacts/artifactStore.js";
 import type { ArtifactStore } from "../artifacts/artifactStore.js";
 import { routes } from "../contract/routes.js";
+import { buildRunMetrics } from "../metrics/analyze.js";
+import { loadAwsRates } from "../metrics/awsRates.js";
 import { withDeadline } from "../shutdown.js";
 import { parseS3Event } from "../trigger/s3Event.js";
 import { LAMBDA_BACKGROUND_DEADLINE_MS, runBackground } from "./background.js";
@@ -165,6 +167,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       latencyMs: steps.reduce((a, s) => a + (s.latencyMs ?? 0), 0),
     };
     return { run, steps, totals };
+  });
+
+  app.get<{ Params: { id: string } }>(routes.pattern.metrics, async (req, reply) => {
+    const run = await store.getRun(req.params.id);
+    if (!run) return reply.code(404).send({ error: "not_found" });
+    return buildRunMetrics(run, await store.listSteps(run.runId), { rates: loadAwsRates() });
   });
 
   app.get<{ Params: { id: string } }>(routes.pattern.versions, async (req, reply) => {

@@ -1,6 +1,6 @@
-# Infra: OrchestratorDataStack and OrchestratorLambdaStack
+# Infra: OrchestratorDataStack, OrchestratorLambdaStack, and OrchestratorWebStack
 
-AWS CDK v2 (TypeScript) for the data layer (`OrchestratorDataStack`) and the Lambda hosting (`OrchestratorLambdaStack`, see "Lambda stack" below) of the Backend orchestrator. Region us-west-2. Every resource is tagged `project=no-code-cht-config`. No account IDs or ARNs are hard-coded.
+AWS CDK v2 (TypeScript) for the data layer (`OrchestratorDataStack`), Lambda hosting (`OrchestratorLambdaStack`, see "Lambda stack" below), and static web delivery (`OrchestratorWebStack`, see "Web stack" below) of the Backend orchestrator. Region us-west-2. Every resource is tagged `project=no-code-cht-config`. No account IDs or ARNs are hard-coded.
 
 ## What it creates
 
@@ -51,6 +51,8 @@ Deploy is done by a human with their own AWS credentials: `AWS_REGION=us-west-2 
 | UPLOADDLQURL | none (monitoring) |
 | APPPOLICYARN | none (attach to the compute role) |
 
+The web stack additionally outputs `WEBURL`, `WEBASSETBUCKET`, and `BACKENDAPIURL`. Build the frontend with `BACKENDAPIURL`, upload the compiled assets to `WEBASSETBUCKET`, and use `WEBURL` as the production browser origin for `uiOrigins`.
+
 Also set `AWS_REGION=us-west-2` for the app. Keep `LEASE_MS` below the queue visibility timeout (5400 s); raise both together.
 
 The browser PUT to the presigned upload URL must send exactly `Content-Type: application/pdf`, because the URL is signed with that content type. Any other value fails signature validation.
@@ -70,6 +72,23 @@ Created by `lib/lambda-stack.ts`, wired after the data stack in `bin/app.ts`:
 - Outputs: `APIURL`, `FUNCTIONNAME`. Tag `project=no-code-cht-config`.
 
 A Fargate or EC2 host is NOT used; the app runs only as this Lambda.
+
+## Web stack (OrchestratorWebStack)
+
+Created by `lib/web-stack.ts` and wired from `bin/app.ts`:
+
+- Private S3 bucket for compiled frontend assets with public access blocked, SSL enforcement, SSE-S3, and `RETAIN` removal policy.
+- CloudFront distribution using S3 Origin Access Control, so the bucket is readable through CloudFront but not directly public.
+- HTTP-to-HTTPS redirect and SPA fallback from 403/404 responses to `/index.html`.
+- Outputs `WEBURL` and `WEBASSETBUCKET`.
+
+The stack intentionally does not create a custom domain, ACM certificate, DNS record, or frontend build. Those can be added after the frontend domain is chosen. For the current stack, upload the build output with:
+
+```bash
+aws s3 sync Frontend/dist s3://<WEBASSETBUCKET> --delete
+```
+
+The frontend should receive the backend `APIURL` as a build-time configuration value. With the generated CloudFront hostname, bootstrap in two deploys: deploy once to obtain `WEBURL`, then deploy again with `uiOrigins` set to that exact origin. With a preselected custom domain, pass that domain as `uiOrigins` from the first deploy.
 
 Extra context keys: `prices` (object or JSON string; becomes `PRICES_JSON`). `uiOrigins` and `modelId` are shared with the data stack.
 
@@ -95,8 +114,11 @@ Extra context keys: `prices` (object or JSON string; becomes `PRICES_JSON`). `ui
 1. Start Docker locally: the image is built (and pushed to the bootstrap ECR repository) at deploy time. `cdk synth` and the tests only hash the Backend folder and need no Docker.
 2. `aws sso login --profile <your profile>` and export the profile.
 3. `AWS_REGION=us-west-2 npx cdk bootstrap` (once per account/region).
+<<<<<<< HEAD
 4. `AWS_REGION=us-west-2 npx cdk deploy --all`.
-5. Read `APIURL` and `FUNCTIONNAME` from the outputs. Set the UI origin with `-c uiOrigins=https://app.example.org` on every synth/deploy (or once in `cdk.json`). Check the synthesized CORS `AllowOrigins` before deploying.
+5. Read `APIURL`, `FUNCTIONNAME`, and `WEBURL` from the outputs. Set the UI origin with `-c uiOrigins=https://app.example.org` on every synth/deploy (or once in `cdk.json`), and check synthesized CORS `AllowOrigins` before deploying.
+6. With the generated CloudFront hostname, deploy again with `AWS_REGION=us-west-2 npx cdk deploy --all -c 'uiOrigins=["https://<cloudfront-domain>"]'`.
+7. Build the frontend against `APIURL`, upload `Frontend/dist` to `WEBASSETBUCKET`, and use `WEBURL` as the browser URL.
 
 CI (`.github/workflows/ci.yml`) runs Infra `tsc`, tests and `cdk synth` with a dummy account and no credentials; it never deploys.
 
