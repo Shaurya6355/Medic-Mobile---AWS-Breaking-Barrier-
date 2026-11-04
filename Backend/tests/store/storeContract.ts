@@ -152,5 +152,28 @@ export function runStoreContract(name: string, makeStore: () => Store | Promise<
       const ids2 = (await s.listResumable(1050)).map((r) => r.runId).sort();
       expect(ids2).toEqual(["free"]);
     });
+
+    it("concurrent acquireLease by two owners: exactly one wins", async () => {
+      const s = await makeStore();
+      await s.createRun(run("r1"));
+      const results = await Promise.all([
+        s.acquireLease("r1", "a", 100, 1000),
+        s.acquireLease("r1", "b", 100, 1000),
+      ]);
+      expect(results.filter((x) => x === true)).toHaveLength(1);
+    });
+
+    it("concurrent updateRun with the same expectedState: one succeeds, one Conflict", async () => {
+      const s = await makeStore();
+      await s.createRun(run("r1"));
+      const results = await Promise.allSettled([
+        s.updateRun("r1", { state: "ingesting" }, "created"),
+        s.updateRun("r1", { state: "failed" }, "created"),
+      ]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const bad = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+      expect(bad).toHaveLength(1);
+      expect(bad[0]!.reason).toBeInstanceOf(Conflict);
+    });
   });
 }
