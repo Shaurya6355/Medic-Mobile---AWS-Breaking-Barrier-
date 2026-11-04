@@ -17,7 +17,7 @@ export const CreateRunRequest = z.object({
     .min(1, { message: "pages must not be empty; omit pages to use every page" })
     .refine((p) => new Set(p).size === p.length, { message: "pages must not contain duplicates" })
     .optional(),
-  filename: z.string().min(1),
+  filename: z.string().min(1).max(255),
 });
 export type CreateRunRequest = z.infer<typeof CreateRunRequest>;
 
@@ -30,13 +30,13 @@ export type CreateRunResponse = z.infer<typeof CreateRunResponse>;
 export const SaveVersionRequest = z.object({
   parentVersion: z.number().int().nonnegative(),
   body: z.unknown(),
-  author: z.string().min(1),
+  author: z.string().min(1).max(200),
 });
 export type SaveVersionRequest = z.infer<typeof SaveVersionRequest>;
 
 export const CreateCommentRequest = z.object({
-  itemRef: z.string().min(1),
-  text: z.string().min(1),
-  author: z.string().min(1),
+  itemRef: z.string().min(1).max(500),
+  text: z.string().min(1).max(10000),
+  author: z.string().min(1).max(200),
 });
 export type CreateCommentRequest = z.infer<typeof CreateCommentRequest>;

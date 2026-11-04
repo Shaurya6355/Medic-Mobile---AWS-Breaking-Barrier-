@@ -280,3 +280,48 @@ describe("resume", () => {
     await new Promise((r) => setTimeout(r, 5));
   });
 });
+
+describe("length limits on user strings", () => {
+  it("400 and no run for a filename over 255 characters; 255 is accepted", async () => {
+    const { server, store, orchestrator } = setup();
+    const bad = await server.inject({ method: "POST", url: routes.runs(), payload: { filename: "f".repeat(256) } });
+    expect(bad.statusCode).toBe(400);
+    expect(orchestrator.createRun).not.toHaveBeenCalled();
+    expect(await store.listRuns()).toEqual([]);
+    const ok = await server.inject({ method: "POST", url: routes.runs(), payload: { filename: "f".repeat(255) } });
+    expect(ok.statusCode).toBe(201);
+  });
+
+  it.each([
+    ["text", { itemRef: "o1", text: "t".repeat(10001), author: "u" }],
+    ["author", { itemRef: "o1", text: "hi", author: "a".repeat(201) }],
+    ["itemRef", { itemRef: "i".repeat(501), text: "hi", author: "u" }],
+  ])("400 and no comment for a comment %s over its limit", async (_n, payload) => {
+    const { server, store, artifacts } = setup();
+    await seedRun(store, artifacts);
+    const res = await server.inject({ method: "POST", url: routes.comments("r1", 1), payload });
+    expect(res.statusCode).toBe(400);
+    expect(await store.listComments("r1", 1)).toEqual([]);
+  });
+
+  it("accepts comment fields at their limits", async () => {
+    const { server, store, artifacts } = setup();
+    await seedRun(store, artifacts);
+    const payload = { itemRef: "i".repeat(500), text: "t".repeat(10000), author: "a".repeat(200) };
+    const res = await server.inject({ method: "POST", url: routes.comments("r1", 1), payload });
+    expect(res.statusCode).toBe(201);
+  });
+
+  it("400 and no version for a save author over 200 characters", async () => {
+    const { server, store, artifacts, onVersionSaved } = setup();
+    await seedRun(store, artifacts);
+    const res = await server.inject({
+      method: "POST",
+      url: routes.versions("r1"),
+      payload: { parentVersion: 1, body: {}, author: "a".repeat(201) },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(await store.listVersions("r1")).toHaveLength(1);
+    expect(onVersionSaved).not.toHaveBeenCalled();
+  });
+});
