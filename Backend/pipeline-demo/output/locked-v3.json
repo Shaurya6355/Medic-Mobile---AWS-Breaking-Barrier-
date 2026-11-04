@@ -4,28 +4,9 @@
     "n": 3,
     "parent": 2,
     "author": "demo-clinician-tomas",
-    "createdAt": 1793782837000,
+    "createdAt": 1793782840000,
     "artifactKey": "runs/pipeline-demo/versions/v3-<uuid>.json",
-    "signatures": [
-      {
-        "runId": "pipeline-demo",
-        "n": 3,
-        "modelSha": "5e8e1bac61b3328a47fcb80e7e3e72db6fb1b866b056d445143758f18c6ed271",
-        "role": "program_officer",
-        "userId": "demo-officer-amara",
-        "signedAt": 1793782842000
-      },
-      {
-        "runId": "pipeline-demo",
-        "n": 3,
-        "modelSha": "5e8e1bac61b3328a47fcb80e7e3e72db6fb1b866b056d445143758f18c6ed271",
-        "role": "clinician",
-        "userId": "demo-clinician-tomas",
-        "signedAt": 1793782844000
-      }
-    ],
-    "status": "locked",
-    "lockedAt": 1793782844000
+    "bodySha256": "70fbcc9f45bff164bd76b11602dd0b018bcbea18ad642ae86e9ba9525a7b77f2"
   },
   "model": {
     "schema_version": "1.0",
@@ -638,7 +619,7 @@
             ]
           },
           {
-            "text": "Oral antibiotic (amoxycillin tablet—250 mg): Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10 tabs) Age 12 months up to 5 years—2 tablets (total 20 tabs)",
+            "text": "Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10 tabs) Age 12 months up to 5 years—2 tablets (total 20 tabs)",
             "origin": "guideline",
             "source": [
               {
@@ -686,7 +667,7 @@
             ]
           },
           {
-            "text": "Advise on when to return. Go to nearest health facility or, if not possible, return immediately if child: Cannot drink or feed; Becomes sicker; Has blood in stool",
+            "text": "Advise on when to return. Go to nearest health facility or, if not possible, return immediately if child Cannot drink or feed Becomes sicker Has blood in stool",
             "origin": "guideline",
             "source": [
               {
@@ -744,7 +725,7 @@
             ]
           },
           {
-            "text": "Advise on when to return. Go to nearest health facility or, if not possible, return immediately if child: Cannot drink or feed; Becomes sicker; Has blood in stool",
+            "text": "Advise on when to return. Go to nearest health facility or, if not possible, return immediately if child Cannot drink or feed Becomes sicker Has blood in stool",
             "origin": "guideline",
             "source": [
               {
@@ -821,7 +802,7 @@
           ]
         },
         "outcome": "refer_urgent_with_antibiotic",
-        "origin": "guideline",
+        "origin": "team",
         "source": [
           {
             "page": 7,
@@ -841,7 +822,7 @@
           "op": "is_yes"
         },
         "outcome": "refer_urgent",
-        "origin": "guideline",
+        "origin": "team",
         "source": [
           {
             "page": 6,
@@ -857,7 +838,7 @@
           "op": "is_yes"
         },
         "outcome": "treat_fast_breathing_at_home",
-        "origin": "guideline",
+        "origin": "team",
         "source": [
           {
             "page": 9,
@@ -1010,7 +991,7 @@
           "R1",
           "outside_age_range"
         ],
-        "route_to": "program_officer",
+        "route_to": "clinician",
         "status": "resolved",
         "resolution": "TEST-ONLY demo answer (synthetic): accepted as drafted so the demo can continue. Not a clinical or programme decision."
       },
@@ -1021,12 +1002,34 @@
           "R6",
           "no_cough"
         ],
-        "route_to": "program_officer",
+        "route_to": "clinician",
         "status": "resolved",
         "resolution": "TEST-ONLY demo answer (synthetic): accepted as drafted so the demo can continue. Not a clinical or programme decision."
       },
       {
         "id": "Q11",
+        "question": "The booklet passage for the medicine step act_amox_home (\"Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10 tabs) Age 12 months up to 5 years—2 tablets (total 20 tabs)\") does not name the medicine; the guideline reader linked it to \"oral antibiotic (amoxycillin tablet—250 mg)\". The form shows the booklet's words only. Is it clear to the health worker which medicine this is, or must the wording be changed?",
+        "affects": [
+          "treat_fast_breathing_at_home"
+        ],
+        "route_to": "clinician",
+        "status": "resolved",
+        "resolution": "TEST-ONLY demo answer (synthetic): accepted as drafted so the demo can continue. Not a clinical or programme decision."
+      },
+      {
+        "id": "Q12",
+        "question": "These items rest only on a passage the draft chose to cite, not on a cut-off or a question taken from the guideline, so they are marked as the team's: R2, R3, R4. Please check that each one does what the guideline says.",
+        "affects": [
+          "R2",
+          "R3",
+          "R4"
+        ],
+        "route_to": "clinician",
+        "status": "resolved",
+        "resolution": "TEST-ONLY demo answer (synthetic): accepted as drafted so the demo can continue. Not a clinical or programme decision."
+      },
+      {
+        "id": "Q13",
         "question": "These items have no supporting quote from the guideline and are the team's wording or choice: cough_no_fast_breathing, no_cough, R5. Please confirm or correct them.",
         "affects": [
           "cough_no_fast_breathing",
@@ -1038,7 +1041,7 @@
         "resolution": "TEST-ONLY demo answer (synthetic): accepted as drafted so the demo can continue. Not a clinical or programme decision."
       },
       {
-        "id": "Q12",
+        "id": "Q14",
         "question": "The guideline publisher and edition were not recorded. Please fill them in.",
         "affects": [],
         "route_to": "program_officer",

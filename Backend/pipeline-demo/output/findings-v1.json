@@ -1,11 +1,11 @@
 {
-  "modelSha": "a97593f9cdea794ae3a8da1ce90b6b17436749eab4e2c575c5744df88a371b31",
+  "modelSha": "161b103ca75943f8a8b782af2deb31832ea2e61c126821f2d5ff5e11d79f528e",
   "claim": "PROVEN",
   "gates": {
     "canOfficerSign": false,
     "canClinicianSign": false,
     "canCompile": false,
-    "summary": "The program officer cannot sign yet. Still to settle: 7 unanswered open questions. The clinician cannot sign yet: this waits for the program officer's signature, and these are for the clinician: 5 unanswered open questions. The form cannot be built yet: 12 items still block."
+    "summary": "The program officer cannot sign yet. Still to settle: 5 unanswered open questions. The clinician cannot sign yet: this waits for the program officer's signature, and these are for the clinician: 4 test cases that cannot be run; 9 unanswered open questions. The form cannot be built yet: 18 items still block."
   },
   "byAudience": {
     "program_officer": [
@@ -28,14 +28,14 @@
         "code": "OPEN_QUESTION",
         "decidedBy": "program_officer",
         "yours": true,
-        "message": "Open question Q12 has not been answered: The guideline publisher and edition were not recorded. Please fill them in. It concerns the draft as a whole. The program officer decides the answer and records it before the draft can be signed."
+        "message": "Open question Q13 has not been answered: These items have no supporting quote from the guideline and are the team's wording or choice: cough_no_fast_breathing, no_cough, R5. Please confirm or correct them. It concerns cough_no_fast_breathing, no_cough, R5. The program officer decides the answer and records it before the draft can be signed."
       },
       {
         "severity": "blocking",
         "code": "OPEN_QUESTION",
         "decidedBy": "program_officer",
         "yours": true,
-        "message": "Open question Q9 has not been answered: The guideline covers children from 2 months up to 60 months. Rule R1 (added by the team) refers every other child to a health facility as the most urgent result. Is that the right handling? It concerns R1, outside_age_range. The program officer decides the answer and records it before the draft can be signed."
+        "message": "Open question Q14 has not been answered: The guideline publisher and edition were not recorded. Please fill them in. It concerns the draft as a whole. The program officer decides the answer and records it before the draft can be signed."
       },
       {
         "severity": "blocking",
@@ -46,17 +46,38 @@
       },
       {
         "severity": "blocking",
-        "code": "OPEN_QUESTION",
-        "decidedBy": "program_officer",
-        "yours": true,
-        "message": "Open question Q10 has not been answered: When no other rule applies, the form shows \"no_cough\" (rule R6, added by the team). Is that the right result for those children? It concerns R6, no_cough. The program officer decides the answer and records it before the draft can be signed."
+        "code": "GOLDEN_INVALID",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "Test case g09 (\"1 month, no cough\") cannot be run: it expects a result (\"refer_outside_age_range\") that the draft does not have. Nothing has been checked for this case. The clinician corrects the test case."
       },
       {
         "severity": "blocking",
-        "code": "OPEN_QUESTION",
+        "code": "GOLDEN_INVALID",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "Test case g15 (\"KNOWN HAZARD: 1 month old with convulsions\") cannot be run: it expects a result (\"refer_outside_age_range\") that the draft does not have. Nothing has been checked for this case. The clinician corrects the test case."
+      },
+      {
+        "severity": "blocking",
+        "code": "GOLDEN_INVALID",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "Test case g08 (\"60 months, no cough\") cannot be run: it expects a result (\"refer_outside_age_range\") that the draft does not have. Nothing has been checked for this case. The clinician corrects the test case."
+      },
+      {
+        "severity": "blocking",
+        "code": "GOLDEN_INVALID",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "Test case g17 (\"KNOWN HAZARD: 1 month old with chest indrawing\") cannot be run: it expects a result (\"refer_outside_age_range\") that the draft does not have. Nothing has been checked for this case. The clinician corrects the test case."
+      },
+      {
+        "severity": "warning",
+        "code": "TEAM_DEFAULT_WINDOW",
         "decidedBy": "program_officer",
         "yours": true,
-        "message": "Open question Q11 has not been answered: These items have no supporting quote from the guideline and are the team's wording or choice: cough_no_fast_breathing, no_cough, R5. Please confirm or correct them. It concerns cough_no_fast_breathing, no_cough, R5. The program officer decides the answer and records it before the draft can be signed."
+        "message": "The follow-up of the result \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" is due after 3 days, but neither the booklet nor the draft says how many days the task stays open after that. The form uses the team's default of 7 days until this is answered (open question Q7). The program officer confirms that number, or gets the right one from the clinician."
       },
       {
         "severity": "warning",
@@ -87,11 +108,11 @@
         "message": "On page 11 of the booklet, 2 passages that contain numbers or instructions are not used by any item of the draft, for example: \"Teach the caregiver how to give the oral medicines at home\"; \"Amoxicillin: Give one dose now, then twice daily for 5 days\". They may belong to another pathway, or the draft may have left something out. The program officer marks each as out of scope, or sends it to the clinician."
       },
       {
-        "severity": "info",
-        "code": "CONTEXT_NOT_PROVIDED",
-        "decidedBy": "program_officer",
-        "yours": true,
-        "message": "Some checks did not run, because the information they need was not supplied: the test-case check, the form-readiness check. Nothing has been confirmed by them, so their silence is not a pass. The program officer supplies the test cases, the form settings and runs the checks again."
+        "severity": "warning",
+        "code": "OUTCOME_WITHOUT_GOLDEN_CASE",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "No test case leads to the result \"Refer to health facility: the child's age is outside the range this form covers\", so nobody has checked that a child really gets this result. The clinician adds a test case for it, or says why none is needed."
       },
       {
         "severity": "info",
@@ -137,6 +158,27 @@
       },
       {
         "severity": "info",
+        "code": "FOLLOWUP_NOT_COMPILED",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "The follow-up of the result \"Refer to health facility: the child's age is outside the range this form covers\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
+      },
+      {
+        "severity": "info",
+        "code": "FOLLOWUP_NOT_COMPILED",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "The follow-up of the result \"Danger sign: refer urgently\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
+      },
+      {
+        "severity": "info",
+        "code": "FOLLOWUP_NOT_COMPILED",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "The follow-up of the result \"Danger sign: refer urgently and give first dose of antibiotic\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
+      },
+      {
+        "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": false,
@@ -179,6 +221,13 @@
       },
       {
         "severity": "info",
+        "code": "GOLDEN_COUNT",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "17 test cases were run through the draft: 13 give the expected result and 4 do not. This is for information; the cases only show that the draft does what the clinician expects, so they are as good as the cases themselves."
+      },
+      {
+        "severity": "info",
         "code": "INCLUSIVITY_ASSUMED",
         "decidedBy": "clinician",
         "yours": false,
@@ -193,13 +242,6 @@
       },
       {
         "severity": "info",
-        "code": "NUMBER_UNIT_CONVERTED",
-        "decidedBy": "clinician",
-        "yours": false,
-        "message": "The action \"Oral antibiotic (amoxycillin tablet—250 mg): Give twice daily for 5 days: Age...\" of the result \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" uses an age limit of 60 months in the dose table (12 up to 60 months), while the booklet gives the same amount in another unit: 60 months is the same as 5 years. The booklet (page 9) says: \"Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10 tabs) Age 12 months up to 5 years—2 tablets (total 20 tabs)\". The draft has an age limit of 60 months in the dose table (12 up to 60 months). This is for information; the clinician may confirm the conversion if in doubt."
-      },
-      {
-        "severity": "info",
         "code": "ENTRY_LIMIT_TEAM_CHOICE",
         "decidedBy": "clinician",
         "yours": false,
@@ -211,6 +253,13 @@
         "decidedBy": "clinician",
         "yours": false,
         "message": "The age range the pathway covers uses an upper age limit of 60 months, while the booklet gives the same amount in another unit: 60 months is the same as 5 years. The booklet (page 3) says: \"(child age 2 months up to 5 years)\". The draft has an upper age limit of 60 months. This is for information; the clinician may confirm the conversion if in doubt."
+      },
+      {
+        "severity": "info",
+        "code": "NUMBER_UNIT_CONVERTED",
+        "decidedBy": "clinician",
+        "yours": false,
+        "message": "The action \"Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10...\" of the result \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" uses an age limit of 60 months in the dose table (12 up to 60 months), while the booklet gives the same amount in another unit: 60 months is the same as 5 years. The booklet (page 9) says: \"Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10 tabs) Age 12 months up to 5 years—2 tablets (total 20 tabs)\". The draft has an age limit of 60 months in the dose table (12 up to 60 months). This is for information; the clinician may confirm the conversion if in doubt."
       },
       {
         "severity": "info",
@@ -237,10 +286,59 @@
     "clinician": [
       {
         "severity": "blocking",
+        "code": "GOLDEN_INVALID",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "Test case g09 (\"1 month, no cough\") cannot be run: it expects a result (\"refer_outside_age_range\") that the draft does not have. Nothing has been checked for this case. The clinician corrects the test case."
+      },
+      {
+        "severity": "blocking",
+        "code": "GOLDEN_INVALID",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "Test case g15 (\"KNOWN HAZARD: 1 month old with convulsions\") cannot be run: it expects a result (\"refer_outside_age_range\") that the draft does not have. Nothing has been checked for this case. The clinician corrects the test case."
+      },
+      {
+        "severity": "blocking",
+        "code": "GOLDEN_INVALID",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "Test case g08 (\"60 months, no cough\") cannot be run: it expects a result (\"refer_outside_age_range\") that the draft does not have. Nothing has been checked for this case. The clinician corrects the test case."
+      },
+      {
+        "severity": "blocking",
+        "code": "GOLDEN_INVALID",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "Test case g17 (\"KNOWN HAZARD: 1 month old with chest indrawing\") cannot be run: it expects a result (\"refer_outside_age_range\") that the draft does not have. Nothing has been checked for this case. The clinician corrects the test case."
+      },
+      {
+        "severity": "blocking",
+        "code": "OPEN_QUESTION",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "Open question Q11 has not been answered: The booklet passage for the medicine step act_amox_home (\"Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10 tabs) Age 12 months up to 5 years—2 tablets (total 20 tabs)\") does not name the medicine; the guideline reader linked it to \"oral antibiotic (amoxycillin tablet—250 mg)\". The form shows the booklet's words only. Is it clear to the health worker which medicine th... It concerns treat_fast_breathing_at_home. The clinician decides the answer and records it before the draft can be signed."
+      },
+      {
+        "severity": "blocking",
         "code": "OPEN_QUESTION",
         "decidedBy": "clinician",
         "yours": true,
         "message": "Open question Q6 has not been answered: These danger signs from the guideline are not asked in this form: Diarrhoea for 14 days or more; Blood in stool; Fever for last 7 days or more; Red on MUAC strap; Yellow on MUAC strap and has HIV; Has HIV and any other illness; Swelling of both feet. Any general danger sign means urgent referral. Is it safe to use this form without them, or must they be added? The booklet (page 6) says: \"Diarrhoea for 14 days or more\". It concerns the draft as a whole. The clinician decides the answer and records it before the draft can be signed."
+      },
+      {
+        "severity": "blocking",
+        "code": "OPEN_QUESTION",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "Open question Q9 has not been answered: The guideline covers children from 2 months up to 60 months. Rule R1 (added by the team) refers every other child to a health facility as the most urgent result. Is that the right handling? It concerns R1, outside_age_range. The clinician decides the answer and records it before the draft can be signed."
+      },
+      {
+        "severity": "blocking",
+        "code": "OPEN_QUESTION",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "Open question Q12 has not been answered: These items rest only on a passage the draft chose to cite, not on a cut-off or a question taken from the guideline, so they are marked as the team's: R2, R3, R4. Please check that each one does what the guideline says. It concerns R2, R3, R4. The clinician decides the answer and records it before the draft can be signed."
       },
       {
         "severity": "blocking",
@@ -269,6 +367,27 @@
         "decidedBy": "clinician",
         "yours": true,
         "message": "Open question Q1 has not been answered: The guideline gives no treatment row for cough without fast breathing. What should the health worker do, and is there a follow-up? It concerns cough_no_fast_breathing. The clinician decides the answer and records it before the draft can be signed."
+      },
+      {
+        "severity": "blocking",
+        "code": "OPEN_QUESTION",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "Open question Q10 has not been answered: When no other rule applies, the form shows \"no_cough\" (rule R6, added by the team). Is that the right result for those children? It concerns R6, no_cough. The clinician decides the answer and records it before the draft can be signed."
+      },
+      {
+        "severity": "warning",
+        "code": "AI_WORDED_TEXT",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "15 pieces of wording shown to the health worker are not the booklet's own words; the AI or the team wrote them: \"Child's age in months\"; \"Does the child have a cough?\"; \"For how many days has the child had the cough?\"; \"Has the child had convulsions?\"; \"Is the child not able to drink or feed anything?\"; \"Does the child vomit everything?\"; \"Look: does the child have chest indrawing?\"; \"Count the child's breaths in 1 minute\"; \"Look: is the child unusually sleepy or unconscious?\"; \"Refer to health facility: the child's age is outside the range this form covers\"; \"Danger sign: refer urgently and give first dose of antibiotic\"; \"Danger sign: refer urgently\"; \"Fast breathing (pneumonia): treat at home and follow up in 3 days\"; \"Cough without fast breathing or danger signs\", and 1 more. The booklet was used to check numbers and \"not\" in them, but not their meaning. The clinician reads each one and confirms that it says what the booklet says."
+      },
+      {
+        "severity": "warning",
+        "code": "OUTCOME_WITHOUT_GOLDEN_CASE",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "No test case leads to the result \"Refer to health facility: the child's age is outside the range this form covers\", so nobody has checked that a child really gets this result. The clinician adds a test case for it, or says why none is needed."
       },
       {
         "severity": "info",
@@ -321,6 +440,27 @@
       },
       {
         "severity": "info",
+        "code": "FOLLOWUP_NOT_COMPILED",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "The follow-up of the result \"Refer to health facility: the child's age is outside the range this form covers\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
+      },
+      {
+        "severity": "info",
+        "code": "FOLLOWUP_NOT_COMPILED",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "The follow-up of the result \"Danger sign: refer urgently\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
+      },
+      {
+        "severity": "info",
+        "code": "FOLLOWUP_NOT_COMPILED",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "The follow-up of the result \"Danger sign: refer urgently and give first dose of antibiotic\" is a follow-up for when the child comes back, and the form builder will not create a reminder for it, because there is no date to count from. The booklet (page 7) says: \"FOLLOW UP child on return at least once\na week until child is well.\". The clinician says how the return date will become known (for example, the health worker enters it at the first visit), or whether a fixed number of days should be used instead."
+      },
+      {
+        "severity": "info",
         "code": "DANGER_SIGN_EXCLUDED_NOT_COUGH",
         "decidedBy": "clinician",
         "yours": true,
@@ -363,6 +503,20 @@
       },
       {
         "severity": "info",
+        "code": "GOLDEN_PENDING_CLINICIAN",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "17 test cases are still waiting for the clinician to confirm them (g01, g02, g03, g04, g05, g06, g07, g08, g09, g10, g11, g12, g13, g14, g15, g16, g17). Until then they show what the draft does, not what is right. This is for information; the clinician confirms each case."
+      },
+      {
+        "severity": "info",
+        "code": "GOLDEN_COUNT",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "17 test cases were run through the draft: 13 give the expected result and 4 do not. This is for information; the cases only show that the draft does what the clinician expects, so they are as good as the cases themselves."
+      },
+      {
+        "severity": "info",
         "code": "INCLUSIVITY_ASSUMED",
         "decidedBy": "clinician",
         "yours": true,
@@ -377,13 +531,6 @@
       },
       {
         "severity": "info",
-        "code": "NUMBER_UNIT_CONVERTED",
-        "decidedBy": "clinician",
-        "yours": true,
-        "message": "The action \"Oral antibiotic (amoxycillin tablet—250 mg): Give twice daily for 5 days: Age...\" of the result \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" uses an age limit of 60 months in the dose table (12 up to 60 months), while the booklet gives the same amount in another unit: 60 months is the same as 5 years. The booklet (page 9) says: \"Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10 tabs) Age 12 months up to 5 years—2 tablets (total 20 tabs)\". The draft has an age limit of 60 months in the dose table (12 up to 60 months). This is for information; the clinician may confirm the conversion if in doubt."
-      },
-      {
-        "severity": "info",
         "code": "ENTRY_LIMIT_TEAM_CHOICE",
         "decidedBy": "clinician",
         "yours": true,
@@ -395,6 +542,13 @@
         "decidedBy": "clinician",
         "yours": true,
         "message": "The age range the pathway covers uses an upper age limit of 60 months, while the booklet gives the same amount in another unit: 60 months is the same as 5 years. The booklet (page 3) says: \"(child age 2 months up to 5 years)\". The draft has an upper age limit of 60 months. This is for information; the clinician may confirm the conversion if in doubt."
+      },
+      {
+        "severity": "info",
+        "code": "NUMBER_UNIT_CONVERTED",
+        "decidedBy": "clinician",
+        "yours": true,
+        "message": "The action \"Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10...\" of the result \"Fast breathing (pneumonia): treat at home and follow up in 3 days\" uses an age limit of 60 months in the dose table (12 up to 60 months), while the booklet gives the same amount in another unit: 60 months is the same as 5 years. The booklet (page 9) says: \"Give twice daily for 5 days: Age 2 months up to 12 months—1 tablet (total 10 tabs) Age 12 months up to 5 years—2 tablets (total 20 tabs)\". The draft has an age limit of 60 months in the dose table (12 up to 60 months). This is for information; the clinician may confirm the conversion if in doubt."
       },
       {
         "severity": "info",
@@ -416,13 +570,6 @@
         "decidedBy": "clinician",
         "yours": true,
         "message": "Some questions need a count or a measurement: For how many days has the child had the cough?; Count the child's breaths in 1 minute. If it could not be measured (for example the child will not keep still for the count), the form has no way to record that, and the health worker must invent a number or leave it out, which is then treated as normal. This is for information; the clinician says what should happen when it could not be measured."
-      },
-      {
-        "severity": "info",
-        "code": "CONTEXT_NOT_PROVIDED",
-        "decidedBy": "program_officer",
-        "yours": false,
-        "message": "Some checks did not run, because the information they need was not supplied: the test-case check, the form-readiness check. Nothing has been confirmed by them, so their silence is not a pass. The program officer supplies the test cases, the form settings and runs the checks again."
       }
     ]
   }
