@@ -11,6 +11,13 @@ VITE_API_URL=<APIURL> npm run dev             # against the orchestrator API (Ba
 npm run build && npm run lint
 ```
 
+Locally, with no AWS (main's real API, pipeline and sign-off code in memory; every upload gives the same cough draft from a fake model):
+
+```
+cd Backend && npm ci && npm run dev:local                          # API on http://localhost:8787
+cd Frontend && VITE_API_URL=http://localhost:8787 npm run dev      # UI on http://localhost:5173
+```
+
 `<APIURL>` is the `APIURL` output of `OrchestratorLambdaStack` (DEPLOYMENT.md), without the trailing slash. The API allows the origins in the CDK context `uiOrigins` (default `http://localhost:5173`). Optional: `VITE_CLINICIAN_ID` is the clinician's user id for signatures (default `clinician`).
 
 ## How it uses the backend (live mode)
