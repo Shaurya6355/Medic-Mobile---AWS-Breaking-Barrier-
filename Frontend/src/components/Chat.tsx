@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ChatMsg, Workflow } from "../domain/types";
 import type { Actions } from "../actions";
+import type { ItemScore } from "../domain/scores";
+import { QuestionScoreNote } from "./QuoteScores";
 
 const TRY = ["What happens to a 2 year old breathing 45 a minute?", "Explain R3", "Change 40 to 45", "Which checks have problems?"];
 
 /** One open question at a time, as a card: the question, the guideline passage, two big answers. */
-function QuestionCard({ w, act, canAct, onSelect, onChange }: { w: Workflow; act: Actions; canAct: boolean; onSelect: (id: string) => void; onChange: (about: string) => void }) {
+function QuestionCard({ w, act, canAct, onSelect, onChange, scores }: { w: Workflow; act: Actions; canAct: boolean; onSelect: (id: string) => void; onChange: (about: string) => void; scores?: Map<string, ItemScore> }) {
   const total = w.flags.length, done = w.flags.filter(f => f.res).length;
   const f = w.flags.find(x => !x.res);
   if (!total) return null;
@@ -18,6 +20,7 @@ function QuestionCard({ w, act, canAct, onSelect, onChange }: { w: Workflow; act
       </div>
       <p className="qtext">{f.title}</p>
       {f.src !== "No guideline passage" ? <blockquote className="qquote">{f.src}</blockquote> : <p className="note">The guideline does not answer this; it is your call.</p>}
+      <QuestionScoreNote v={scores?.get(f.about)} />
       <div className="qbtns">
         <button type="button" className="btn primary" disabled={!canAct} onClick={() => act.answer(f.id, "keep")}>Keep it</button>
         <button type="button" className="btn" disabled={!canAct} onClick={() => { act.answer(f.id, "change"); onChange(f.about); }}>Change it</button>
@@ -78,7 +81,8 @@ function Msg({ m, w, act, canAct, onSelect, onChange }: { m: ChatMsg; w: Workflo
 }
 
 /** The assistant beside the flow: answers questions about the rules and proposes changes the clinician applies. */
-export function Chat({ w, act, canAct, onSelect, onChange, onClose }: { w: Workflow; act: Actions; canAct: boolean; onSelect: (id: string) => void; onChange: (about: string) => void; onClose: () => void }) {
+/** `scores` adds the weak-quote line to the question card; `item` (the selected item's quote support) sits under it. */
+export function Chat({ w, act, canAct, onSelect, onChange, onClose, scores, item }: { w: Workflow; act: Actions; canAct: boolean; onSelect: (id: string) => void; onChange: (about: string) => void; onClose: () => void; scores?: Map<string, ItemScore>; item?: ReactNode }) {
   const [text, setText] = useState("");
   const log = useRef<HTMLOListElement>(null);
   useEffect(() => { const el = log.current; if (el) el.scrollTop = el.scrollHeight; }, [w.chat.length]);
@@ -90,7 +94,10 @@ export function Chat({ w, act, canAct, onSelect, onChange, onClose }: { w: Workf
         <span className="note" />
         <button type="button" className="lnk" onClick={onClose} aria-label="Hide assistant">Hide</button>
       </div>
-      <QuestionCard w={w} act={act} canAct={canAct} onSelect={onSelect} onChange={onChange} />
+      <div className="chat-top">
+        <QuestionCard w={w} act={act} canAct={canAct} onSelect={onSelect} onChange={onChange} scores={scores} />
+        {item}
+      </div>
       <ol className="clog" ref={log}>
         {w.chat.filter(m => !m.ask).map(m => <Msg key={m.id} m={m} w={w} act={act} canAct={canAct} onSelect={onSelect} onChange={onChange} />)}
       </ol>

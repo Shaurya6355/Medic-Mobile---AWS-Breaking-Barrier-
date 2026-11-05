@@ -1,8 +1,7 @@
 import { splitItem } from "../../../shared/pathway/index.ts";
 import { getD, getO, getQ, itemLabel } from "../domain/logic";
-import { fmtScore, readFirst, type ItemScore } from "../domain/scores";
+import { fmtScore, type ItemScore } from "../domain/scores";
 import type { ItemId, Model, QuoteScores } from "../domain/types";
-import { SectionHead } from "./Page";
 
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const KIND: Record<string, string> = { scope: "Applies to", question: "Question", derived: "Derived value", rule: "Rule", outcome: "Classification", action: "Action", follow_up: "Follow-up task" };
@@ -54,52 +53,39 @@ function Detail({ v, m }: { v: ItemScore; m: Model }) {
   );
 }
 
-/** The quote check in the View tab: the advisory notice, the flagged items to read first, and the selected item's
-    details. It never feeds the checks, the blocking count or the approve button. */
-export function QuoteScoresPanel({ s, m, idx, sel, onSelect }: { s: QuoteScores | null | undefined; m: Model; idx: Map<ItemId, ItemScore>; sel: string; onSelect: (id: ItemId) => void }) {
-  if (!s) return null;
-  const sub = "Advisory: a model's opinion of how well each quote supports its item. It never blocks approval.";
-  if (s.status !== "scored") {
-    return (
-      <section className="qs" aria-label="Quote check">
-        <SectionHead icon="format_quote" tone="grey" title="Quote check" sub={sub} />
-        <p className="note">{s.status === "failed"
-          ? "Quote scoring did not finish for this run. Review the quotes as usual; nothing else is affected."
-          : "No quote scores for version " + s.n + ". Only the AI draft (version 1) is scored today."}</p>
-      </section>
-    );
-  }
-  const first = readFirst(idx);
-  const stale = [...idx.values()].filter(v => v.flagged && v.stale).length;
-  const picked = idx.get(sel);
+/** The selected item's quote support, on the right side of the review screen (next to the question card).
+    Shows the score even when it is high, because the clinician picked this item to look at; the caveat says what
+    the number is not. It never feeds the checks, the blocking count or the approve button. */
+export function ItemQuoteCard({ s, m, idx, id }: { s: QuoteScores | null | undefined; m: Model; idx: Map<ItemId, ItemScore>; id: string }) {
+  if (!s || !id) return null;
+  const v = idx.get(id);
+  // "scope" is the default selection, not a pick: say nothing about it unless it was actually scored.
+  if (id === "scope" && !v) return null;
+  const body = s.status === "failed" ? <p className="note">Quote scoring did not finish for this run. Nothing else is affected.</p>
+    : s.status !== "scored" ? <p className="note">{"No quote scores for version " + s.n + ". Only the AI draft (version 1) is scored today."}</p>
+    : v ? <Detail v={v} m={m} />
+    : <p className="note"><b>{label(m, id)}</b>{": not scored. It cites no guideline quote, or it was added after scoring."}</p>;
   return (
-    <section className="qs" aria-label="Quote check">
-      <SectionHead icon="format_quote" tone="grey" title="Quote check" sub="Which guideline quotes to read first."
-        aside={<span className="badge qs">{s.sample ? "Sample scores" : "Scored on version " + s.n}</span>} />
-      <p className="qs-notice">{s.notice}</p>
-      <div className="qs-chips">
-        <span className="qs-chip flag">{s.summary.flagged + " flagged"}</span>
-        <span className="qs-chip">{s.summary.scored - s.summary.flagged + " look supported"}</span>
-        {s.summary.not_scored ? <span className="qs-chip">{s.summary.not_scored + " cite no quote"}</span> : null}
-        {stale ? <span className="qs-chip">{stale + " edited since scoring"}</span> : null}
+    <section className="qs-card" aria-label="Quote support">
+      <div className="qs-chead">
+        <span className="qs-lab">{"Quote support" + (s.status === "scored" ? (s.sample ? " · sample scores" : " · scored on version " + s.n) : "")}</span>
       </div>
-      {first.length ? (
-        <>
-          <h3 className="qs-sub">Read these quotes first</h3>
-          <ul className="qs-list">
-            {first.map(v => (
-              <li key={v.id}>
-                <button type="button" className={"qs-item" + (sel === v.id ? " on" : "")} aria-pressed={sel === v.id} onClick={() => onSelect(v.id)}>
-                  <span className="qs-row"><b>{label(m, v.id)}</b><span className="qs-val">{fmtScore(v.entry.score)}</span></span>
-                  <Bar score={v.entry.score} />
-                  {v.entry.why ? <span className="note">{cap(v.entry.why)}</span> : null}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : <p className="note">No quote is flagged{stale ? " that still matches the current text" : ""}.</p>}
-      {picked ? <Detail v={picked} m={m} /> : <p className="note">Select a box in the flow, or an item above, to see its quote score.</p>}
+      {body}
+      <p className="note qs-caveat">Advisory: whether the quote backs the item, not whether the item is clinically right. It never blocks approval.</p>
     </section>
+  );
+}
+
+/** One line on the question card when the item it asks about has a weak quote. Nothing for a good score, so a
+    high number never sits next to "Keep it". */
+export function QuestionScoreNote({ v }: { v: ItemScore | undefined }) {
+  if (!v || !v.flagged) return null;
+  if (v.stale) return <p className="qs-qnote old">Its quote was scored on the earlier text, before your edit.</p>;
+  const e = v.entry;
+  return (
+    <p className="qs-qnote">
+      <b>{"The cited quote may not support this (" + fmtScore(e.score) + ")"}</b>
+      {e.lowest_reason ? ": " + e.lowest_reason : e.why ? ": " + e.why : "."}
+    </p>
   );
 }
