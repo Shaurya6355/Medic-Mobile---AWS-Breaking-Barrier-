@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DraftSchema, type Draft } from "../../../src/logic/fill/draftSchema.js";
 import {
   mapThresholdOp,
+  normalizeUnit,
   parseAgeBand,
   parseDoseText,
   parseFollowup,
@@ -351,5 +352,26 @@ describe("draft schema", () => {
     delete e.questions[1].variable_id;
     delete e.questions[1].danger_sign_id;
     expect(DraftSchema.safeParse(e).success).toBe(false);
+  });
+});
+
+describe("normalizeUnit", () => {
+  it("reads any unit that names months as months (real run 6a22034d wrote \"months/years\")", () => {
+    for (const u of ["months", "Months", "month", "months/years", "age in months", "months (whole)"]) expect(normalizeUnit(u), u).toBe("months");
+  });
+  it("leaves other units alone", () => {
+    expect(normalizeUnit("breaths per minute")).toBe("breaths_per_minute");
+    expect(normalizeUnit("days")).toBe("days");
+    expect(normalizeUnit("years")).toBe("years");
+    expect(normalizeUnit("  ")).toBeUndefined();
+    expect(normalizeUnit(null)).toBeUndefined();
+  });
+});
+
+describe("resolveDraft accepts an age variable whose unit is months/years", () => {
+  it("does not report a missing child age variable", () => {
+    const ex = extraction((e) => { e.variables[0]!.unit = "months/years"; });
+    const r = resolveDraft(draft(), ex, opts);
+    expect(r.ok ? [] : r.problems.filter((p) => /no child age variable/.test(p))).toEqual([]);
   });
 });

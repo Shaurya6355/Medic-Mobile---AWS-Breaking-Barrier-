@@ -62,6 +62,8 @@ describe("createStrandsModelClient timeout", () => {
 describe("temperatureSetting", () => {
   it("sends no temperature to Claude Haiku 5.5, which rejects it, and 0 to every other model", () => {
     expect(temperatureSetting("us.anthropic.claude-haiku-5-5")).toEqual({});
+    expect(temperatureSetting("us.anthropic.claude-sonnet-5-5")).toEqual({});
+    expect(temperatureSetting("global.anthropic.claude-opus-5-5")).toEqual({});
     expect(temperatureSetting("us.meta.llama4-scout-17b-instruct-v1:0")).toEqual({ temperature: 0 });
     expect(temperatureSetting("us.anthropic.claude-sonnet-4-5-20250929-v1:0")).toEqual({ temperature: 0 });
   });

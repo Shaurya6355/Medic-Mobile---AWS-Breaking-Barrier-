@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { artifactKey, pageImageName } from "../artifacts/artifactStore.js";
-import { UsageError, type Step } from "../engine/step.js";
+import { TransientUsageError, type Step } from "../engine/step.js";
 import { ModelOutputError, type ModelContent } from "../model/modelClient.js";
 import { ExtractionOutput } from "./extractionSchema.js";
 
@@ -17,7 +17,7 @@ interface InputDoc {
 
 /** A quote the model got almost right, and the deterministic repair applied to it (recorded, never silent). */
 export interface QuoteFix {
-  kind: "typography" | "block";
+  kind: "typography" | "block" | "format" | "span";
   from: { block_id: string; quote: string };
   to: { block_id: string; quote: string };
 }
@@ -25,6 +25,63 @@ export interface QuoteFix {
 // Curly quotes and primes become their ASCII form. One UTF-16 unit for one, so an index found in the folded
 // text is the same index in the original, and the booklet's own characters can be cut out of it.
 const foldQuotes = (s: string): string => s.replace(/[‘’‚‛′]/g, "'").replace(/[“”„‟″]/g, '"');
+
+// Lower-cased, curly quotes folded, ALL whitespace dropped (the model adds and removes spaces and line breaks
+// freely, and the booklet's OCR spacing is odd: "H EALTH"); map[i] is the index in the original of text[i], so a
+// match found here is cut out of the original (the booklet's own characters).
+function squash(s: string): { text: string; map: number[] } {
+  const map: number[] = [];
+  let text = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = foldQuotes(s[i]!);
+    if (/\s/.test(ch)) continue;
+    for (const c of ch.toLowerCase()) { text += c; map.push(i); }
+  }
+  return { text, map };
+}
+
+// A looser match must still be specific: shorter than this it could match anywhere.
+const MIN_FORMAT_MATCH = 12;
+
+/**
+ * Last resort: the quote differs from the booklet only by case, spacing or trailing punctuation (the model
+ * tidies the booklet's OCR, e.g. "H EALTH" or an added full stop). Found exactly once in the block, the
+ * booklet's own text for that span is returned; never the model's version.
+ */
+function looseIn(text: string, quote: string): string | undefined {
+  const q = squash(quote).text.replace(/^["']+/, "").replace(/["'.,;:!?]+$/, "");
+  if (q.length < MIN_FORMAT_MATCH) return undefined;
+  const t = squash(text);
+  const i = t.text.indexOf(q);
+  if (i < 0 || t.text.indexOf(q, i + 1) >= 0) return undefined;
+  return text.slice(t.map[i]!, t.map[i + q.length - 1]! + 1);
+}
+
+/**
+ * The model joined lines that are not next to each other (it skipped a line in the middle). When every line of
+ * the quote is found in the block, in order, the booklet's own contiguous text from the first line's start to
+ * the last line's end is returned, so the stored quote is still verbatim (just wider than what was cited).
+ * Needs at least two lines, and the span may not be more than twice the quote's length.
+ */
+function spanIn(text: string, quote: string): string | undefined {
+  const segs = quote
+    .split(/\n/)
+    .map((l) => squash(l).text)
+    .filter((l) => l.length > 0);
+  if (segs.length < 2 || segs.join("").length < MIN_FORMAT_MATCH) return undefined;
+  const t = squash(text);
+  let from = 0;
+  let first = -1;
+  let end = -1;
+  for (const seg of segs) {
+    const i = t.text.indexOf(seg, from);
+    if (i < 0) return undefined;
+    if (first < 0) first = i;
+    from = end = i + seg.length;
+  }
+  const out = text.slice(t.map[first]!, t.map[end - 1]! + 1);
+  return out.length <= 2 * quote.length ? out : undefined;
+}
 
 /** The booklet's exact text for `quote` in `text`: as is, or after folding curly quotes only; else undefined. */
 function exactIn(text: string, quote: string): string | undefined {
@@ -43,6 +100,10 @@ const pageOf = (blockId: string): string | undefined => /^(p\d+)\./.exec(blockId
  *   the quote becomes the booklet's exact text;
  * - block: the quote is not in the cited block but is in exactly ONE block of the same page (the model
  *   miscounted blocks); block_id moves to that block.
+ * - format: the quote is in the cited block but for case, spacing or trailing punctuation; the quote becomes
+ *   the booklet's exact text (at least a phrase long, and found once).
+ * - span: every line of the quote is in the cited block, in order, but the model skipped a line in between;
+ *   the quote becomes the booklet's contiguous text covering them (at most twice the quote's length).
  * Anything else is bad: an empty quote, a quote in no block of the page, or in several (ambiguous).
  */
 export function checkQuotes(
@@ -70,8 +131,14 @@ export function checkQuotes(
           bad.push({ block_id: id, quote });
         } else {
           const here = exactIn(blocks.get(id) ?? "", quote);
+          const loose = here === undefined ? looseIn(blocks.get(id) ?? "", quote) : undefined;
+          const span = here === undefined && loose === undefined ? spanIn(blocks.get(id) ?? "", quote) : undefined;
           let fix: QuoteFix | undefined;
-          if (here === undefined) {
+          if (here === undefined && loose !== undefined) {
+            fix = { kind: "format", from: { block_id: id, quote }, to: { block_id: id, quote: loose } };
+          } else if (here === undefined && span !== undefined) {
+            fix = { kind: "span", from: { block_id: id, quote }, to: { block_id: id, quote: span } };
+          } else if (here === undefined) {
             const page = pageOf(id);
             const hits = (page === undefined ? [] : byPage.get(page) ?? [])
               .filter((b) => b !== id)
@@ -150,7 +217,11 @@ export function createExtractStep(opts: { modelId: string; promptPath: string; m
           maxTokens: opts.maxTokens ?? 32000,
         });
       } catch (e) {
-        if (e instanceof ModelOutputError) await ctx.artifacts.put(rawKey, e.raw, "text/plain");
+        if (e instanceof ModelOutputError) {
+          await ctx.artifacts.put(rawKey, e.raw, "text/plain");
+          // Invalid JSON or a missing field varies from call to call: retry it (the cost of this call is recorded).
+          throw new TransientUsageError(e.message, e.usage);
+        }
         throw e;
       }
       await ctx.artifacts.put(rawKey, result.raw, "text/plain");
@@ -163,7 +234,8 @@ export function createExtractStep(opts: { modelId: string; promptPath: string; m
           .slice(0, MAX_LISTED)
           .map((b) => `${b.block_id}: ${b.quote.length > MAX_QUOTE ? b.quote.slice(0, MAX_QUOTE) : b.quote}`)
           .join("; ");
-        throw new UsageError(
+        // The model's wording varies from call to call, so a fresh call usually passes: retry (the cost is recorded).
+        throw new TransientUsageError(
           `Extraction has ${bad.length} quote(s) not found in their cited block: ${listed}`,
           result.usage,
         );

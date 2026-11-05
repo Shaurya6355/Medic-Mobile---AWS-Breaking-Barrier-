@@ -37,6 +37,19 @@ export class TransientError extends Error {
   }
 }
 
+// A transient failure that happened after a model call had already been paid for (for example the model's
+// output failed a check, and another call will probably pass). It is retried like any TransientError and the
+// runner still records the usage of the failed attempt.
+export class TransientUsageError extends TransientError {
+  constructor(
+    message: string,
+    public readonly usage?: StepUsage,
+  ) {
+    super(message);
+    this.name = "TransientUsageError";
+  }
+}
+
 // A non-transient failure that happened after a model call had already been paid
 // for. The runner records the usage on the failed attempt (DEC-003).
 export class UsageError extends Error {

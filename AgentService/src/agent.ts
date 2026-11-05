@@ -58,10 +58,10 @@ export interface AgentDeps {
   region?: string;
 }
 
-/** Claude Haiku 5.5 rejects any temperature but its default, so none is sent for it (as in Backend/src/model/strands.ts). */
-const NO_TEMPERATURE = /claude-haiku-5/;
+/** The Claude 5 models (Haiku 5.5, Sonnet 5.5, ...) reject any temperature but their default, so none is sent (as in Backend/src/model/strands.ts). */
+const NO_TEMPERATURE = /claude-[a-z]+-5/;
 
-/** Real factory: mirrors Backend/src/model/strands.ts (temperature 0 except Haiku 5.5, no printer, no SDK retries). */
+/** Real factory: mirrors Backend/src/model/strands.ts (temperature 0 except the Claude 5 models, no printer, no SDK retries). */
 export const createStrandsAgent: AgentFactory = (opts) => {
   const model = new BedrockModel({
     region: opts.region,

@@ -31,10 +31,11 @@ export function isTransientBedrockError(e: unknown): boolean {
 }
 
 /**
- * Claude Haiku 5.5 rejects any temperature but its default ("`temperature` is deprecated for this model", ERR-012,
- * found with direct test calls), so none is sent for it. Every other model keeps temperature 0.
+ * The Claude 5 models (Haiku 5.5, Sonnet 5.5, ...) reject any temperature but their default ("`temperature` is
+ * deprecated for this model", ERR-012, found with direct test calls), so none is sent for them. Every other model
+ * keeps temperature 0.
  */
-const NO_TEMPERATURE = /claude-haiku-5/;
+const NO_TEMPERATURE = /claude-[a-z]+-5/;
 export function temperatureSetting(modelId: string): { temperature?: number } {
   return NO_TEMPERATURE.test(modelId) ? {} : { temperature: 0 };
 }

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { NotFound, artifactKey } from "../artifacts/artifactStore.js";
-import { UsageError, type Step, type StepContext, type StepResult, type StepUsage } from "../engine/step.js";
+import { TransientUsageError, UsageError, type Step, type StepContext, type StepResult, type StepUsage } from "../engine/step.js";
 import { DraftSchema, type Draft } from "../logic/fill/draftSchema.js";
 import { resolveDraft, type ResolveOptions, type ResolvedModel } from "../logic/fill/resolve.js";
 import { ModelOutputError, type ModelContent } from "../model/modelClient.js";
@@ -137,7 +137,9 @@ export function createFillLogicStep(opts: FillLogicOptions): Step {
         attempt = tryResolve(second.draft, second.problems);
         draft = second.draft;
         if (attempt.model === undefined) {
-          throw new UsageError(
+          // The draft is sampled, so a fresh call usually avoids the slip (an outcome used as an action, a number used
+          // as yes/no): retry it. The cost of this attempt's calls is still recorded.
+          throw new TransientUsageError(
             `fill_logic: the model draft still has ${attempt.problems.length} problem(s) after one repair: ${attempt.problems.slice(0, 10).join("; ")}`,
             usage,
           );

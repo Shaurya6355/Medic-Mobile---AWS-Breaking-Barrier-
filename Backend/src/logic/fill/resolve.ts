@@ -57,7 +57,11 @@ export const clipText = (s: string, max = TEXT_MAX): string => {
 export function normalizeUnit(u: string | null | undefined): string | undefined {
   if (u === null || u === undefined) return undefined;
   const s = u.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-  return s === "" ? undefined : s;
+  if (s === "") return undefined;
+  // The extraction prompt does not fix the wording of the age unit, and models write "months/years",
+  // "age in months", ... The form asks the child's age in whole months (ENTRY_LIMITS.months), so any unit that
+  // names months is months. Found in a real run: "months/years" made fill_logic fail with "no child age variable".
+  return /(^|_)months?(_|$)/.test(s) ? "months" : s;
 }
 
 const toMonths = (n: number, unit: string): number => (/^y/i.test(unit) ? n * 12 : n);

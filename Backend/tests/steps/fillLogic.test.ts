@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Version } from "../../src/domain/types.js";
 import { Conflict, type Store } from "../../src/store/store.js";
 import { MemoryArtifactStore, artifactKey } from "../../src/artifacts/artifactStore.js";
-import { TransientError, UsageError, type StepContext } from "../../src/engine/step.js";
+import { TransientError, TransientUsageError, UsageError, type StepContext } from "../../src/engine/step.js";
 import { createFillLogicStep } from "../../src/steps/fillLogic.js";
 import { acceptAnyObjectValidator, parseModelValidator } from "../../src/steps/logicModelValidator.js";
 import { MemoryStore } from "../../src/store/memoryStore.js";
@@ -146,12 +146,12 @@ describe("fill_logic step", () => {
     }
   });
 
-  it("fails clearly after one failed repair, records the usage of both calls and writes no version", async () => {
+  it("fails clearly (as a retryable error) after one failed repair, records the usage of both calls and writes no version", async () => {
     const { ctx, store, artifacts, model } = await setup([{ raw: badDraft(), usage: usage(1000, 400) }, { raw: badDraft(), usage: usage(1100, 410) }, good]);
     const err = await step.run(ctx).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(UsageError);
+    expect(err).toBeInstanceOf(TransientError);
     expect((err as Error).message).toMatch(/still has 2 problem\(s\) after one repair/);
-    expect((err as UsageError).usage).toEqual(usage(2100, 810));
+    expect((err as TransientUsageError).usage).toEqual(usage(2100, 810));
     expect(model.calls).toHaveLength(2);
     expect(await store.listVersions("r1")).toHaveLength(0);
     expect(await artifacts.exists(v1Key)).toBe(false);

@@ -139,7 +139,7 @@ describe("extract step", () => {
     expect(model.calls[0]!.maxTokens).toBe(123);
   });
 
-  it("fails non-transient on bad quotes, keeps raw, does not store output", async () => {
+  it("fails as a retryable (transient) error on bad quotes, carries usage, keeps raw, does not store output", async () => {
     const o = emptyOutput() as Record<string, unknown[]>;
     o.unclear_items = Array.from({ length: 12 }, (_, i) => ({
       id: `u${i}`, block_id: "p3.b1", quote: "x".repeat(200), what_is_unclear: "w", related_ids: [],
@@ -148,7 +148,7 @@ describe("extract step", () => {
     const model = new FakeModelClient([{ raw, usage }]);
     const { ctx, artifacts } = await setup(model);
     const err = await createExtractStep({ modelId: "m1", promptPath }).run(ctx).catch((e) => e);
-    expect(err).not.toBeInstanceOf(TransientError);
+    expect(err).toBeInstanceOf(TransientError);
     expect(err.usage).toEqual(usage);
     expect(err.message).toContain("12");
     expect(err.message.match(/p3\.b1: /g)).toHaveLength(10);
@@ -158,10 +158,10 @@ describe("extract step", () => {
     expect(await artifacts.exists(artifactKey("r1", "extract", "extraction_output.json"))).toBe(false);
   });
 
-  it("propagates ModelOutputError for invalid JSON", async () => {
+  it("turns a ModelOutputError for invalid JSON into a retryable error", async () => {
     const model = new FakeModelClient([{ raw: "not json" }]);
     const { ctx } = await setup(model);
-    await expect(createExtractStep({ modelId: "m1", promptPath }).run(ctx)).rejects.toBeInstanceOf(ModelOutputError);
+    await expect(createExtractStep({ modelId: "m1", promptPath }).run(ctx)).rejects.toBeInstanceOf(TransientError);
   });
 
   it("keeps the full raw text of an invalid response in raw_response.txt", async () => {
@@ -178,7 +178,7 @@ describe("extract step", () => {
     const { ctx } = await setup(model);
     const prices = { m1: { inPerMTok: 1_000_000, outPerMTok: 2_000_000 } };
     const rec = await runStep(createExtractStep({ modelId: "m1", promptPath }), ctx, {
-      maxAttempts: 3,
+      maxAttempts: 1,
       backoffMs: () => 0,
       sleep: async () => {},
       prices,
@@ -228,6 +228,51 @@ describe("checkQuotes repairs only unambiguous slips, and records them", () => {
     expect(r.bad).toEqual([]);
     expect(r.fixes.map((f) => [f.kind, f.from.block_id, f.to.block_id])).toEqual([["block", "p5.b7", "p5.b5"], ["block", "p9.b17", "p9.b18"]]);
     expect(o.nodes.map((n) => n.src[0]!.block_id)).toEqual(["p5.b5", "p9.b18"]);
+  });
+
+  it("format: case, spacing and a trailing full stop are repaired to the booklet's exact text (real run acb54e44)", () => {
+    const b = new Map([
+      ["p7.b1", " I F ANY DANGER SIGN , R EFER C HILD URGENTLY TO H EALTH F ACILITY"],
+      ["p9.b32", " Advise on when to return.\nGo to nearest health facility\n Has blood in stool\n Advise caregiver on use of a\nbednet (ITN)"],
+    ]);
+    const o = { n: [
+      { src: [{ block_id: "p7.b1", quote: " I F ANY DANGER SIGN , R EFER C HILD URGENTLY to H EALTH F ACILITY" }] },
+      { src: [{ block_id: "p9.b32", quote: " Advise caregiver on use of a\nbednet (ITN)." }] },
+    ] };
+    const r = checkQuotes(o, b, { apply: true });
+    expect(r.bad).toEqual([]);
+    expect(r.fixes.map((f) => f.kind)).toEqual(["format", "format"]);
+    expect(o.n[0]!.src[0]!.quote).toBe("I F ANY DANGER SIGN , R EFER C HILD URGENTLY TO H EALTH F ACILITY");
+    expect(o.n[1]!.src[0]!.quote).toBe("Advise caregiver on use of a\nbednet (ITN)");
+    for (const [id, q] of [["p7.b1", o.n[0]!.src[0]!.quote], ["p9.b32", o.n[1]!.src[0]!.quote]] as const) expect(b.get(id)!.includes(q)).toBe(true);
+  });
+
+  it("format: a different word, a too-short quote, or an ambiguous match is still bad", () => {
+    const b = new Map([["p1.b1", "Give oral antibiotic for 5 days. Give oral antibiotic for 5 days."], ["p1.b2", "Fever now"]]);
+    expect(checkQuotes(out("p1.b1", "give oral antibiotic for 5 days"), b).bad).toHaveLength(1); // twice in the block
+    expect(checkQuotes(out("p1.b2", "fever now."), b).bad).toHaveLength(1); // under the minimum length
+    expect(checkQuotes(out("p1.b1", "Give oral antibiotic for 7 days."), b).bad).toHaveLength(1);
+  });
+
+  it("span: a quote that skips a middle line is widened to the booklet's contiguous text (real run bc79d0a4)", () => {
+    const blk = "Give twice daily for 5 days:\nAge 2 months up to 12 months\u20141 tablet (total 10 tabs)\nAge 12 months up to 5 years\u20142 tablets (total 20 tabs)";
+    const b = new Map([["p9.b19", blk], ["p7.b9", " If fast breathing or chest indrawing, give first\ndose of oral antibiotic (amoxycillin tablet\u2014250 mg):\nAge 2 months up to 12 months\u20141 tablet\nAge 12 months up to 5 years\u20142 tablets"]]);
+    const o = { n: [
+      { src: [{ block_id: "p9.b19", quote: "Give twice daily for 5 days:\nAge 12 months up to 5 years\u20142 tablets (total 20 tabs)" }] },
+      { src: [{ block_id: "p7.b9", quote: "If fast breathing or chest indrawing, give first dose of oral antibiotic (amoxycillin tablet\u2014250 mg):\nAge 12 months up to 5 years\u20142 tablets" }] },
+    ] };
+    const r = checkQuotes(o, b, { apply: true });
+    expect(r.bad).toEqual([]);
+    expect(r.fixes.map((f) => f.kind)).toEqual(["span", "span"]);
+    expect(o.n[0]!.src[0]!.quote).toBe(blk);
+    for (const [id, q] of [["p9.b19", o.n[0]!.src[0]!.quote], ["p7.b9", o.n[1]!.src[0]!.quote]] as const) expect(b.get(id)!.includes(q)).toBe(true);
+  });
+
+  it("span: out-of-order lines, a missing line, or a huge swallow are still bad", () => {
+    const b = new Map([["p1.b1", "Line one is here.\nLine two is here.\nLine three is here."], ["p1.b2", "Start of the instruction\n" + "x".repeat(300) + "\nEnd of the instruction"]]);
+    expect(checkQuotes(out("p1.b1", "Line three is here.\nLine one is here."), b).bad).toHaveLength(1);
+    expect(checkQuotes(out("p1.b1", "Line one is here.\nLine nine is here."), b).bad).toHaveLength(1);
+    expect(checkQuotes(out("p1.b2", "Start of the instruction\nEnd of the instruction"), b).bad).toHaveLength(1);
   });
 
   it("without apply, nothing in the output changes", () => {
