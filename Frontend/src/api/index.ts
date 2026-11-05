@@ -9,7 +9,8 @@
 import { clone, fnv, loadSpec } from "../domain/data";
 import * as wf from "../domain/workflow";
 import { FALLBACK_TEXT } from "../domain/agent";
-import type { AuditRow, Guideline, GuidelineType, ItemId, Patch, Spec, Workflow } from "../domain/types";
+import { sampleScores } from "../domain/scores";
+import type { AuditRow, Guideline, GuidelineType, ItemId, Model, Patch, QuoteScores, Spec, Workflow } from "../domain/types";
 
 export const API_URL: string | undefined = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || undefined;
 /** True when guidelines come from the backend pipeline rather than sample data. */
@@ -35,6 +36,9 @@ interface StepRecord { step: string; attempt: number; status: "running" | "succe
 interface VersionRec { n: number; author: string; authorRole?: string; createdAt: number; status?: string }
 interface FindingsView { modelSha: string; claimText: string; blocking: number; groups: { severity: "blocking" | "warning" | "info"; findings: { message: string; check: string }[] }[] }
 interface StatusView { n: number; modelSha: string; status: string; runState: RunState; nextStep: string }
+type ScoresView =
+  | ({ runId: string; n: number; status: "scored"; modelSha: string } & Omit<Extract<QuoteScores, { status: "scored" }>, "status" | "n" | "modelSha" | "base">)
+  | { runId: string; n: number; status: "not_scored" };
 
 const CLINICIAN_ID = (import.meta.env.VITE_CLINICIAN_ID as string | undefined) || "clinician";
 
@@ -139,6 +143,34 @@ export const getGuideline = async (id: string): Promise<Guideline> => {
   return toGuideline(r.run, r.steps, r.run.state === "awaiting_officer" && (await agentEscalated(id)));
 };
 
+/* ---------- Quote-support scores (advisory) ---------- */
+/** Scores for version n, or for version 1 when n is a later version (only the AI draft is scored today).
+    Never throws: a missing route or a network error leaves the review without scores, nothing else. */
+async function loadScores(runId: string, n: number, model: Model): Promise<QuoteScores | null> {
+  try {
+    const at = async (k: number) => call<ScoresView>("/runs/" + runId + "/versions/" + k + "/scores");
+    let s = await at(n), base = model;
+    if (s.status !== "scored" && n > 1) {
+      const s1 = await at(1);
+      if (s1.status === "scored") {
+        const v1 = await call<{ body: unknown }>("/runs/" + runId + "/versions/1");
+        s = s1; base = loadSpec(v1.body, "The backend's logic model (version 1)");
+      }
+    }
+    if (s.status === "scored") {
+      const { runId: _r, status: _s, ...rest } = s;
+      void _r; void _s;
+      return { ...rest, status: "scored", base };
+    }
+    // Not scored: say "failed" when the checks step recorded a scoring failure, so the panel can tell them apart.
+    const r = await call<{ steps: { artifactRefs?: Record<string, string> }[] }>("/runs/" + runId);
+    const refs = r.steps.map(x => x.artifactRefs ?? {}).filter(a => a.scoresStatus).pop();
+    return refs?.scoresStatus === "failed" ? { status: "failed", n, error: refs.scoresError } : { status: "not_scored", n };
+  } catch {
+    return null;
+  }
+}
+
 /* ---------- Workflow ---------- */
 export async function createDraft(args: { guidelineId: string; pathway: string; pages: number[] }): Promise<Workflow> {
   const id = "wf-" + seq++;
@@ -149,7 +181,10 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
     if (!last) throw new Error("This run has no logic model version yet. Wait for the pipeline to finish.");
     const v = await call<{ body: unknown }>("/runs/" + g.id + "/versions/" + last.n);
     const model = loadSpec(v.body, "The backend's logic model (version " + last.n + ")");
-    const [fc, fo] = await Promise.all(["clinician", "program_officer"].map(a => call<FindingsView>("/runs/" + g.id + "/versions/" + last.n + "/findings?audience=" + a)));
+    const [[fc, fo], scores] = await Promise.all([
+      Promise.all(["clinician", "program_officer"].map(a => call<FindingsView>("/runs/" + g.id + "/versions/" + last.n + "/findings?audience=" + a))),
+      loadScores(g.id, last.n, model),
+    ]);
     const flat = (f: FindingsView, role: "clinician" | "program_officer") => f.groups.flatMap(gr => gr.findings.map(x => ({ severity: gr.severity, message: x.message, check: x.check, role })));
     const remote = { runId: g.id, n: last.n, modelSha: fc.modelSha, base: clone(model), claimText: fc.claimText, findings: [...flat(fc, "clinician"), ...flat(fo, "program_officer")] };
     const evidence = { pages: null, pagesFrom: "Guideline text stays in the backend; its own quote check is in the backend findings", draftB: null, draftBFrom: "The backend does not return a second draft" };
@@ -158,11 +193,13 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
       event: "Loaded logic model version " + last.n + " from the backend (run " + g.id + ")",
       note: "modelSha " + fc.modelSha.slice(0, 12) + " · " + fc.claimText,
     });
+    workflows[id] = { ...workflows[id], scores };
     return clone(workflows[id]);
   }
   const g = guidelines.find(x => x.id === args.guidelineId);
   if (!g) throw new Error("Guideline not found");
-  workflows[id] = wf.createDraft(wf.initialWorkflow(id), { id: g.id, name: g.name, pathway: args.pathway, pages: args.pages });
+  const w0 = wf.createDraft(wf.initialWorkflow(id), { id: g.id, name: g.name, pathway: args.pathway, pages: args.pages });
+  workflows[id] = { ...w0, scores: sampleScores(w0.draft) };
   return respond(workflows[id], 400);
 }
 export const getWorkflow = async (id: string) => respond(load(id));
