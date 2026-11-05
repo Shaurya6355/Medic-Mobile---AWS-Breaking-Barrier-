@@ -4,6 +4,29 @@ import type { Actions } from "../actions";
 
 const TRY = ["What happens to a 2 year old breathing 45 a minute?", "Explain R3", "Change 40 to 45", "Which checks have problems?"];
 
+/** One open question at a time, as a card: the question, the guideline passage, two big answers. */
+function QuestionCard({ w, act, canAct, onSelect, onChange }: { w: Workflow; act: Actions; canAct: boolean; onSelect: (id: string) => void; onChange: (about: string) => void }) {
+  const total = w.flags.length, done = w.flags.filter(f => f.res).length;
+  const f = w.flags.find(x => !x.res);
+  if (!total) return null;
+  if (!f) return <div className="qdone"><span aria-hidden="true">✓</span>{"All " + total + " questions answered"}</div>;
+  return (
+    <section className="qcard" aria-label={"Question " + (done + 1) + " of " + total}>
+      <div className="qhead">
+        <span className="qnum">{"Question " + (done + 1) + " of " + total}</span>
+        <span className="qbar" aria-hidden="true"><i style={{ width: (100 * done / total) + "%" }} /></span>
+      </div>
+      <p className="qtext">{f.title}</p>
+      {f.src !== "No guideline passage" ? <blockquote className="qquote">{f.src}</blockquote> : <p className="note">The guideline does not answer this; it is your call.</p>}
+      <div className="qbtns">
+        <button type="button" className="btn primary" disabled={!canAct} onClick={() => act.answer(f.id, "keep")}>Keep it</button>
+        <button type="button" className="btn" disabled={!canAct} onClick={() => { act.answer(f.id, "change"); onChange(f.about); }}>Change it</button>
+      </div>
+      <button type="button" className="lnk" onClick={() => onSelect(f.about)}>Show it on the flowchart</button>
+    </section>
+  );
+}
+
 function Ask({ w, id, act, canAct, onChange }: { w: Workflow; id: string; act: Actions; canAct: boolean; onChange: (about: string) => void }) {
   const f = w.flags.find(x => x.id === id);
   if (!f) return null;
@@ -50,16 +73,16 @@ export function Chat({ w, act, canAct, onSelect, onChange, onClose }: { w: Workf
   const log = useRef<HTMLOListElement>(null);
   useEffect(() => { const el = log.current; if (el) el.scrollTop = el.scrollHeight; }, [w.chat.length]);
   const send = (t: string) => { if (t.trim()) { act.chat(t); setText(""); } };
-  const left = w.flags.filter(f => !f.res).length;
   return (
     <aside className="chat panel" aria-label="Assistant">
       <div className="chath">
         <b>Assistant</b>
-        <span className="note">{left ? left + " question" + (left > 1 ? "s" : "") + " for you" : "All questions answered"}</span>
+        <span className="note" />
         <button type="button" className="lnk" onClick={onClose} aria-label="Hide assistant">Hide</button>
       </div>
+      <QuestionCard w={w} act={act} canAct={canAct} onSelect={onSelect} onChange={onChange} />
       <ol className="clog" ref={log}>
-        {w.chat.map(m => <Msg key={m.id} m={m} w={w} act={act} canAct={canAct} onSelect={onSelect} onChange={onChange} />)}
+        {w.chat.filter(m => !m.ask).map(m => <Msg key={m.id} m={m} w={w} act={act} canAct={canAct} onSelect={onSelect} onChange={onChange} />)}
       </ol>
       {canAct ? (
         <>
