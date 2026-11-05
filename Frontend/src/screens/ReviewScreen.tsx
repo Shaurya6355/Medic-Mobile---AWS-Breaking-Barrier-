@@ -55,12 +55,11 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
   const [chatOnBy, setChatRaw] = useState<Record<Tab, boolean>>(() => ({ view: readChat("view"), edit: readChat("edit") }));
   const [openCheck, setOpenCheck] = useState<CheckKey | null>(hashCheck);
   const [approving, setApproving] = useState(false);
-  const [showChecks, setShowChecks] = useState(() => hashCheck() !== null);
   const setTab = (t: Tab) => { setTabRaw(t); try { localStorage.setItem("reviewTab", t); } catch { /* private mode */ } };
   const chatOn = chatOnBy[tab];
   const setChat = (on: boolean) => { setChatRaw(x => ({ ...x, [tab]: on })); try { localStorage.setItem("chat-" + tab, on ? "1" : "0"); } catch { /* private mode */ } };
   useEffect(() => {
-    const on = () => { const k = hashCheck(); setOpenCheck(k); if (k) setShowChecks(true); };
+    const on = () => setOpenCheck(hashCheck());
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
@@ -109,12 +108,14 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
         </div>
       </div>
 
-      <div className={"tlight " + light.tone}>
-        <span className="tl-dot" aria-hidden="true" />
-        <span className="tl-text">{light.text}</span>
-        <button type="button" className="lnk" aria-expanded={showChecks} onClick={() => setShowChecks(!showChecks)}>{showChecks ? "Hide the checks" : "See all " + stages.length + " checks"}</button>
-      </div>
-      {showChecks || failing.length ? <CheckBar stages={showChecks ? stages : failing} open={openCheck} setOpen={k => { setOpenCheck(k); if (!k && location.hash) history.replaceState(null, "", location.pathname + location.search); }} onSelect={setSel} /> : null}
+      <section className="checkbox" aria-label="Safety checks">
+        <div className={"tlight " + light.tone}>
+          <span className="tl-dot" aria-hidden="true" />
+          <span className="tl-text"><b>Safety checks</b>{" · " + light.text}</span>
+          <span className="note">Click a check for details</span>
+        </div>
+        <CheckBar stages={stages} open={openCheck} setOpen={k => { setOpenCheck(k); if (!k && location.hash) history.replaceState(null, "", location.pathname + location.search); }} onSelect={setSel} />
+      </section>
 
       <div className={"rvbody" + (tab === "edit" && !chatOn ? " solo" : "")}>
         {tab === "view" ? (

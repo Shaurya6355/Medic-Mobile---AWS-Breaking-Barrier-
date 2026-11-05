@@ -2,9 +2,10 @@ import { useEffect } from "react";
 import { itemLabel } from "../domain/logic";
 import { stageName, type Stage, type StageStatus } from "../domain/checks";
 import type { Check, CheckKey } from "../domain/types";
+import { Icon } from "./Icon";
 
-const LABEL: Record<StageStatus, string> = { pass: "Passed", warn: "Warnings", fail: "Failed", skipped: "Not run", missing: "Needs input" };
-const ICON: Record<StageStatus, string> = { pass: "✓", warn: "!", fail: "✗", skipped: "–", missing: "?" };
+const LABEL: Record<StageStatus, string> = { pass: "Passed", warn: "To look at", fail: "Needs fixing", skipped: "Not run yet", missing: "Not available here" };
+const ICON: Record<StageStatus, string> = { pass: "check_circle", warn: "visibility", fail: "error", skipped: "schedule", missing: "do_not_disturb_on" };
 
 /** Go to a check even when the address already points at it (a plain link would not fire hashchange then). */
 function goCheck(e: React.MouseEvent, k: CheckKey) {
@@ -33,7 +34,7 @@ export function IssueLine({ c, onSelect, showCheck = true }: { c: Check; onSelec
   );
 }
 
-/** The six checks side by side. Hover or focus a check to expand it; click (or a #check- link) pins it open. */
+/** The six checks, each with a plain name and what it means. Click a check (or a #check- link) for its details. */
 export function CheckBar({ stages, open, setOpen, onSelect }: { stages: Stage[]; open: CheckKey | null; setOpen: (k: CheckKey | null) => void; onSelect: (id: string) => void }) {
   useEffect(() => {
     if (!open) return;
@@ -47,11 +48,11 @@ export function CheckBar({ stages, open, setOpen, onSelect }: { stages: Stage[];
         const on = open === s.key, n = s.issues.length, first = i === 0 || stages[i - 1].owner !== s.owner;
         return (
           <div key={s.key} role="listitem" id={"check-" + s.key} className={"cwid s-" + s.status + (on ? " on" : "") + (first ? " first" : "")}>
-            {first ? <span className="cown">{s.owner === "agent" ? "AI agent" : "Clinician"}</span> : null}
             <button type="button" className="chead" aria-expanded={on} onClick={() => setOpen(on ? null : s.key)}>
-              <span className={"cico " + s.status} aria-hidden="true">{ICON[s.status]}</span>
-              <span className="cname"><span className="sn">{s.n}</span>{s.name}</span>
-              <span className="cstat">{LABEL[s.status] + (n && (s.status === "fail" || s.status === "warn") ? " · " + n : "")}</span>
+              <span className={"cico " + s.status}><Icon name={ICON[s.status]} size={22} fill={s.status === "pass"} /></span>
+              <span className="cname">{s.name}</span>
+              <span className="cdesc">{s.desc}</span>
+              <span className="cstat">{LABEL[s.status] + (n && (s.status === "fail" || s.status === "warn") ? " · " + n : "")}<span className="cmore">{on ? "Hide details" : "Details"}</span></span>
             </button>
             <div className="cpop" role="region" aria-label={s.name}>
               <div className="note">{s.summary}</div>

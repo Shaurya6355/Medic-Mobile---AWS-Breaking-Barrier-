@@ -85,7 +85,7 @@ export function ReleaseScreen({ w, role, act }: { w: Workflow | null; role: Role
           {allPass ? <div className="allpass"><Icon name="verified" size={24} fill /><span><b>{"All " + v.total + " test patients passed."}</b>{" The built form gives the same result as the approved rules for every one."}</span></div> : null}
           <div className="checks">
             {tile("Test patients", v.match + " of " + v.total + " passed", v.match === v.total)}
-            {tile("Golden cases", gold.filter(g => g.ok).length + " of " + gold.length + " passed", gold.every(g => g.ok))}
+            {tile("Known cases", gold.filter(g => g.ok).length + " of " + gold.length + " passed", gold.every(g => g.ok))}
             {tile("Rule coverage", v.cov + " of " + v.covTotal + " rules used", v.cov === v.covTotal)}
             {tile("Content approval", "Clinician · " + a.hash)}
             {tile("Mutation test", v.mut + " of " + v.mutTotal + " threshold changes caught")}
