@@ -10,7 +10,7 @@ import { clone, fnv, loadSpec } from "../domain/data";
 import * as wf from "../domain/workflow";
 import { FALLBACK_TEXT } from "../domain/agent";
 import { sampleScores } from "../domain/scores";
-import { AUTH, idToken, signIn } from "../auth";
+import { AUTH, currentUser, idToken, signIn } from "../auth";
 import type { AuditRow, Guideline, GuidelineType, ItemId, Model, Patch, QuoteScores, Spec, Workflow } from "../domain/types";
 
 export const API_URL: string | undefined = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || undefined;
@@ -41,7 +41,9 @@ type ScoresView =
   | ({ runId: string; n: number; status: "scored"; modelSha: string } & Omit<Extract<QuoteScores, { status: "scored" }>, "status" | "n" | "modelSha" | "base">)
   | { runId: string; n: number; status: "not_scored" };
 
-const CLINICIAN_ID = (import.meta.env.VITE_CLINICIAN_ID as string | undefined) || "clinician";
+/** Who acts: the signed-in person's email with sign-in on (the backend takes it from the token anyway), else
+    VITE_CLINICIAN_ID or "clinician" (sample mode, dev:local without sign-in). */
+const me = (): string => (AUTH ? currentUser()?.email.toLowerCase() : undefined) || (import.meta.env.VITE_CLINICIAN_ID as string | undefined) || "clinician";
 
 const WORK: [RunState, string][] = [["created", "Upload to S3"], ["ingesting", "Read pages"], ["extracting", "Extract"], ["filling_logic", "Draft logic model"], ["checking", "Backend checks"], ["awaiting_officer", "AI agent checks"]];
 const READY: RunState[] = ["in_review", "awaiting_clinician", "locked"];
@@ -237,7 +239,7 @@ export async function chat(id: string, text: string): Promise<Workflow> {
   // Not understood locally: ask the backend. History = the conversation so far, without the local fallback reply.
   const history = local.chat.slice(0, -1).slice(-12).map(m => ({ from: m.from === "clinician" ? "user" : "assistant", text: m.text.slice(0, 1500) }));
   try {
-    const r = await call<ChatReply>("/runs/" + w.remote.runId + "/chat", { method: "POST", body: JSON.stringify({ userId: CLINICIAN_ID, role: "clinician", messages: history }) });
+    const r = await call<ChatReply>("/runs/" + w.remote.runId + "/chat", { method: "POST", body: JSON.stringify({ userId: me(), role: "clinician", messages: history }) });
     const src = [...new Set(r.citations.map(c => (c.kind === "page" ? "page " : c.kind + " ") + c.ref))];
     const next = wf.replaceLastMsg(local, { from: "agent", text: r.reply + (src.length ? "\n\nSources: " + src.join(", ") : "") });
     workflows[id] = next;
@@ -281,8 +283,8 @@ export async function feedback(id: string, text: string, selected?: string): Pro
   // The AI works from the saved backend version and its new version replaces the one on screen, so unsaved edits would be lost.
   if (w.undo.length) throw new Error("You have edits that are not saved yet. Undo them, or approve first, before sending feedback to the AI: it works from the saved version and its answer would replace your edits.");
   const base = "/runs/" + w.remote.runId, ref = feedbackRef(t, selected);
-  await call(base + "/versions/" + w.remote.n + "/comments", { method: "POST", body: JSON.stringify({ itemRef: ref, author: CLINICIAN_ID, text: t }) });
-  const rev = await call<RevisionRec>(base + "/versions/" + w.remote.n + "/revisions", { method: "POST", body: JSON.stringify({ role: "clinician", userId: CLINICIAN_ID, itemRefs: [ref] }) });
+  await call(base + "/versions/" + w.remote.n + "/comments", { method: "POST", body: JSON.stringify({ itemRef: ref, author: me(), text: t }) });
+  const rev = await call<RevisionRec>(base + "/versions/" + w.remote.n + "/revisions", { method: "POST", body: JSON.stringify({ role: "clinician", userId: me(), itemRefs: [ref] }) });
   const next = wf.addMsgs(w,
     { from: "clinician", text: "Feedback for the AI: " + t },
     { from: "agent", text: "I read your feedback and plan to do this:\n\n" + rev.instruction + "\n\nNothing changes until you confirm.", revision: { rid: rev.id, state: "ready" } });
@@ -300,7 +302,7 @@ export async function confirmRevision(id: string, msgId: number, onUpdate: (w: W
   const push = (x: Workflow) => { w = x; workflows[id] = x; onUpdate(clone(x)); };
   push(wf.setRevisionState(w, msgId, "applying"));
   try {
-    await call("/runs/" + runId + "/revisions/" + rid + "/confirm", { method: "POST", body: JSON.stringify({ role: "clinician", userId: CLINICIAN_ID }) });
+    await call("/runs/" + runId + "/revisions/" + rid + "/confirm", { method: "POST", body: JSON.stringify({ role: "clinician", userId: me() }) });
     let rev: RevisionRec | undefined;
     for (let i = 0; i < 90; i++) {
       await wait(2000);
@@ -357,8 +359,8 @@ async function signOnBackend(w: Workflow): Promise<{ n: number; modelSha: string
   const parent = vs[vs.length - 1].n;
   const edits = w.versions.filter(v => v.event.startsWith("Edited")).length;
   const note = "Clinician review in the app: " + edits + " edit" + (edits === 1 ? "" : "s") + " to the rules, open questions answered, checks reviewed.";
-  const body: Spec = { ...w.model, meta: { ...w.model.meta, version: parent + 1, parent_version: parent, created_at: new Date().toISOString(), created_by: CLINICIAN_ID, change_note: note } };
-  let { n } = await call<{ n: number }>(base + "/versions", { method: "POST", body: JSON.stringify({ parentVersion: parent, body, author: CLINICIAN_ID, authorRole: "clinician" }) });
+  const body: Spec = { ...w.model, meta: { ...w.model.meta, version: parent + 1, parent_version: parent, created_at: new Date().toISOString(), created_by: me(), change_note: note } };
+  const { n } = await call<{ n: number }>(base + "/versions", { method: "POST", body: JSON.stringify({ parentVersion: parent, body, author: me(), authorRole: "clinician" }) });
   let st = await call<StatusView>(base + "/versions/" + n + "/status");
   for (let i = 0; i < 60 && st.status === "awaiting_officer"; i++) {
     await wait(1000);
@@ -377,7 +379,7 @@ async function signOnBackend(w: Workflow): Promise<{ n: number; modelSha: string
   if (st.status !== "awaiting_clinician") {
     throw new Error("Version " + n + " was saved, but the officer agent has not signed it (status: " + st.status.replace(/_/g, " ") + "). It may have left a comment on the version; check its findings.");
   }
-  await call(base + "/versions/" + n + "/signatures/clinician", { method: "POST", body: JSON.stringify({ role: "clinician", userId: CLINICIAN_ID, modelSha: st.modelSha }) });
+  await call(base + "/versions/" + n + "/signatures/clinician", { method: "POST", body: JSON.stringify({ role: "clinician", userId: me(), modelSha: st.modelSha }) });
   return { n, modelSha: st.modelSha };
 }
 export const runVerify = (id: string) => mutate(id, wf.runVerify);

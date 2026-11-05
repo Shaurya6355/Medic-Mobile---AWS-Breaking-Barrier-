@@ -1,4 +1,5 @@
 import { visibleRuns, type IdentityResolver } from "../auth/identity.js";
+import { enforceRequestIdentity } from "../auth/requestIdentity.js";
 import Fastify from "fastify";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { ZodType } from "zod";
@@ -135,6 +136,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const background = (work: Promise<unknown>, onError: (e: unknown) => void, onDeadline?: () => void): Promise<void> =>
     runBackground(runMode, work, onError, bgDeadline, onDeadline);
   const app = Fastify({ logger: deps.logger ?? false, bodyLimit: BODY_LIMIT });
+  // With sign-in on, author / userId / role in request bodies come from the verified token (DEC-015).
+  if (deps.identity) enforceRequestIdentity(app, deps.identity);
   const obs = deps.observe;
   if (obs) {
     app.addHook("onResponse", async (req, reply) => {
