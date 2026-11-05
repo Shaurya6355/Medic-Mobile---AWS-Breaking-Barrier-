@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import * as api from "../api";
 import { PATHWAYS, fnv } from "../domain/data";
 import { verLabel } from "../domain/workflow";
@@ -95,6 +94,8 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
   };
 
   const f = lib.find(x => x.id === selId);
+  // Each guideline has its own workflow; the one open now (w) may belong to another guideline.
+  const mine = f ? (w && w.state !== "none" && w.guideline?.id === f.id ? w : api.workflowFor(f.id)) : null;
   const maxPages = f?.pages ?? 1;
 
   // Live: the backend chose the pages when the run was created (every page), so there is nothing to pick here.
@@ -176,7 +177,7 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
                 {creating ? <><span className="spin" aria-hidden="true" />Loading approved version...</> : "Open for release"}
               </button>
             </div>
-          ) : !w || w.state === "none" ? (
+          ) : (
             <div className="actions">
               <span className="note">
                 {role !== "clinician" ? "Only the clinician can start a workflow."
@@ -187,12 +188,11 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
                   : api.LIVE ? "Loads the latest logic model version of this run from the backend."
                   : "Drafts questions and rules with verbatim quotes; the AI agent checks them before you see them."}
               </span>
+              {mine ? <button type="button" className="btn" disabled={creating} onClick={() => void act.openWorkflow(f.id)}>Open workflow ({verLabel(mine)})</button> : null}
               <button type="button" className="btn primary" disabled={!canCreate} onClick={create}>
                 {creating ? <><span className="spin" aria-hidden="true" />Loading logic model...</> : "Create workflow draft"}
               </button>
             </div>
-          ) : (
-            <div className="banner good">A workflow exists for this pathway ({verLabel(w)}). {["verify", "deploy", "done"].includes(w.state) ? <Link to="/release">Open Release</Link> : <Link to="/review">Open Review</Link>}.</div>
           )}
         </section>
       ) : api.LIVE && lib.length ? (

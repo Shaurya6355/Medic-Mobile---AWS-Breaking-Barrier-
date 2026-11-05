@@ -57,7 +57,7 @@ function toGuideline(r: Run, steps?: StepRecord[], escalated = false): Guideline
   const at = WORK.findIndex(([s]) => s === r.state);
   const err = steps?.filter(s => s.status === "failed").pop()?.error;
   return {
-    id: r.runId, name: names()[r.runId] ?? "Run " + r.runId.slice(0, 8), type: "PDF",
+    id: r.runId, name: (names()[r.runId] ?? "Run " + r.runId.slice(0, 8)) + (uploadVer[r.runId] ?? ""), type: "PDF",
     meta: new Date(r.createdAt).toLocaleString() + " · " + (r.pages ? r.pages.length + " pages" : "all pages") + " · " + (escalated && r.state === "awaiting_officer" ? "needs your review (AI agent could not finish)" : r.state.replace(/_/g, " ")),
     status: failed ? "Failed" : ready ? "Indexed" : "Processing",
     pages: r.pages?.length ?? null,
@@ -100,6 +100,28 @@ let guidelines: Guideline[] = [
 const workflows: Record<string, Workflow> = {};
 let seq = 1;
 
+/** Uploads of the same file are versions of it, numbered in upload order: "cough.pdf · v1", "cough.pdf · v2".
+    Guideline id -> the label suffix ("" for a file uploaded once). */
+const uploadVer: Record<string, string> = {};
+function numberUploads(xs: { id: string; name: string }[]) {
+  const total: Record<string, number> = {}, seen: Record<string, number> = {};
+  xs.forEach(x => { total[x.name] = (total[x.name] ?? 0) + 1; });
+  xs.forEach(x => { seen[x.name] = (seen[x.name] ?? 0) + 1; uploadVer[x.id] = total[x.name] > 1 ? " · v" + seen[x.name] : ""; });
+}
+const withVer = (g: Guideline): Guideline => ({ ...g, name: g.name + (uploadVer[g.id] ?? "") });
+
+/** The newest workflow started for this guideline in this browser, or null. Every guideline (every upload) has its own. */
+const latestFor = (guidelineId: string): Workflow | undefined =>
+  Object.values(workflows).filter(x => x.guideline?.id === guidelineId && x.state !== "none").pop();
+/** Read-only: whether this guideline has a workflow, and where it stands. */
+export const workflowFor = (guidelineId: string): Workflow | null => latestFor(guidelineId) ?? null;
+/** Switch to this guideline's workflow. */
+export async function openWorkflow(guidelineId: string): Promise<Workflow> {
+  const w = latestFor(guidelineId);
+  if (!w) throw new Error("This guideline has no workflow yet.");
+  return respond(w);
+}
+
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 async function respond<T>(v: T, ms = 60): Promise<T> { await wait(ms); return clone(v); }
 function load(id: string): Workflow {
@@ -140,13 +162,14 @@ const agentEscalated = async (runId: string): Promise<boolean> => {
   try { return (await call<{ items: { kind: string }[] }>("/runs/" + runId + "/activity")).items.some(e => e.kind === "agent_escalated"); } catch { return false; }
 };
 export const listGuidelines = async (): Promise<Guideline[]> => {
-  if (!LIVE) return respond(guidelines);
+  if (!LIVE) { numberUploads(guidelines); return respond(guidelines.map(withVer)); }
   const runs = await call<Run[]>("/runs");
+  numberUploads([...runs].sort((a, b) => a.createdAt - b.createdAt).map(r => ({ id: r.runId, name: names()[r.runId] ?? r.runId })));
   const esc = await Promise.all(runs.map(r => (r.state === "awaiting_officer" ? agentEscalated(r.runId) : Promise.resolve(false))));
   return runs.map((r, i) => toGuideline(r, undefined, esc[i])).reverse();
 };
 export const getGuideline = async (id: string): Promise<Guideline> => {
-  if (!LIVE) return respond(guidelines.find(g => g.id === id)!);
+  if (!LIVE) return respond(withVer(guidelines.find(g => g.id === id)!));
   const r = await call<{ run: Run; steps: StepRecord[] }>("/runs/" + id);
   return toGuideline(r.run, r.steps, r.run.state === "awaiting_officer" && (await agentEscalated(id)));
 };
