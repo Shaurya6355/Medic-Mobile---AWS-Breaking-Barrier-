@@ -13,6 +13,7 @@ import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 import * as path from "node:path";
 import { addMonitoring } from "./monitoring";
+import { addAuth } from "./auth";
 import { baseModelId, DEFAULT_MODEL_ID, PROJECT_TAG_KEY, PROJECT_TAG_VALUE, resolveUiOrigins } from "./data-stack";
 
 // Lambda hard limit is 15 minutes. LEASE_MS must exceed it so a live invocation is never taken over.
@@ -89,6 +90,8 @@ export class OrchestratorLambdaStack extends Stack {
     super(scope, id, props);
 
     const uiOrigins = resolveUiOrigins(this.node.tryGetContext("uiOrigins"));
+    // Sign-in (DEC-015): on unless `-c auth=off` (an escape hatch; the API is then open to anyone with the URL).
+    const auth = this.node.tryGetContext("auth") === "off" ? undefined : addAuth(this, uiOrigins);
     const ctxModel = this.node.tryGetContext("modelId") as unknown;
     const modelId = typeof ctxModel === "string" && ctxModel !== "" ? ctxModel : DEFAULT_MODEL_ID;
     const ctxBackend = this.node.tryGetContext("modelBackend") as unknown;
@@ -114,6 +117,7 @@ export class OrchestratorLambdaStack extends Stack {
     const logGroup = new logs.LogGroup(this, "FunctionLogs", { retention: logs.RetentionDays.TWO_WEEKS });
 
     const environment: Record<string, string> = {
+      ...(auth ? { COGNITO_USER_POOL_ID: auth.userPool.userPoolId, COGNITO_CLIENT_ID: auth.client.userPoolClientId } : {}),
       RUN_MODE: "lambda",
       TABLE_RUNS: props.runsTable.tableName,
       TABLE_STEPS: props.stepsTable.tableName,
@@ -242,7 +246,8 @@ export class OrchestratorLambdaStack extends Stack {
       ],
     });
 
-    // HTTP API with explicit routes only. NO AUTHENTICATION YET.
+    // HTTP API with explicit routes only. With sign-in on, every route needs a Cognito ID token (JWT authorizer);
+    // the backend verifies the token again and reads who is calling from it (Backend/src/auth/identity.ts).
     // Logical id "HttpApiV2": the API was replaced once to move routes to key-based ids (see below).
     this.httpApi = new apigwv2.CfnApi(this, "HttpApiV2", {
       name: `${this.stackName}-http-api`,
@@ -250,7 +255,7 @@ export class OrchestratorLambdaStack extends Stack {
       corsConfiguration: {
         allowOrigins: uiOrigins,
         allowMethods: ["GET", "POST", "OPTIONS"],
-        allowHeaders: ["content-type"],
+        allowHeaders: ["content-type", "authorization"],
         maxAge: 3000,
       },
     });
@@ -262,6 +267,15 @@ export class OrchestratorLambdaStack extends Stack {
       // Maximum for HTTP APIs; do not lower. Long work (revision step 2) runs in the background.
       timeoutInMillis: API_INTEGRATION_TIMEOUT_MS,
     });
+    const authorizer = auth
+      ? new apigwv2.CfnAuthorizer(this, "CognitoAuthorizer", {
+          apiId: this.httpApi.ref,
+          name: "cognito",
+          authorizerType: "JWT",
+          identitySource: ["$request.header.Authorization"],
+          jwtConfiguration: { audience: [auth.client.userPoolClientId], issuer: auth.issuer },
+        })
+      : undefined;
     // Route logical ids come from the route key, never the list position: an index-based id shifts when a
     // route is inserted, and CloudFormation then creates a "new" route whose key still exists (409).
     const routeIds = new Set<string>();
@@ -273,6 +287,7 @@ export class OrchestratorLambdaStack extends Stack {
         apiId: this.httpApi.ref,
         routeKey,
         target: `integrations/${integration.ref}`,
+        ...(authorizer ? { authorizationType: "JWT", authorizerId: authorizer.ref } : {}),
       });
     });
     const stage = new apigwv2.CfnStage(this, "DefaultStage", {
@@ -292,7 +307,7 @@ export class OrchestratorLambdaStack extends Stack {
       }),
     });
 
-    new CfnOutput(this, "APIURL", { value: `https://${this.httpApi.ref}.execute-api.${this.region}.${this.urlSuffix}/`, description: "HTTP API base URL (no authentication)" });
+    new CfnOutput(this, "APIURL", { value: `https://${this.httpApi.ref}.execute-api.${this.region}.${this.urlSuffix}/`, description: auth ? "HTTP API base URL (Cognito sign-in required)" : "HTTP API base URL (no authentication)" });
     new CfnOutput(this, "FUNCTIONNAME", { value: this.function.functionName, description: "Lambda function name" });
     void stage;
 

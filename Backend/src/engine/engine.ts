@@ -85,10 +85,11 @@ export class Orchestrator {
     return this.statusChangedAt;
   }
 
-  async createRun(pages: number[] | undefined, filename: string): Promise<Run> {
+  async createRun(pages: number[] | undefined, filename: string, createdBy?: string): Promise<Run> {
     const createdAt = this.now();
     const run: Run = { runId: randomUUID(), state: "created", createdAt };
     if (pages !== undefined) run.pages = pages;
+    if (createdBy !== undefined) run.createdBy = createdBy;
     await this.store.createRun(run);
     await this.store.appendAudit(run.runId, {
       at: createdAt,

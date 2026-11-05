@@ -18,6 +18,8 @@ let seq = 0;
 export const BASE = process.env["BASE"] ?? "http://localhost:8080";
 export const PDF = process.env["PDF"] ?? "../Guideline_Docs/Cough_Guideline.pdf";
 export const J = { "content-type": "application/json" };
+// A Cognito ID token for an API deployed with sign-in (DEC-015): AUTH_TOKEN=<id token> npm run ...
+const AUTH: Record<string, string> = process.env["AUTH_TOKEN"] ? { authorization: "Bearer " + process.env["AUTH_TOKEN"] } : {};
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export interface Resp {
@@ -34,7 +36,7 @@ export async function http(method: string, path: string, body?: unknown, opts: {
   try {
     const r = await fetch(BASE + path, {
       method,
-      headers: opts.headers ?? (body !== undefined || opts.raw !== undefined ? J : {}),
+      headers: { ...AUTH, ...(opts.headers ?? (body !== undefined || opts.raw !== undefined ? J : {})) },
       body: opts.raw ?? (body !== undefined ? JSON.stringify(body) : undefined),
       signal: ctl.signal,
     });

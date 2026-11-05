@@ -44,6 +44,8 @@ export interface Config {
   runBudgetUsd?: number;
   // Level of the API's request and error log (Fastify/pino) on stdout; "silent" turns it off. Default info.
   logLevel: LogLevel;
+  // Sign-in (DEC-015): the Cognito user pool and app client whose ID tokens the API accepts. Both or neither.
+  cognito?: { userPoolId: string; clientId: string };
   // Quote-support scoring after the checks (advisory, src/scoring). Present only when JUDGE_MODEL_ID is set.
   scoring?: { judgeModelId: string; pythonBin: string; scriptPath: string; samples: number };
 }
@@ -121,6 +123,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const rawLevel = str(env, "LOG_LEVEL", "info");
   if (!(LOG_LEVELS as readonly string[]).includes(rawLevel)) throw new Error(`LOG_LEVEL must be one of: ${LOG_LEVELS.join(", ")}`);
   const logLevel = rawLevel as LogLevel;
+  const poolId = env["COGNITO_USER_POOL_ID"] ?? "", clientId = env["COGNITO_CLIENT_ID"] ?? "";
+  if ((poolId === "") !== (clientId === "")) throw new Error("Set both COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID, or neither");
   const required: readonly string[] = runMode === "container" ? [...REQUIRED, "UPLOAD_QUEUE_URL"] : REQUIRED;
   const missing = required.filter((n) => env[n] === undefined || env[n] === "");
   if (missing.length > 0) throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
@@ -174,6 +178,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     officerAgentMaxCostUsd: positiveNumber(env, "OFFICER_AGENT_MAX_COST_USD", 2),
     ...(budget !== undefined ? { runBudgetUsd: budget } : {}),
     logLevel,
+    ...(poolId !== "" ? { cognito: { userPoolId: poolId, clientId } } : {}),
     ...(env["JUDGE_MODEL_ID"] !== undefined && env["JUDGE_MODEL_ID"] !== ""
       ? {
           scoring: {

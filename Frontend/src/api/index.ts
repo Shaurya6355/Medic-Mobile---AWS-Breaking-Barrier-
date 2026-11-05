@@ -10,6 +10,7 @@ import { clone, fnv, loadSpec } from "../domain/data";
 import * as wf from "../domain/workflow";
 import { FALLBACK_TEXT } from "../domain/agent";
 import { sampleScores } from "../domain/scores";
+import { AUTH, idToken, signIn } from "../auth";
 import type { AuditRow, Guideline, GuidelineType, ItemId, Model, Patch, QuoteScores, Spec, Workflow } from "../domain/types";
 
 export const API_URL: string | undefined = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || undefined;
@@ -64,9 +65,12 @@ function toGuideline(r: Run, steps?: StepRecord[], escalated = false): Guideline
 /** A backend refusal in plain words: the error code, its message, and any blockers it lists. */
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let r: Response;
-  try { r = await fetch(API_URL + path, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } }); }
+  const token = AUTH ? idToken() : null;
+  if (AUTH && !token) { void signIn(); throw new Error("Your sign-in has expired. Taking you to the sign-in page..."); }
+  try { r = await fetch(API_URL + path, { ...init, headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}), ...init?.headers } }); }
   catch { throw new Error("Can't reach the backend API at " + API_URL + ". Check VITE_API_URL and that the API allows this origin (CORS)."); }
   const body = await r.json().catch(() => null) as (T & { error?: string; message?: string; issues?: unknown[]; blockers?: { message?: string }[] }) | null;
+  if (r.status === 401 && AUTH) { void signIn(); throw new Error("Please sign in again. Taking you to the sign-in page..."); }
   if (!r.ok) {
     const extra = [...(body?.issues ?? []).map(String), ...(body?.blockers ?? []).map(b => b.message ?? "")].filter(Boolean);
     throw new Error((body?.message || body?.error || "Backend returned " + r.status) + " (" + path + ")" + (extra.length ? ": " + extra.join(" | ") : ""));
