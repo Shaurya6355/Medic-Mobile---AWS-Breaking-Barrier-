@@ -90,6 +90,16 @@ describe("runs routes with sign-in", () => {
     expect(get.statusCode).toBe(401);
   });
 
+  it("takes the signer's identity and role from the token, not the body", async () => {
+    const { server } = setup(resolver);
+    const url = routes.pattern.sign.replace(":id", "r1").replace(":n", "1").replace(":role", "clinician");
+    const asIt = await server.inject({ method: "POST", url, headers: { authorization: "Bearer bob" }, payload: { role: "clinician", userId: "clinician", modelSha: "x" } });
+    expect(asIt.statusCode).toBe(403);
+    expect(asIt.json()).toMatchObject({ error: "role_not_allowed" });
+    const noToken = await server.inject({ method: "POST", url, payload: { role: "clinician", userId: "clinician", modelSha: "x" } });
+    expect(noToken.statusCode).toBe(401);
+  });
+
   it("records the uploader and lists each person the runs for their role", async () => {
     const { server, store } = setup(resolver);
     const post = await server.inject({ method: "POST", url: routes.pattern.runs, headers: { authorization: "Bearer alice" }, payload: { filename: "a.pdf" } });
