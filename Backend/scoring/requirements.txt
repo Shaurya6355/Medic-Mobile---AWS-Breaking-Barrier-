@@ -1,0 +1,3 @@
+# Quote-support scorer (score_version.py, eval_scorer.py). Python 3.10 or later.
+# Tested with strands-agents-evals 1.9.0 and strands-agents 1.64.0.
+strands-agents-evals>=1.9,<2

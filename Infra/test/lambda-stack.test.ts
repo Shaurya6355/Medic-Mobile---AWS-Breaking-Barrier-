@@ -64,6 +64,21 @@ describe("function", () => {
   it("rejects a runBudgetUsd that is not a positive number", () => {
     for (const bad of [0, -1, "abc"]) expect(() => build({ runBudgetUsd: bad })).toThrow(/runBudgetUsd/);
   });
+  it("adds JUDGE_MODEL_ID and a Bedrock grant for the judge only when context judgeModelId is set", () => {
+    const judgeStatements = (tpl: Template) =>
+      (Object.values(tpl.findResources("AWS::IAM::Policy")) as any[]).flatMap((p) => p.Properties.PolicyDocument.Statement).filter((st: any) => st.Sid === "BedrockInvokeJudge");
+    expect(fn().Properties.Environment.Variables.JUDGE_MODEL_ID).toBeUndefined();
+    expect(judgeStatements(t)).toEqual([]);
+    const t2 = build({ judgeModelId: "us.meta.llama4-scout-17b-instruct-v1:0" });
+    const e = (Object.values(t2.findResources("AWS::Lambda::Function"))[0] as any).Properties.Environment.Variables;
+    expect(e.JUDGE_MODEL_ID).toBe("us.meta.llama4-scout-17b-instruct-v1:0");
+    const [st] = judgeStatements(t2);
+    expect(st.Action).toEqual(["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]);
+    const res = JSON.stringify(st.Resource);
+    expect(res).toContain("inference-profile/us.meta.llama4-scout-17b-instruct-v1:0");
+    expect(res).toContain("foundation-model/meta.llama4-scout-17b-instruct-v1:0");
+    expect(() => build({ judgeModelId: 7 })).toThrow(/judgeModelId/);
+  });
   it("attaches the app managed policy to the role", () => {
     const roles = Object.values(t.findResources("AWS::IAM::Role")) as any[];
     const withPolicy = roles.filter((r) => (r.Properties.ManagedPolicyArns ?? []).some((a: any) => JSON.stringify(a).includes("OrchestratorAppPolicy") || JSON.stringify(a).includes("Fn::ImportValue")));
@@ -134,6 +149,7 @@ describe("http api", () => {
         "GET /runs/{id}/activity", "POST /runs/{id}/chat", "GET /runs/{id}/versions/{n}/flow",
         "POST /runs/{id}/versions/{n}/edits/preview", "POST /runs/{id}/versions/{n}/edits",
         "GET /runs/{id}/versions/{a}/diff/{b}", "GET /runs/{id}/versions/{n}/change", "POST /runs/{id}/versions/{n}/restore",
+        "GET /runs/{id}/versions/{n}/scores",
       ].sort(),
     );
   });

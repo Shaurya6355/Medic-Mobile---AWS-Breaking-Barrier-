@@ -232,3 +232,32 @@ describe("runStep", () => {
     expect(rec.error).toBe("Run budget exceeded: $2.5000 of $2.0000");
   });
 });
+
+describe("runStep logging", () => {
+  it("logs each attempt's start and end with ids, timing and tokens, and a retry", async () => {
+    const { ctx, opts } = await setup();
+    const lines: [string, Record<string, unknown>][] = [];
+    const step = stepFrom([
+      async () => {
+        throw new TransientError("throttled");
+      },
+      async () => ({ artifactRefs: { output: "k" }, usage: { inputTokens: 5, outputTokens: 2, modelId: "m1" } }),
+    ]);
+    await runStep(step, ctx, { ...opts, log: (m, d) => lines.push([m, d as Record<string, unknown>]) });
+    expect(lines.map(([m]) => m)).toEqual(["step started", "step failed", "step started", "step succeeded"]);
+    expect(lines[1]![1]).toMatchObject({ runId: "r1", step: "s", attempt: 1, transient: true, willRetry: true, error: "throttled" });
+    expect(lines[3]![1]).toMatchObject({ runId: "r1", step: "s", attempt: 2, inputTokens: 5, outputTokens: 2, modelId: "m1", refs: { output: "k" } });
+    expect(typeof lines[3]![1].ms).toBe("number");
+  });
+
+  it("a logger that throws never changes the result", async () => {
+    const { ctx, opts } = await setup();
+    const rec = await runStep(stepFrom([async () => ({ artifactRefs: {} })]), ctx, {
+      ...opts,
+      log: () => {
+        throw new Error("broken logger");
+      },
+    });
+    expect(rec.status).toBe("succeeded");
+  });
+});
