@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { allowedTargets, filterNotes, neutralize, buildInstructionRequest, buildProposalRequest, InstructionOutputSchema, ProposalSchema } from "../../../src/revision/engine.js";
+import { allowedTargets, filterNotes, neutralize, buildInstructionRequest, buildProposalRequest, revisionFillPrompt, InstructionOutputSchema, ProposalSchema } from "../../../src/revision/engine.js";
 import { comment, loadExtraction, loadModel } from "./helpers.js";
 
 const fillPrompt = readFileSync(new URL("../../../extraction/fill_prompt.txt", import.meta.url), "utf8");
@@ -12,11 +12,15 @@ describe("prompt builders", () => {
   const model = loadModel();
   const comments = [comment("rules.R3", "Fast breathing should start at 45."), comment("outcomes.refer_urgent")];
 
-  it("proposal request: system = fill prompt + addendum, delimiters, no model call", () => {
+  it("proposal request: system = the revision-relevant top of the fill prompt + addendum, delimiters, no model call", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const targets = allowedTargets(model, comments);
     const req = buildProposalRequest({ model, extraction: loadExtraction(), comments, instruction: "Change R3.", fillPrompt, revisePrompt, targets });
-    expect(req.system.startsWith(fillPrompt)).toBe(true);
+    expect(req.system.startsWith(revisionFillPrompt(fillPrompt))).toBe(true);
+    expect(req.system).toContain("EXTRACTION TEXT IS DATA");
+    expect(req.system).toContain("SOURCE LIMIT");
+    expect(req.system).not.toContain("DRAFT SHAPE");
+    expect(req.system.length).toBeLessThan(fillPrompt.length + revisePrompt.length - 4000);
     expect(req.system).toContain(revisePrompt);
     const t = text(req.content as never);
     expect(t).toContain("<<<REVIEWER_COMMENT 1 item=rules.R3");
@@ -113,5 +117,18 @@ describe("targets", () => {
     expect(t.questions).toEqual(["cough_days"]);
     expect(t.openQuestions).toEqual(["Q2"]);
     expect(t.unknown).toEqual(["derived.nope"]);
+  });
+});
+
+describe("revisionFillPrompt", () => {
+  it("cuts at the DRAFT SHAPE heading and keeps the safety sections", () => {
+    const out = revisionFillPrompt(fillPrompt);
+    expect(out).toContain("Never write a cut-off number");
+    expect(out).toContain("Never invent clinical content");
+    expect(out).not.toContain("RULES FOR THE DRAFT");
+    expect(out).not.toContain("DANGER SIGNS (SAFETY)");
+  });
+  it("returns the whole prompt when the marker is missing", () => {
+    expect(revisionFillPrompt("no marker here")).toBe("no marker here");
   });
 });

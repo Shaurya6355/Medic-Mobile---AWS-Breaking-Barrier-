@@ -19,7 +19,6 @@ import { InProcessDispatcher, LambdaAsyncDispatcher } from "./revision/dispatch.
 import type { RevisionDispatcher } from "./revision/dispatch.js";
 import { RevisionService } from "./revision/service.js";
 import { Signoff } from "./signoff/signoff.js";
-import { jsonLog } from "./log.js";
 import { withScoring } from "./scoring/scoreVersion.js";
 import { createChecksStep } from "./steps/checks.js";
 import { createExtractStep } from "./steps/extract.js";
@@ -30,6 +29,8 @@ import { unpricedModelIds } from "./metrics/cost.js";
 import { recordProcess } from "./metrics/record.js";
 import { summarize } from "./metrics/usage.js";
 import { DynamoStore } from "./store/dynamoStore.js";
+import { createLogger } from "./observability/logger.js";
+import { observeModel, observeStore } from "./observability/observe.js";
 import { startQueueConsumer } from "./trigger/queueConsumer.js";
 
 const PRESIGN_EXPIRES_SECONDS = 900;
@@ -46,8 +47,9 @@ async function readPrompt(name: string, file: string): Promise<string> {
 
 const resumeSweepIntervalMs = (leaseMs: number): number => Math.max(1, Math.min(60000, Math.floor(leaseMs / 2)));
 
-// Never log env values, request bodies or message bodies (see log.ts).
-const log = jsonLog;
+// Never log env values, request bodies or message bodies.
+const logger = createLogger({ base: { service: "orchestrator" } });
+const log = (msg: string, detail?: object): void => logger.info(msg, detail as Record<string, unknown>);
 
 async function main(): Promise<void> {
   const cfg = loadConfig(process.env);
@@ -55,13 +57,16 @@ async function main(): Promise<void> {
   if (unpriced.length > 0) log("warning: no price in PRICES_JSON for these models; their cost will be missing from totals", { models: unpriced });
 
   const doc = DynamoDBDocumentClient.from(new DynamoDBClient({ region: cfg.region }));
-  const store = new DynamoStore(doc, cfg.tables);
+  // Every step, audit event, version, signature and model call is logged and measured (CloudWatch).
+  const store = observeStore(new DynamoStore(doc, cfg.tables), logger);
   const s3 = new S3Client({ region: cfg.region });
   const artifacts = new S3ArtifactStore(s3, cfg.artifactBucket);
-  const model =
+  const model = observeModel(
     cfg.modelBackend === "agentcore"
       ? createAgentCoreModelClient({ region: cfg.region, runtimeArn: cfg.agentCoreRuntimeArn as string })
-      : createStrandsModelClient({ region: cfg.region });
+      : createStrandsModelClient({ region: cfg.region }),
+    logger,
+  );
 
   const orchestrator = new Orchestrator({
     store,
@@ -171,6 +176,7 @@ async function main(): Promise<void> {
     runMode: cfg.runMode,
     // Request lines (method, path, status, time) and the API's error logs; bodies are never logged.
     logger: cfg.logLevel === "silent" ? false : { level: cfg.logLevel },
+    observe: logger,
   });
 
   const abort = new AbortController();

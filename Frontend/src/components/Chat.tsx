@@ -47,7 +47,7 @@ function Msg({ m, w, act, canAct, onSelect, onChange }: { m: ChatMsg; w: Workflo
   return (
     <li className={"cmsg " + m.from + (m.ask ? " ask" : "")}>
       {m.ask ? <span className="ctag">{"Question " + m.ask.slice(2)}</span> : null}
-      <div>{m.text}</div>
+      <div style={{ whiteSpace: "pre-wrap" }}>{m.text}</div>
       {m.proposals?.length ? (
         <ul className="cprops">
           {m.proposals.map((p, i) => (
@@ -60,6 +60,16 @@ function Msg({ m, w, act, canAct, onSelect, onChange }: { m: ChatMsg; w: Workflo
           ))}
           {open ? <li><button type="button" className="lnk" disabled={!canAct} onClick={() => act.dismiss(m.id)}>Dismiss</button></li> : null}
         </ul>
+      ) : null}
+      {m.revision ? (
+        <div className="cbtns">
+          {m.revision.state === "ready" ? (
+            <div className="btnrow">
+              <button type="button" className="btn tiny primary" disabled={!canAct} onClick={() => act.confirmRevision(m.id)}>Confirm and apply</button>
+              <button type="button" className="btn tiny" disabled={!canAct} onClick={() => act.cancelRevision(m.id)}>Cancel</button>
+            </div>
+          ) : <span className="note">{{ applying: "Working on it… (the AI edits, then the checks and the officer agent run)", applied: "✓ Applied", no_change: "No change made", failed: "Did not finish", cancelled: "Cancelled", ready: "" }[m.revision.state]}</span>}
+        </div>
       ) : null}
       {m.ask ? <Ask w={w} id={m.ask} act={act} canAct={canAct} onChange={onChange} /> : null}
       {m.select ? <button type="button" className="lnk cshow" onClick={() => onSelect(m.select!)}>Show on flow</button> : null}
@@ -89,8 +99,13 @@ export function Chat({ w, act, canAct, onSelect, onChange, onClose }: { w: Workf
           <div className="ctry">{TRY.map(t => <button key={t} type="button" className="chipb" onClick={() => send(t)}>{t}</button>)}</div>
           <form className="cin" onSubmit={e => { e.preventDefault(); send(text); }}>
             <label className="sr" htmlFor="chat-in">Message the assistant</label>
-            <input id="chat-in" type="text" value={text} onChange={e => setText(e.target.value)} placeholder="Ask about a patient, a rule, or a change" autoComplete="off" />
-            <button type="submit" className="btn primary" disabled={!text.trim()}>Send</button>
+            <textarea id="chat-in" rows={3} value={text} onChange={e => setText(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(text); } }}
+              placeholder="Ask about a patient, a rule or the guideline, or describe a change. Enter sends, Shift+Enter adds a line." />
+            <div className="cact">
+              <button type="submit" className="btn primary" disabled={!text.trim()}>Send</button>
+              {w.remote ? <button type="button" className="btn" disabled={!text.trim()} title="Save this as a comment and ask the AI to revise the logic model. You confirm the plan before anything changes." onClick={() => { act.feedback(text); setText(""); }}>Send as feedback</button> : null}
+            </div>
           </form>
         </>
       ) : <p className="note">Read-only: only the clinician talks to the assistant.</p>}

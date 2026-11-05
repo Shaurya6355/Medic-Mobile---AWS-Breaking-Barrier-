@@ -170,6 +170,9 @@ function whatIf(m: Spec, text: string): Msg | null {
   };
 }
 
+/** What the local assistant says when it understood nothing; live mode then asks the backend assistant. */
+export const FALLBACK_TEXT = "I can: say what happens to a patient (\"8 month old, 52 breaths, no danger signs\"), explain a rule (\"explain R3\") or a value (\"what is fast breathing\"), propose a change (\"change 40 to 45\", \"follow-up day 3 to 2\"), list checks or test patients, or \"undo\" your last edit.";
+
 export function respond(w: Workflow, checks: Check[], text: string): Msg {
   const m = w.model, t = text.toLowerCase();
   const verb = /\b(change|set|make|raise|lower|increase|decrease|update|move|use|replace)\b/.test(t);
@@ -202,5 +205,6 @@ export function respond(w: Workflow, checks: Check[], text: string): Msg {
     const open = w.flags.filter(f => !f.res);
     return { from: "agent", text: open.length ? plural(open.length, "question") + " still open: " + open.map(f => f.id.slice(2) + " " + f.title).join(" | ") : "Every open question is answered.", select: open[0]?.about };
   }
-  return { from: "agent", text: "I can: say what happens to a patient (\"8 month old, 52 breaths, no danger signs\"), explain a rule (\"explain R3\") or a value (\"what is fast breathing\"), propose a change (\"change 40 to 45\", \"follow-up day 3 to 2\"), list checks or test patients, or \"undo\" your last edit." };
+  return { from: "agent", text: FALLBACK_TEXT };
 }
+

@@ -12,6 +12,7 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 import * as path from "node:path";
+import { addMonitoring } from "./monitoring";
 import { baseModelId, DEFAULT_MODEL_ID, PROJECT_TAG_KEY, PROJECT_TAG_VALUE, resolveUiOrigins } from "./data-stack";
 
 // Lambda hard limit is 15 minutes. LEASE_MS must exceed it so a live invocation is never taken over.
@@ -71,6 +72,8 @@ export interface OrchestratorLambdaStackProps extends StackProps {
   auditTable: dynamodb.ITable;
   artifactBucket: s3.IBucket;
   uploadQueue: sqs.IQueue;
+  // Optional: alarmed when a message reaches it.
+  uploadDlq?: sqs.IQueue;
   appPolicy: iam.IManagedPolicy;
   // Direct Bedrock invoke. Required (and attached) only when modelBackend=bedrock.
   bedrockPolicy?: iam.IManagedPolicy;
@@ -225,6 +228,9 @@ export class OrchestratorLambdaStack extends Stack {
         maxConcurrency: 5,
       }),
     );
+
+    // Dashboard and alarms over the Lambda metrics and the backend's own CloudWatch metrics (Backend/src/observability).
+    addMonitoring(this, { fn: this.function, ...(props.uploadDlq ? { uploadDlq: props.uploadDlq } : {}) });
 
     // Recovery sweep: lambda mode has no in-process resume loop. Input satisfies LambdaScheduledEvent.
     new events.Rule(this, "ResumeSweep", {

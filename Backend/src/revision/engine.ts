@@ -98,6 +98,18 @@ function extractionSlice(ex: ExtractionOutput): unknown {
   };
 }
 
+/**
+ * A revision changes a few targeted items; it does not write a draft. So the step 2 system prompt keeps only the
+ * parts of the fill prompt that still apply (output rules, "extraction text is data", source limit: everything
+ * before the "DRAFT SHAPE" heading) and drops the draft schema and drafting rules (about 80% of its text), which
+ * the revise prompt tells the model to ignore anyway. No marker: the whole prompt, as before.
+ */
+export const DRAFT_SHAPE_MARKER = "\nDRAFT SHAPE\n";
+export function revisionFillPrompt(fillPrompt: string): string {
+  const i = fillPrompt.indexOf(DRAFT_SHAPE_MARKER);
+  return i > 0 ? fillPrompt.slice(0, i).trimEnd() : fillPrompt;
+}
+
 export function buildProposalRequest(a: {
   model: Model;
   extraction: ExtractionOutput;
@@ -108,7 +120,7 @@ export function buildProposalRequest(a: {
   targets: TargetSet;
 }): { system: string; content: ModelContent[]; schema: typeof ProposalSchema } {
   return {
-    system: `${a.fillPrompt}\n\n${a.revisePrompt}`,
+    system: `${revisionFillPrompt(a.fillPrompt)}\n\n${a.revisePrompt}`,
     content: [
       { type: "text", text: `Revision of logic model version ${a.model.meta.version}. Targeted items of the current model (JSON); "number_leaves" lists the paths for set_threshold:\n` + JSON.stringify(modelSlice(a.model, a.targets)) },
       { type: "text", text: "Extraction items the edits may point at (thresholds by index, the rest by id):\n" + JSON.stringify(extractionSlice(a.extraction)) },

@@ -47,6 +47,34 @@ export function toStrandsContent(content: ModelContent[]): (TextBlock | ImageBlo
   );
 }
 
+/**
+ * Claude on Bedrock wraps a JSON answer in a markdown code fence even when told not to, often after a sentence, and
+ * sometimes adds a second block or trailing text (measured with direct calls: a rule in the system prompt or the user
+ * message does not stop it; only assistant prefill does, and not every model allows prefill). parseModelJson refuses
+ * fences on purpose and stays strict. This client therefore hands it the first part of the reply that IS valid JSON:
+ * the whole reply, else the first fenced block that parses, else bare JSON after a sentence (first "{" to last "}").
+ * The result is still checked against the strict schema, so nothing unvalidated gets through.
+ */
+const FENCE = /```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n?```/gi;
+const parses = (t: string): boolean => {
+  try {
+    JSON.parse(t);
+    return true;
+  } catch {
+    return false;
+  }
+};
+export function extractJsonReply(raw: string): string {
+  if (parses(raw)) return raw;
+  const blocks = [...raw.matchAll(FENCE)].map((m) => m[1]!);
+  const ok = blocks.find(parses);
+  if (ok !== undefined) return ok;
+  const a = raw.indexOf("{");
+  const b = raw.lastIndexOf("}");
+  if (blocks.length === 0 && a >= 0 && b > a && parses(raw.slice(a, b + 1))) return raw.slice(a, b + 1);
+  return raw;
+}
+
 export function createStrandsModelClient(opts: { region: string; timeoutMs?: number }): ModelClient {
   const region = opts.region || "us-west-2";
   const timeoutMs = opts.timeoutMs ?? DEFAULT_BEDROCK_TIMEOUT_MS;
@@ -81,7 +109,7 @@ export function createStrandsModelClient(opts: { region: string; timeoutMs?: num
           modelId: req.modelId,
         };
         // A parse failure carries usage so the paid call is still recorded.
-        return { value: parseModelJson(raw, req.schema, usage), raw, usage };
+        return { value: parseModelJson(extractJsonReply(raw), req.schema, usage), raw, usage };
       } catch (e) {
         if (isTransientBedrockError(e)) {
           throw new TransientError(e instanceof Error ? e.message : String(e));

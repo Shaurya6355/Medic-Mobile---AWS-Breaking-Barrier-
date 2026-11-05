@@ -66,3 +66,29 @@ describe("temperatureSetting", () => {
     expect(temperatureSetting("us.anthropic.claude-sonnet-4-5-20250929-v1:0")).toEqual({ temperature: 0 });
   });
 });
+
+describe("extractJsonReply", () => {
+  it("takes the content of a fenced block, with or without a sentence before it", async () => {
+    const { extractJsonReply } = await import("../../src/model/strands.js");
+    expect(extractJsonReply('```json\n{"a":1}\n```')).toBe('{"a":1}');
+    expect(extractJsonReply('\n```\n{"a":1}\n```\n')).toBe('{"a":1}');
+    expect(extractJsonReply('I will search first.\n\n```json\n{"needs":[]}\n```')).toBe('{"needs":[]}');
+  });
+  it("takes the first block that is valid JSON when the model adds a second block or trailing text", async () => {
+    const { extractJsonReply } = await import("../../src/model/strands.js");
+    expect(extractJsonReply('Plan:\n```json\n{"a":1}\n```\nThen the answer:\n```json\n{"a":2}\n```')).toBe('{"a":1}');
+    expect(extractJsonReply('```json\n{broken\n```\n```json\n{"a":2}\n```')).toBe('{"a":2}');
+    expect(extractJsonReply('```json\n{"a":1}\n```\nHope that helps! {smile}')).toBe('{"a":1}');
+  });
+  it("takes bare JSON that follows a sentence, only when that span parses", async () => {
+    const { extractJsonReply } = await import("../../src/model/strands.js");
+    expect(extractJsonReply('I need to search.\n\n{"needs":[{"tool":"runStatus"}]}')).toBe('{"needs":[{"tool":"runStatus"}]}');
+    const broken = 'I need to search {not json at all} ok';
+    expect(extractJsonReply(broken)).toBe(broken);
+  });
+  it("leaves a reply with no valid JSON alone (the strict parser then refuses it)", async () => {
+    const { extractJsonReply } = await import("../../src/model/strands.js");
+    expect(extractJsonReply("plain words")).toBe("plain words");
+    expect(extractJsonReply('```json\n{"a":\n```')).toBe('```json\n{"a":\n```');
+  });
+});

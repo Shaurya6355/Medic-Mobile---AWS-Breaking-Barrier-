@@ -6,6 +6,10 @@ export interface Actions {
   edit: (item: ItemId, field: string, patch: Patch) => void;
   undo: () => void;
   chat: (text: string) => void;
+  /** Live only: send feedback to the AI (comment + plan). Then confirm or cancel the plan. */
+  feedback: (text: string) => void;
+  confirmRevision: (msgId: number) => void;
+  cancelRevision: (msgId: number) => void;
   apply: (msgId: number, i: number) => void;
   dismiss: (msgId: number) => void;
   answer: (flagId: string, choice: "keep" | "change") => void;

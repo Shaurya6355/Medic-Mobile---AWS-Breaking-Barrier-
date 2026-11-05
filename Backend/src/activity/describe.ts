@@ -74,7 +74,10 @@ function describeOne(e: AuditEvent): { actor: Actor; kind: string; text: string 
     case "officer_agent_signed":
       return { actor: "officer_agent", kind: "agent_signed", text: `The review agent signed off${v}.` };
     case "officer_agent_escalated":
-      return { actor: "officer_agent", kind: "agent_escalated", text: typeof d.reason === "string" ? `The review agent needs a person: ${d.reason}` : "The review agent needs a person to look at this." };
+      // The agent writes the cause under `why` (older records may have `reason`).
+      return { actor: "officer_agent", kind: "agent_escalated", text: typeof (d.why ?? d.reason) === "string" ? `The review agent needs a person: ${String(d.why ?? d.reason)}` : "The review agent needs a person to look at this." };
+    case "officer_agent_refused_paths":
+      return { actor: "officer_agent", kind: "agent_note", text: "The review agent's proposed fix was refused because it touched parts of the model it may not change." };
     default:
       return { actor: "pipeline", kind: e.type, text: e.type.replace(/_/g, " ") + "." };
   }

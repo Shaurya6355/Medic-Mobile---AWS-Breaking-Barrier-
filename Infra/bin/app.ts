@@ -27,6 +27,7 @@ new OrchestratorLambdaStack(app, "OrchestratorLambdaStack", {
   auditTable: data.auditTable,
   artifactBucket: data.artifactBucket,
   uploadQueue: data.uploadQueue,
+  uploadDlq: data.uploadDlq,
   appPolicy: data.appPolicy,
   bedrockPolicy: data.bedrockPolicy,
   agentCoreRuntimeArn: agentCore?.runtimeArn,

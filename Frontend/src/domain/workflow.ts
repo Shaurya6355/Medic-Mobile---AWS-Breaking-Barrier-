@@ -12,8 +12,10 @@ import type { ChatMsg, Check, Evidence, Flag, ItemId, Model, Patch, Remote, WfSt
 export { applyPatch };
 
 /** Open questions from the logic model. With no program officer, every one goes to the clinician. */
-export function flagsFrom(m: Model): Flag[] {
-  return m.open_questions.filter(q => q.status === "open").map(q => {
+/** `live`: a backend model. Questions routed to the program officer belong to the AI officer agent: the backend refuses them
+    answered by anyone else and books such an answer as WRONG_RESOLVER for good, so the clinician is never offered them. */
+export function flagsFrom(m: Model, live = false): Flag[] {
+  return m.open_questions.filter(q => q.status === "open" && (!live || q.route_to === "clinician")).map(q => {
     const src = srcList(q.source);
     return {
       id: "F-" + q.id,
@@ -55,6 +57,38 @@ const say = (w: Workflow, ...msgs: Omit<ChatMsg, "id">[]): Workflow => {
   return { ...w, chat: w.chat.concat(msgs.map(m => ({ ...m, id: ++n }))) };
 };
 
+/* ---------- Live mode: the backend's assistant and revision loop ---------- */
+/** Add messages to the chat (the clinician's own words, or the backend's replies). */
+export function addMsgs(w: Workflow, ...msgs: Omit<ChatMsg, "id">[]): Workflow {
+  return say(w, ...msgs);
+}
+/** Replace the last chat message (used to swap the local "I did not understand" reply for the backend's answer). */
+export function replaceLastMsg(w: Workflow, m: Omit<ChatMsg, "id">): Workflow {
+  const last = w.chat[w.chat.length - 1];
+  return last ? { ...w, chat: w.chat.slice(0, -1).concat({ ...m, id: last.id }) } : w;
+}
+export function setRevisionState(w: Workflow, msgId: number, state: NonNullable<ChatMsg["revision"]>["state"]): Workflow {
+  return { ...w, chat: w.chat.map(c => (c.id === msgId && c.revision ? { ...c, revision: { ...c.revision, state } } : c)) };
+}
+/** The backend made a new version (an AI revision, or the officer agent after it): show it, keep the chat.
+    Answers the clinician already gave are carried into the new version (the backend's copy does not have them yet), and a
+    chat card is added for every question that is new, so nothing the clinician did is lost and nothing is left unanswerable. */
+export function replaceFromBackend(w: Workflow, model: Model, remote: Remote, note: string): Workflow {
+  const answered = w.flags.filter(f => f.res && model.open_questions.some(q => "F-" + q.id === f.id && q.status === "open"));
+  let m = clone(model);
+  for (const f of answered) {
+    const qid = f.id.slice(2);
+    m = applyPatch(applyPatch(m, { op: "set", path: ["open_questions", qid, "status"], value: "resolved" }), { op: "set", path: ["open_questions", qid, "resolution"], value: resolutionText(f.res!.choice, f.res!.note) });
+  }
+  const known = new Set(w.flags.map(f => f.id));
+  const fresh = flagsFrom(m, true).filter(f => !known.has(f.id));
+  const kept = answered.concat(w.flags.filter(f => f.res && !answered.includes(f) && m.open_questions.some(q => "F-" + q.id === f.id)));
+  const flags = kept.concat(flagsFrom(m, true).filter(f => !kept.some(k => k.id === f.id)));
+  let x: Workflow = { ...w, model: m, draft: clone(m), flags, remote, undo: [], lastKey: null, rev: w.rev + 1 };
+  x = logged(x, "AI revision", "Loaded version " + remote.n + " from the backend", note);
+  return fresh.length ? say(x, { from: "agent", text: "The AI's revision left " + fresh.length + " new question" + (fresh.length > 1 ? "s" : "") + " for you:" }, ...fresh.map(f => ({ from: "agent" as const, text: f.title, ask: f.id, select: f.about }))) : x;
+}
+
 /* ---------- Gate: what still stops approval ---------- */
 export function gate(w: Workflow, checks: Check[]) {
   const blockIds = [...new Set(checks.filter(c => c.sev === "blocking").map(c => c.id))];
@@ -67,7 +101,7 @@ export function gate(w: Workflow, checks: Check[]) {
 export function createDraft(w: Workflow, g: { id: string; name: string; pathway: string; pages: number[] }, from?: { model: Model; event: string; note: string; evidence: Evidence; remote?: Remote }): Workflow {
   expect(w, "none");
   let x: Workflow = { ...initialWorkflow(w.id), guideline: g };
-  if (from) x = { ...x, model: clone(from.model), flags: flagsFrom(from.model), evidence: from.evidence, remote: from.remote ?? null };
+  if (from) x = { ...x, model: clone(from.model), flags: flagsFrom(from.model, !!from.remote), evidence: from.evidence, remote: from.remote ?? null };
   x = logged(x, "Clinician", "Started a workflow", "Pages " + g.pages.join(", ") + " of " + g.name);
   x = from ? logged(x, "System", from.event, from.note) : logged(x, "System", "Drafted by Bedrock (draft A and draft B)", "Every quote and number checked against the source in code");
   // The AI agent's pass: checks 1 to 3, safe fixes, then hand over.
