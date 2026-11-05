@@ -59,6 +59,7 @@ export default function App() {
 
   const act: Actions = {
     createDraft: args => run(api.createDraft(args), () => nav("/review")),
+    openForRelease: args => run(api.openForRelease(args), () => nav("/release")),
     edit: (item, field, patch) => { if (w) run(api.saveEdit(w.id, { item, field, patch })); },
     undo: () => { if (w) run(api.undo(w.id)); },
     chat: text => { if (w) run(api.chat(w.id, text), x => { const s = x.chat[x.chat.length - 1]?.select; if (s) setSel(s); }); },

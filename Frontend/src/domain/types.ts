@@ -103,4 +103,6 @@ export interface Guideline {
   steps?: PipelineStep[];
   error?: string;
   s3Uri?: string;
+  /** Live: the clinician approved this run and the backend locked a version; the IT approver can open it at Release. */
+  locked?: boolean;
 }

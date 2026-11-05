@@ -60,6 +60,7 @@ function toGuideline(r: Run, steps?: StepRecord[], escalated = false): Guideline
     meta: new Date(r.createdAt).toLocaleString() + " · " + (r.pages ? r.pages.length + " pages" : "all pages") + " · " + (escalated && r.state === "awaiting_officer" ? "needs your review (AI agent could not finish)" : r.state.replace(/_/g, " ")),
     status: failed ? "Failed" : ready ? "Indexed" : "Processing",
     pages: r.pages?.length ?? null,
+    ...(r.state === "locked" ? { locked: true } : {}),
     steps: WORK.map(([s, label], i) => ({ key: s, label, state: ready || i < at ? "done" : i === at ? (failed ? "failed" : "running") : failed && at < 0 && i === WORK.findIndex(([x]) => x === r.currentStep) ? "failed" : "pending" })),
     ...(failed ? { error: "The backend run failed" + (r.currentStep ? " at " + r.currentStep : "") + (err ? ": " + err : "") + ". Resume it with POST /runs/" + r.runId + "/resume." } : {}),
   };
@@ -209,6 +210,30 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
   return respond(workflows[id], 400);
 }
 export const getWorkflow = async (id: string) => respond(load(id));
+
+/** IT approver, in their own browser: open a run the clinician approved (locked on the backend) straight at
+    Release. Loads the newest locked version; nothing on the backend changes. */
+export async function openForRelease(args: { guidelineId: string; pathway: string }): Promise<Workflow> {
+  if (!LIVE) throw new Error("Opening an approved run needs the backend. In sample mode, approve in this browser first.");
+  const g = await getGuideline(args.guidelineId);
+  const base = "/runs/" + g.id;
+  const vs = await call<VersionRec[]>(base + "/versions");
+  const lockedV = [...vs].reverse().find(v => v.status === "locked");
+  if (!lockedV) throw new Error("This run has no approved version yet. The clinician approves it first.");
+  const n = lockedV.n;
+  const [v, st] = await Promise.all([call<{ body: unknown }>(base + "/versions/" + n), call<StatusView>(base + "/versions/" + n + "/status")]);
+  const model = loadSpec(v.body, "The approved logic model (version " + n + ")");
+  const id = "wf-" + seq++;
+  const remote = { runId: g.id, n, modelSha: st.modelSha, base: clone(model), claimText: "", findings: [] };
+  const evidence = { pages: null, pagesFrom: "Guideline text stays in the backend", draftB: null, draftBFrom: "The backend does not return a second draft" };
+  const x = wf.createDraft(wf.initialWorkflow(id), { id: g.id, name: g.name, pathway: args.pathway, pages: [] }, {
+    model, evidence, remote,
+    event: "Opened approved version " + n + " for release (run " + g.id + ")",
+    note: "modelSha " + st.modelSha.slice(0, 12) + " · approved by " + lockedV.author,
+  });
+  workflows[id] = { ...x, state: "verify", approved: { ver: "v" + n, hash: st.modelSha.slice(0, 12), locked: { n, modelSha: st.modelSha } } };
+  return respond(workflows[id]);
+}
 export const saveEdit = (id: string, patch: { item: ItemId; field: string; patch: Patch }) => mutate(id, w => wf.applyEdit(w, patch.item, patch.field, patch.patch));
 export const undo = (id: string) => mutate(id, wf.undoEdit);
 /* ---------- Live mode: the backend assistant and the feedback loop (Backend/src/chat, Backend/src/revision) ---------- */
