@@ -36,7 +36,9 @@ function nextStep(w: Workflow, role: Role, checks: Check[], path: string, act: A
       break;
     case "clinician": {
       const g = gate(w, checks);
-      res.todo = g.blockIds.map(id => ({ id, label: itemLabel(id) })).concat(g.asks.map(f => ({ id: f.id, label: "Question " + f.id.slice(2) })));
+      // On Review the hand-over card says this; the strip only points there from other screens.
+      if (path === "/review") break;
+      res.todo = g.blockIds.map(id => ({ id, label: itemLabel(id) }));
       res.title = g.ready ? "The AI agent's checks pass and every question is answered. Approve when the flow looks right."
         : (g.asks.length ? g.asks.length + " question" + (g.asks.length > 1 ? "s" : "") + " for you in the assistant" : "") + (g.asks.length && g.blockIds.length ? "; " : "") + (g.blockIds.length ? g.blockIds.length + " blocking problem" + (g.blockIds.length > 1 ? "s" : "") + " to fix" : "") + ".";
       res.primary = path !== "/review" ? { label: "Open Review", fn: () => go("/review") } : null;
@@ -72,7 +74,7 @@ export function NextStrip({ w, role, checks, path, act, go, pick }: { w: Workflo
           </li>
         ))}
       </ol>
-      <div className="nx-in">
+      {n.title || n.primary ? <div className="nx-in">
         <div className="nx-main">
           <div className="nx-title">{n.title}</div>
           {n.todo.length ? (
@@ -83,7 +85,7 @@ export function NextStrip({ w, role, checks, path, act, go, pick }: { w: Workflo
           ) : null}
         </div>
         {n.primary ? <div className="btnrow"><button type="button" className={"btn " + (n.mine ? "primary" : "")} onClick={n.primary.fn}>{n.primary.label}</button></div> : null}
-      </div>
+      </div> : null}
     </section>
   );
 }

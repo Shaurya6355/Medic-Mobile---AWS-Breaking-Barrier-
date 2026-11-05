@@ -31,14 +31,15 @@ function markersFor(w: Workflow, checks: Check[]) {
 }
 
 /** The high-emphasis card: what the AI agent handed over and what still stops approval. */
-function HandOver({ ready, blocking, asks, ver, state }: { ready: boolean; blocking: number; asks: number; ver: string; state: Workflow["state"] }) {
+function HandOver({ ready, blocking, asks, ver, state, onAnswer }: { ready: boolean; blocking: number; asks: number; ver: string; state: Workflow["state"]; onAnswer: () => void }) {
   const title = state !== "clinician" ? "Approved" : ready ? "Ready to approve" : asks ? asks + " question" + (asks > 1 ? "s" : "") + " for you" : blocking + " problem" + (blocking > 1 ? "s" : "") + " to fix";
-  const desc = state !== "clinician" ? "This version is signed and read-only." : ready ? "Checks pass and every question is answered. Approve when the flow looks right." : "Answer the open questions in the assistant and fix blocking checks before approving this version.";
+  const desc = state !== "clinician" ? "This version is signed and read-only." : ready ? "Checks pass and every question is answered. Approve when the flow looks right." : asks ? "The AI agent needs your answer before this version can be approved. One at a time." : "Fix the blocking checks before approving this version.";
   return (
     <section className="score" aria-label="AI agent hand-over">
       <span className="score-k">AI agent hand-over</span>
       <h2 className="score-t">{title}</h2>
       <p className="score-d">{desc}</p>
+      {state === "clinician" && asks ? <button type="button" className="score-btn" onClick={onAnswer}>{"Answer " + (asks > 1 ? "the questions" : "the question")}<Icon name="arrow_forward" size={18} /></button> : null}
       <dl className="score-rows">
         <div><dt>Blocking checks</dt><dd>{blocking}</dd></div>
         <div className={asks ? "accent" : ""}><dt>Open questions</dt><dd>{asks}</dd></div>
@@ -54,11 +55,12 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
   const [chatOnBy, setChatRaw] = useState<Record<Tab, boolean>>(() => ({ view: readChat("view"), edit: readChat("edit") }));
   const [openCheck, setOpenCheck] = useState<CheckKey | null>(hashCheck);
   const [approving, setApproving] = useState(false);
+  const [showChecks, setShowChecks] = useState(() => hashCheck() !== null);
   const setTab = (t: Tab) => { setTabRaw(t); try { localStorage.setItem("reviewTab", t); } catch { /* private mode */ } };
   const chatOn = chatOnBy[tab];
   const setChat = (on: boolean) => { setChatRaw(x => ({ ...x, [tab]: on })); try { localStorage.setItem("chat-" + tab, on ? "1" : "0"); } catch { /* private mode */ } };
   useEffect(() => {
-    const on = () => setOpenCheck(hashCheck());
+    const on = () => { const k = hashCheck(); setOpenCheck(k); if (k) setShowChecks(true); };
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
@@ -67,6 +69,11 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
 
   const canEdit = role === "clinician" && w.state === "clinician";
   const stages = checkStages(w.model, w.evidence);
+  const failing = stages.filter(x => x.status === "fail");
+  const notes = stages.filter(x => x.status === "warn" || x.status === "missing").length;
+  const light = failing.length ? { tone: "red", text: failing.length + " check" + (failing.length > 1 ? "s need" : " needs") + " you" }
+    : notes ? { tone: "amber", text: "Checks passed · " + notes + " with notes to look at" }
+    : { tone: "green", text: "All " + stages.length + " checks passed" };
   const g = gate(w, checks);
   const { mk, tone } = markersFor(w, checks);
   const edited = Object.values(mk).filter(l => l.some(([c]) => c === "ed")).length;
@@ -89,7 +96,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
           </button>
         </div>
         <div className="rvact">
-          {!chatOn ? <button type="button" className="btn" onClick={() => setChat(true)}><Icon name="forum" size={18} />Assistant{g.asks.length ? " (" + g.asks.length + ")" : ""}</button> : null}
+          {!chatOn ? <button type="button" className="btn" onClick={() => setChat(true)}><Icon name="forum" size={18} />Assistant</button> : null}
           {canEdit ? (
             <>
               {tab === "edit" ? <button type="button" className="btn" disabled={!w.undo.length} onClick={act.undo}><Icon name="undo" size={18} />Undo</button> : null}
@@ -102,7 +109,12 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
         </div>
       </div>
 
-      <CheckBar stages={stages} open={openCheck} setOpen={k => { setOpenCheck(k); if (!k && location.hash) history.replaceState(null, "", location.pathname + location.search); }} onSelect={setSel} />
+      <div className={"tlight " + light.tone}>
+        <span className="tl-dot" aria-hidden="true" />
+        <span className="tl-text">{light.text}</span>
+        <button type="button" className="lnk" aria-expanded={showChecks} onClick={() => setShowChecks(!showChecks)}>{showChecks ? "Hide the checks" : "See all " + stages.length + " checks"}</button>
+      </div>
+      {showChecks || failing.length ? <CheckBar stages={showChecks ? stages : failing} open={openCheck} setOpen={k => { setOpenCheck(k); if (!k && location.hash) history.replaceState(null, "", location.pathname + location.search); }} onSelect={setSel} /> : null}
 
       <div className={"rvbody" + (tab === "edit" && !chatOn ? " solo" : "")}>
         {tab === "view" ? (
@@ -133,7 +145,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
           </div>
         )}
         {tab === "edit" && !chatOn ? null : <div className="rvside">
-          {tab === "view" ? <HandOver ready={g.ready} blocking={g.blockIds.length} asks={g.asks.length} ver={verLabel(w) + " · " + (w.approved?.hash ?? hashOf(w.model))} state={w.state} /> : null}
+          {tab === "view" ? <HandOver ready={g.ready} blocking={g.blockIds.length} asks={g.asks.length} ver={verLabel(w) + " · " + (w.approved?.hash ?? hashOf(w.model))} state={w.state} onAnswer={() => { setChat(true); setTimeout(() => document.querySelector(".qcard")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50); }} /> : null}
           {chatOn ? <Chat w={w} act={act} canAct={canEdit} onSelect={id => { setSel(id); }} onChange={toEdit} onClose={() => setChat(false)} /> : null}
         </div>}
       </div>
