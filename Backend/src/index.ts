@@ -13,6 +13,8 @@ import { startResumeSweep } from "./engine/sweep.js";
 import { withDeadline } from "./shutdown.js";
 import { createAgentCoreModelClient } from "./model/agentcore.js";
 import { createStrandsModelClient } from "./model/strands.js";
+import { OfficerAgent } from "./agent/officerAgent.js";
+import { runBackground } from "./api/background.js";
 import * as revisionEngine from "./revision/engine.js";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { InProcessDispatcher, LambdaAsyncDispatcher } from "./revision/dispatch.js";
@@ -68,6 +70,17 @@ async function main(): Promise<void> {
     logger,
   );
 
+  // The officer agent is built after the orchestrator and signoff; the hooks below reach it through this holder.
+  const triggers: { agent?: OfficerAgent } = {};
+  const triggerAgent = (runId: string): Promise<void> => {
+    const agent = triggers.agent;
+    if (!agent) return Promise.resolve();
+    // Idempotent: the agent's state record per base version stops a second run from doing the work twice.
+    return runBackground(cfg.runMode, agent.onAwaitingOfficer(runId), (e) =>
+      log("officer agent failed", { runId, error: e instanceof Error ? e.message : String(e) }),
+    );
+  };
+
   const orchestrator = new Orchestrator({
     store,
     artifacts,
@@ -90,6 +103,7 @@ async function main(): Promise<void> {
         : createChecksStep(),
     ],
     finalState: "awaiting_officer",
+    onFinalState: triggerAgent,
     log,
     owner: randomUUID(),
     leaseMs: cfg.leaseMs,
@@ -114,12 +128,29 @@ async function main(): Promise<void> {
   // Findings, status and signatures. Compile is not here: it runs on the build host (DEC-014),
   // see scripts/compileLocked.ts.
   const signoff = new Signoff({ store, artifacts });
+  // The agent saves its fixes through saveVersion with signoff.onVersionSaved (no re-trigger: it loops itself).
+  triggers.agent = new OfficerAgent({
+    store,
+    artifacts,
+    signoff,
+    model,
+    modelId: cfg.officerAgentModelId,
+    validator: parseModelValidator,
+    saveDeps: { store, artifacts, validator: parseModelValidator, onVersionSaved: (runId, n) => signoff.onVersionSaved(runId, n), now: Date.now },
+    now: Date.now,
+    budgetUsd: cfg.officerAgentMaxCostUsd,
+    prices: cfg.prices,
+    leaseMs: cfg.leaseMs,
+  });
 
   // Every saved version is checked and goes back to the program officer (AR-01, AR-02, GR-03).
   const onVersionSaved = async (runId: string, n: number): Promise<void> => {
     log("version saved", { runId, version: n });
     // Recorded as the "validate" process of this version (DEC-003).
     await recordProcess(store, { runId, process: "validate", versionId: String(n), now: Date.now }, () => signoff.onVersionSaved(runId, n));
+    // The officer agent looks at every new version, including one made by an AI revision. Its own saves go
+    // through signoff directly (see saveDeps), so it does not trigger itself.
+    await triggerAgent(runId);
   };
 
   // Revision loop: the original fill prompt is step 2's system prompt, the addendum follows it.
@@ -170,8 +201,10 @@ async function main(): Promise<void> {
         expiresIn: PRESIGN_EXPIRES_SECONDS,
       }),
     onVersionSaved,
+    onRejected: triggerAgent,
     signoff,
     revisions,
+    chat: { model, modelId: cfg.chatModelId, prices: cfg.prices, maxCostUsd: cfg.chatMaxCostUsd, maxTokens: cfg.chatMaxTokens, ratePerMin: cfg.chatRatePerMin },
     maxPages: cfg.maxPages,
     runMode: cfg.runMode,
     // Request lines (method, path, status, time) and the API's error logs; bodies are never logged.

@@ -34,6 +34,9 @@ export interface OrchestratorOptions {
   // State the run enters after the last step (default in_review). Production registers the checks step
   // last and ends in awaiting_officer, where the sign-off starts (DEC-019).
   finalState?: RunState;
+  // Called (and awaited, errors dropped) once a run has reached finalState and its lease is released, and by
+  // resumeAll for every run waiting in awaiting_officer. Must be idempotent; production wires the officer agent.
+  onFinalState?: (runId: string) => Promise<void>;
   // One line per state change and per unexpected error. Default: no logging.
   log?: Log;
 }
@@ -49,6 +52,7 @@ export class Orchestrator {
   private readonly now: () => number;
   private readonly maxTotalAttempts: number;
   private readonly finalState: RunState;
+  private readonly onFinalState: ((runId: string) => Promise<void>) | undefined;
   private readonly log: Log;
   // Runs this instance is advancing right now. The lease is per owner, so it does
   // not stop two calls in the same process (for example a duplicate upload event
@@ -67,6 +71,7 @@ export class Orchestrator {
     this.now = opts.now ?? Date.now;
     this.maxTotalAttempts = opts.maxTotalAttempts ?? DEFAULT_MAX_TOTAL_ATTEMPTS;
     this.finalState = opts.finalState ?? "in_review";
+    this.onFinalState = opts.onFinalState;
     this.log = safeLog(opts.log);
   }
 
@@ -105,33 +110,49 @@ export class Orchestrator {
     if (this.active.has(runId)) return;
     this.active.add(runId);
     if (this.active.size === 1) this.statusChangedAt = this.now();
+    let reachedFinal = false;
     try {
-      await this.advanceHeld(runId);
+      reachedFinal = await this.advanceHeld(runId);
     } finally {
       this.active.delete(runId);
       if (this.active.size === 0) this.statusChangedAt = this.now();
     }
+    if (reachedFinal) await this.fireFinal(runId);
   }
 
-  private async advanceHeld(runId: string): Promise<void> {
-    if (!(await this.renewLease(runId))) return;
+  private async fireFinal(runId: string): Promise<void> {
+    if (!this.onFinalState) return;
+    try {
+      await this.onFinalState(runId);
+    } catch (e) {
+      this.log("final state hook error", { runId, error: errorMessage(e) });
+      try {
+        await this.store.appendAudit(runId, { at: this.now(), type: "final_state_hook_error", detail: { error: errorText(e).slice(0, MAX_ERROR_CHARS) } });
+      } catch {
+        // Best effort only.
+      }
+    }
+  }
+
+  private async advanceHeld(runId: string): Promise<boolean> {
+    if (!(await this.renewLease(runId))) return false;
     let threw = false;
     let current: Step | undefined;
     try {
       let run = await this.mustGet(runId);
       if (run.state === "created") {
         const first = this.steps[0];
-        if (!first) return;
+        if (!first) return false;
         run = await this.transition(run, first.runState);
       }
 
       for (;;) {
         const index = this.steps.findIndex((s) => s.runState === run.state);
-        if (index === -1) return;
+        if (index === -1) return false;
         const step = this.steps[index]!;
         current = step;
         // Another owner may have taken the run after our lease lapsed: stop quietly.
-        if (!(await this.renewLease(runId))) return;
+        if (!(await this.renewLease(runId))) return false;
 
         const records = (await this.store.listSteps(runId)).filter((r) => r.step === step.name);
         // A succeeded record means the step's outputs already exist; skip it.
@@ -149,9 +170,9 @@ export class Orchestrator {
           const remaining = this.maxTotalAttempts - used;
           if (remaining <= 0) {
             await this.failCapped(run, step, firstAttempt, used);
-            if (!(await this.renewLease(runId))) return;
+            if (!(await this.renewLease(runId))) return false;
             await this.transition(run, "failed", { currentStep: step.name });
-            return;
+            return false;
           }
           const ctx = { run, store: this.store, artifacts: this.artifacts, model: this.model, now: this.now };
           const rec = await runStep(step, ctx, {
@@ -159,14 +180,15 @@ export class Orchestrator {
             firstAttempt,
             maxAttempts: Math.min(this.runnerOpts.maxAttempts, remaining),
           });
-          if (!(await this.renewLease(runId))) return;
+          if (!(await this.renewLease(runId))) return false;
           if (rec.status === "failed") {
             await this.transition(run, "failed", { currentStep: step.name });
-            return;
+            return false;
           }
         }
 
         run = await this.transition(run, this.steps[index + 1]?.runState ?? this.finalState);
+        if (index + 1 >= this.steps.length) return true;
       }
     } catch (e) {
       threw = true;
@@ -205,6 +227,9 @@ export class Orchestrator {
 
   // Never throws for a single run's failure: records resume_error on it and moves on.
   async resumeAll(): Promise<void> {
+    if (this.onFinalState) {
+      for (const run of await this.store.listByState("awaiting_officer")) await this.fireFinal(run.runId);
+    }
     for (const run of await this.store.listResumable(this.now())) {
       try {
         await this.advance(run.runId);
