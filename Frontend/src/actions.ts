@@ -3,6 +3,8 @@ import type { ItemId, Patch, Role } from "./domain/types";
 /** Everything a screen can ask the app to do. App.tsx implements these by calling src/api. */
 export interface Actions {
   createDraft: (args: { guidelineId: string; pathway: string; pages: number[] }) => Promise<void>;
+  /** IT approver: open a clinician-approved (locked) run at Release. */
+  openForRelease: (args: { guidelineId: string; pathway: string }) => Promise<void>;
   edit: (item: ItemId, field: string, patch: Patch) => void;
   undo: () => void;
   chat: (text: string) => void;

@@ -103,6 +103,14 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
   const sampleOnly = wrongPath || (!api.LIVE && selId !== "g-imci");
   const canCreate = role === "clinician" && !!f && f.status === "Indexed" && (api.LIVE || pages.length > 0) && !sampleOnly && !creating;
 
+  const canRelease = role === "it" && api.LIVE && !!f?.locked && !creating;
+  const openRelease = async () => {
+    if (!f) return;
+    setCreating(true);
+    try { await act.openForRelease({ guidelineId: f.id, pathway: path }); }
+    finally { setCreating(false); }
+  };
+
   const create = async () => {
     if (!f) return;
     setCreating(true);
@@ -161,7 +169,14 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
           <div className="lab">Existing form to compare against</div>
           <div className="mono pcard">forms/app/cough_assessment.xlsx · deployed v3</div>
 
-          {!w || w.state === "none" ? (
+          {role === "it" && (!w || w.state === "none" || w.remote?.runId !== f.id) ? (
+            <div className="actions">
+              <span className="note">{f.locked ? "The clinician approved this run. Open it to run the synthetic check and approve the deploy." : "Opens for release once the clinician approves this run."}</span>
+              <button type="button" className="btn primary" disabled={!canRelease} onClick={openRelease}>
+                {creating ? <><span className="spin" aria-hidden="true" />Loading approved version...</> : "Open for release"}
+              </button>
+            </div>
+          ) : !w || w.state === "none" ? (
             <div className="actions">
               <span className="note">
                 {role !== "clinician" ? "Only the clinician can start a workflow."
@@ -177,7 +192,7 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
               </button>
             </div>
           ) : (
-            <div className="banner good">A workflow exists for this pathway ({verLabel(w)}). <Link to="/review">Open Review</Link>.</div>
+            <div className="banner good">A workflow exists for this pathway ({verLabel(w)}). {["verify", "deploy", "done"].includes(w.state) ? <Link to="/release">Open Release</Link> : <Link to="/review">Open Review</Link>}.</div>
           )}
         </section>
       ) : api.LIVE && lib.length ? (
