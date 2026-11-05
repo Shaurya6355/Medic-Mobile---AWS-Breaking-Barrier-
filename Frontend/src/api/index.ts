@@ -360,7 +360,7 @@ async function signOnBackend(w: Workflow): Promise<{ n: number; modelSha: string
   const edits = w.versions.filter(v => v.event.startsWith("Edited")).length;
   const note = "Clinician review in the app: " + edits + " edit" + (edits === 1 ? "" : "s") + " to the rules, open questions answered, checks reviewed.";
   const body: Spec = { ...w.model, meta: { ...w.model.meta, version: parent + 1, parent_version: parent, created_at: new Date().toISOString(), created_by: me(), change_note: note } };
-  const { n } = await call<{ n: number }>(base + "/versions", { method: "POST", body: JSON.stringify({ parentVersion: parent, body, author: me(), authorRole: "clinician" }) });
+  let { n } = await call<{ n: number }>(base + "/versions", { method: "POST", body: JSON.stringify({ parentVersion: parent, body, author: me(), authorRole: "clinician" }) });
   let st = await call<StatusView>(base + "/versions/" + n + "/status");
   for (let i = 0; i < 60 && st.status === "awaiting_officer"; i++) {
     await wait(1000);
