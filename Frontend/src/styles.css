@@ -987,3 +987,36 @@ h1.display,.rvhead h1.display{font-weight:600;letter-spacing:-.8px}
 .cwid.s-pass{background:var(--s-low)}
 .cpop{left:0;right:0;width:auto;top:calc(100% + 6px)}
 .cwid:nth-child(n+4) .cpop{left:0;right:0}
+
+/* Quote check (advisory quote-support scores). Neutral with a dashed edge: an opinion, kept apart from the
+   Edited / Question badges (secondary container) and blocking checks (error). */
+.badge.qs{background:var(--s-low);color:var(--muted);border:1px dashed var(--subtle)}
+.badge.qs.old{text-decoration:line-through;opacity:.75}
+.badge.qs.fine{border-style:solid}
+.qs{display:grid;gap:16px}
+.qs-notice{margin:0;font-size:14px;line-height:20px;color:var(--muted);background:var(--s-low);border-radius:8px;padding:12px 16px}
+.qs-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.qs-chip{font-size:14px;line-height:20px;border-radius:4px;padding:4px 10px;background:var(--s-low);color:var(--ink)}
+.qs-chip.flag{background:var(--s-high);border:1px dashed var(--subtle);font-weight:600}
+.qs-sub{margin:0;font:600 16px/24px var(--font-display)}
+.qs-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.qs-item{width:100%;height:100%;font:inherit;text-align:left;display:grid;gap:6px;border:0;border-radius:8px;padding:12px 16px;background:var(--s-low);color:var(--ink);cursor:pointer;min-height:44px}
+.qs-item:hover{background:var(--s-high)}
+.qs-item.on{background:var(--s-high);box-shadow:inset 0 0 0 2px var(--accent)}
+.qs-row{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.qs-val{font-family:var(--font-mono);font-size:14px;color:var(--muted)}
+.qs-bar{position:relative;display:block;height:6px;border-radius:3px;background:var(--s-highest)}
+.qs-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--color-secondary)}
+.qs-bar b{position:absolute;left:70%;top:-3px;width:2px;height:12px;background:var(--ink)}
+.qs-detail{border:1px dashed var(--subtle);border-radius:8px;padding:16px;display:grid;gap:12px;background:var(--surface)}
+.qs-detail.old{opacity:.85}
+.qs-dhead{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.qs-score{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.qs-num{font-family:var(--font-mono);font-size:28px;line-height:1;color:var(--ink)}
+.qs-dl{margin:0;display:grid;grid-template-columns:120px minmax(0,1fr);gap:6px 12px;font-size:14px;line-height:20px}
+.qs-dl dt{color:var(--muted)}
+.qs-dl dd{margin:0}
+.qs-quote{display:grid;gap:6px}
+.qs-lab{font-size:12px;font-weight:600;color:var(--muted)}
+.qs-quote blockquote{margin:0;font-size:14px;line-height:20px;color:var(--muted);border-left:3px solid var(--subtle);padding-left:10px}
+.qs-stale{margin:0;color:var(--chg)}

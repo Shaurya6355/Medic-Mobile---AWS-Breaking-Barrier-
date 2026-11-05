@@ -13,6 +13,8 @@ import { Chat } from "../components/Chat";
 import { RuleTable } from "../components/RuleTable";
 import { Icon } from "../components/Icon";
 import { SectionHead } from "../components/Page";
+import { QuoteScoresPanel } from "../components/QuoteScores";
+import { scoreBadge, scoreIndex, type ItemScore } from "../domain/scores";
 
 type Tab = "view" | "edit";
 const readTab = (): Tab => { try { return localStorage.getItem("reviewTab") === "edit" ? "edit" : "view"; } catch { return "view"; } };
@@ -20,13 +22,15 @@ const readTab = (): Tab => { try { return localStorage.getItem("reviewTab") === 
 const readChat = (t: Tab): boolean => { try { const v = localStorage.getItem("chat-" + t); return v === null ? t === "view" : v === "1"; } catch { return t === "view"; } };
 const hashCheck = () => (location.hash.match(/^#check-(\w+)/)?.[1] as CheckKey | undefined) ?? null;
 
-/** Yellow: a question waiting for the clinician. Red: a blocking check. Badge: edited since the agent's hand-over. */
-function markersFor(w: Workflow, checks: Check[]) {
+/** Yellow: a question waiting for the clinician. Red: a blocking check. Badge: edited since the agent's hand-over.
+    Quote badge: the quote check flagged this item's quote (advisory: a badge only, never a tone or a check). */
+function markersFor(w: Workflow, checks: Check[], scores: Map<string, ItemScore>) {
   const mk: Markers = {}, tone: Tone = {};
   const add = (id: string, cls: string, label: string) => { (mk[id] = mk[id] || []).push([cls, label]); };
   allItems(w.model, w.draft).forEach(id => { if (nodeSig(w.model, id) !== nodeSig(w.draft, id)) add(id, "ed", "Edited"); });
   w.flags.filter(f => !f.res).forEach(f => { tone[f.about] = "open"; add(f.about, "fl", "Question"); });
   checks.filter(c => c.sev === "blocking").forEach(c => { tone[c.id] = "bad"; });
+  scores.forEach(v => { const b = scoreBadge(v); if (b) add(v.id, b[0], b[1]); });
   return { mk, tone };
 }
 
@@ -74,7 +78,8 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
     : notes ? { tone: "amber", text: "Checks passed · " + notes + " with notes to look at" }
     : { tone: "green", text: "All " + stages.length + " checks passed" };
   const g = gate(w, checks);
-  const { mk, tone } = markersFor(w, checks);
+  const scores = scoreIndex(w.scores, w.model);
+  const { mk, tone } = markersFor(w, checks, scores);
   const edited = Object.values(mk).filter(l => l.some(([c]) => c === "ed")).length;
   const edit = (item: string, field: string, patch: Parameters<Actions["edit"]>[2]) => act.edit(item, field, patch);
   const toEdit = (about: string) => { setSel(about); setTab("edit"); setChatRaw(x => ({ ...x, edit: true })); };
@@ -131,6 +136,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
               <SectionHead icon="account_tree" tone="teal" title="Decision flow" sub="Rules in priority order. The first rule that matches decides the outcome." />
               <Flow m={w.model} selected={sel === "scope" ? undefined : sel} onSelect={setSel} markers={mk} tone={tone} label="Decision flow" />
             </section>
+            {w.scores ? <section className="panel"><QuoteScoresPanel s={w.scores} m={w.model} idx={scores} sel={sel} onSelect={setSel} /></section> : null}
             <section className="panel"><GoldenCases m={w.model} onSelect={setSel} /></section>
           </div>
         ) : (

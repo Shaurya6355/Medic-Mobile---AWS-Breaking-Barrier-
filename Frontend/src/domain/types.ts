@@ -53,6 +53,20 @@ export interface RemoteFinding { severity: "blocking" | "warning" | "info"; mess
 /** Live mode: the backend run and version this workflow was loaded from. */
 export interface Remote { runId: string; n: number; modelSha: string; base: Model; claimText: string; findings: RemoteFinding[] }
 
+/** One scored item of GET /runs/:id/versions/:n/scores (Backend/scoring/score_version.py). */
+export interface ScoreItem {
+  /** The scorer's path: scope, questions/X, derived/X, rules/X, outcomes/X, outcomes/X/actions/i, outcomes/X/follow_up. */
+  item: string; kind: string;
+  score: number | null; flag: boolean; why?: string | null;
+  agreement?: number | null; lowest_reason?: string; pages?: number[]; quotes?: string[];
+}
+/** Advisory quote-support scores: a model's opinion of each quote, never a check or a gate (Medic rule 6).
+    `base` is the logic model that was scored; an item that differs from it now has an out-of-date score. */
+export type QuoteScores =
+  | { status: "scored"; n: number; modelSha: string; notice: string; summary: { scored: number; flagged: number; not_scored: number }; items: ScoreItem[]; base: Model; sample?: boolean }
+  | { status: "not_scored"; n: number }
+  | { status: "failed"; n: number; error?: string };
+
 export interface Workflow {
   id: string;
   guideline: { id: string; name: string; pathway: string; pages: number[] } | null;
@@ -75,6 +89,8 @@ export interface Workflow {
   lastKey: string | null;
   /** Set in live mode only. */
   remote: Remote | null;
+  /** Quote-support scores for the reviewed version, when the backend has them. Advisory only. */
+  scores?: QuoteScores | null;
 }
 
 export type GuidelineType = "PDF" | "Word" | "Spreadsheet" | "Image" | "Web or text" | "Other";
