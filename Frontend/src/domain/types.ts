@@ -36,6 +36,8 @@ export interface ChatMsg {
   proposals?: Proposal[];
   /** An open question the clinician answers from the chat. */
   ask?: string;
+  /** Live mode: the AI's plan for the clinician's feedback (backend revision loop). Applied only on Confirm. */
+  revision?: { rid: string; state: "ready" | "applying" | "applied" | "no_change" | "failed" | "cancelled" };
 }
 /** Something the AI agent fixed or checked on its own, before the clinician sees the draft. */
 export interface AgentFix { item: ItemId; check: CheckKey; text: string }
