@@ -97,6 +97,7 @@ const orchestrator = new Orchestrator({
     createChecksStep(),
   ],
   finalState: "awaiting_officer",
+  onFinalState: triggerAgent,
   owner: "dev-local",
   leaseMs: 60_000,
   runnerOpts: { maxAttempts: 1, backoffMs: () => 0, sleep: async () => {}, prices: {} },

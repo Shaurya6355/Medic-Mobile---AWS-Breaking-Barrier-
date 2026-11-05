@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "lib": ["es2022"],
     "strict": true,
     "noImplicitAny": true,
@@ -16,5 +16,8 @@
     "noEmit": true
   },
   "include": ["bin", "lib", "test"],
-  "exclude": ["node_modules", "cdk.out"]
+  "exclude": ["node_modules", "cdk.out"],
+  "ts-node": {
+    "compilerOptions": { "module": "commonjs", "moduleResolution": "node" }
+  }
 }

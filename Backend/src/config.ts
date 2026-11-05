@@ -31,6 +31,15 @@ export interface Config {
   // Model for the fill_logic draft; defaults to MODEL_ID (the IAM policy covers MODEL_ID only).
   fillModelId: string;
   prices: PriceTable;
+  // Chat: model (defaults to MODEL_ID), cost cap per run in USD, and requests per user per minute.
+  chatModelId: string;
+  chatMaxCostUsd: number;
+  chatRatePerMin: number;
+  // Per-run token cap for chat when PRICES_JSON has no price for the model (fails closed).
+  chatMaxTokens: number;
+  // Officer agent: model (defaults to MODEL_ID) and cost cap in USD per run.
+  officerAgentModelId: string;
+  officerAgentMaxCostUsd: number;
   // Optional cap on the recorded cost of one run (RUN_BUDGET_USD); absent means no cap.
   runBudgetUsd?: number;
   // Level of the API's request and error log (Fastify/pino) on stdout; "silent" turns it off. Default info.
@@ -63,6 +72,14 @@ function positiveInt(env: NodeJS.ProcessEnv, name: string, dflt: number, max = N
   if (!/^\d+$/.test(raw)) throw new Error(`${name} must be a positive integer`);
   const n = Number(raw);
   if (!Number.isSafeInteger(n) || n < 1 || n > max) throw new Error(`${name} must be a positive integer${max < Number.MAX_SAFE_INTEGER ? ` up to ${max}` : ""}`);
+  return n;
+}
+
+function positiveNumber(env: NodeJS.ProcessEnv, name: string, dflt: number): number {
+  const raw = env[name];
+  if (raw === undefined || raw === "") return dflt;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`${name} must be a positive number`);
   return n;
 }
 
@@ -149,6 +166,12 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     revisePrompt: str(env, "REVISE_PROMPT", path.join(extractionDir, "revise_prompt.txt")),
     fillModelId: str(env, "FILL_MODEL_ID", req("MODEL_ID")),
     prices: loadPrices(env),
+    chatModelId: str(env, "CHAT_MODEL_ID", req("MODEL_ID")),
+    chatMaxCostUsd: positiveNumber(env, "CHAT_MAX_COST_USD", 1),
+    chatRatePerMin: positiveInt(env, "CHAT_RATE_PER_MIN", 10, 600),
+    chatMaxTokens: positiveInt(env, "CHAT_MAX_TOKENS", 200000, 100000000),
+    officerAgentModelId: str(env, "OFFICER_AGENT_MODEL_ID", req("MODEL_ID")),
+    officerAgentMaxCostUsd: positiveNumber(env, "OFFICER_AGENT_MAX_COST_USD", 2),
     ...(budget !== undefined ? { runBudgetUsd: budget } : {}),
     logLevel,
     ...(env["JUDGE_MODEL_ID"] !== undefined && env["JUDGE_MODEL_ID"] !== ""
