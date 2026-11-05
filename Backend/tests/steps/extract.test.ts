@@ -6,7 +6,7 @@ import { runStep } from "../../src/engine/runner.js";
 import type { StepContext } from "../../src/engine/step.js";
 import { TransientError } from "../../src/engine/step.js";
 import { FakeModelClient, ModelOutputError } from "../../src/model/modelClient.js";
-import { createExtractStep, findBadQuotes } from "../../src/steps/extract.js";
+import { checkQuotes, createExtractStep, findBadQuotes } from "../../src/steps/extract.js";
 import { ExtractionOutput } from "../../src/steps/extractionSchema.js";
 import { MemoryStore } from "../../src/store/memoryStore.js";
 
@@ -197,5 +197,59 @@ describe("extract step", () => {
     expect(err.name).toBe("Error");
     expect(err.message).toMatch(/No pages to extract/);
     expect(model.calls).toHaveLength(0);
+  });
+});
+
+describe("checkQuotes repairs only unambiguous slips, and records them", () => {
+  // Shapes seen on the 2014 HIV-adapted booklet (Nov 2026 run): blocks keep the PDF's leading spaces and curly quotes.
+  const blocks = new Map([
+    ["p5.b5", " Chest indrawing?"],
+    ["p5.b7", " If cough, count breaths in 1 minute: ___ breaths per\nminute (bpm)."],
+    ["p5.b8", " Unusually sleepy or unconscious?"],
+    ["p9.b17", " Advise the caregiver to\ngive more fluids and\ncontinue feeding."],
+    ["p9.b18", " Give oral antibiotic (amoxycillin tablet\u2014250 mg )."],
+    ["p12.b3", "Check vaccines received (see child\u2019s health card)"],
+    ["p6.b1", "Fever"],
+    ["p6.b2", "Fever"],
+  ]);
+  const out = (block_id: string, quote: string) => ({ nodes: [{ id: "n1", src: [{ block_id, pdf_page: 1, quote }] }] });
+
+  it("typography: a straight apostrophe for the booklet's curly one becomes the booklet's exact text", () => {
+    const o = out("p12.b3", "Check vaccines received (see child's health card)");
+    const r = checkQuotes(o, blocks, { apply: true });
+    expect(r.bad).toEqual([]);
+    expect(r.fixes).toEqual([{ kind: "typography", from: { block_id: "p12.b3", quote: "Check vaccines received (see child's health card)" }, to: { block_id: "p12.b3", quote: "Check vaccines received (see child\u2019s health card)" } }]);
+    expect(o.nodes[0]!.src[0]!.quote).toBe("Check vaccines received (see child\u2019s health card)");
+  });
+
+  it("block: a quote found in exactly one other block of the same page moves to that block", () => {
+    const o = { nodes: [{ src: [{ block_id: "p5.b7", quote: " Chest indrawing?" }] }, { src: [{ block_id: "p9.b17", quote: " Give oral antibiotic (amoxycillin tablet\u2014250 mg )." }] }] };
+    const r = checkQuotes(o, blocks, { apply: true });
+    expect(r.bad).toEqual([]);
+    expect(r.fixes.map((f) => [f.kind, f.from.block_id, f.to.block_id])).toEqual([["block", "p5.b7", "p5.b5"], ["block", "p9.b17", "p9.b18"]]);
+    expect(o.nodes.map((n) => n.src[0]!.block_id)).toEqual(["p5.b5", "p9.b18"]);
+  });
+
+  it("without apply, nothing in the output changes", () => {
+    const o = out("p5.b7", " Chest indrawing?");
+    expect(checkQuotes(o, blocks).fixes).toHaveLength(1);
+    expect(o.nodes[0]!.src[0]!.block_id).toBe("p5.b7");
+  });
+
+  it("still fails: a quote on another page, in two blocks of the page, in no block, or empty", () => {
+    for (const [id, q] of [["p9.b17", " Chest indrawing?"], ["p6.b9", "Fever"], ["p5.b7", "Fast breathing"], ["p5.b5", " "], ["p99.b1", "Chest"]] as const) {
+      const r = checkQuotes(out(id, q), blocks, { apply: true });
+      expect(r.bad, `${id} ${q}`).toEqual([{ block_id: id, quote: q }]);
+      expect(r.fixes).toEqual([]);
+    }
+  });
+
+  it("other words are never repaired: only curly quotes are folded", () => {
+    expect(checkQuotes(out("p12.b3", "Check vaccine received (see child's health card)"), blocks).bad).toHaveLength(1);
+    expect(checkQuotes(out("p9.b18", "Give oral antibiotic (amoxycillin tablet-250 mg )."), blocks).bad).toHaveLength(1);
+  });
+
+  it("findBadQuotes still reports every quote not exactly in its cited block", () => {
+    expect(findBadQuotes(out("p5.b7", " Chest indrawing?"), blocks)).toEqual([{ block_id: "p5.b7", quote: " Chest indrawing?" }]);
   });
 });

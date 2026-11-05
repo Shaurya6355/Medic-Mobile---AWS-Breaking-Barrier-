@@ -16,16 +16,28 @@ RUN npm ci --omit=dev
 # All base images are multi-arch (node:22-slim, Debian poppler-utils/python3), so
 # `docker buildx build --platform linux/arm64` (AgentCore Runtime) needs no changes.
 # Runtime image: ingest needs pdftoppm/pdftotext (poppler-utils) and python3.
+# Quote scoring (scoring/score_version.py, used when JUDGE_MODEL_ID is set) needs Strands Evals, installed in
+# its own venv so it never touches the system Python that ingest uses.
 FROM node:22-slim AS runtime
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends poppler-utils python3 \
+    && apt-get install -y --no-install-recommends poppler-utils python3 python3-venv \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-ENV NODE_ENV=production
+COPY scoring/requirements.txt ./scoring/requirements.txt
+RUN python3 -m venv /opt/scoring \
+    && /opt/scoring/bin/pip install --no-cache-dir -r scoring/requirements.txt
+ENV NODE_ENV=production \
+    SCORING_PYTHON=/opt/scoring/bin/python
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
 COPY extraction/prepare_input.py extraction/final_prompt.txt extraction/fill_prompt.txt extraction/revise_instruction_prompt.txt extraction/revise_prompt.txt ./extraction/
+COPY scoring/score_version.py ./scoring/score_version.py
+# COPY keeps the build machine's file modes, and Lambda runs the image as a non-root user that does not own
+# these files: an owner-only file on a laptop (-rw-------) is then unreadable. a+rX makes every file readable
+# and every directory traversable. (Not COPY --chmod: it also sets the created directories' mode, and 0644
+# directories cannot be entered.)
+RUN chmod -R a+rX /app/extraction /app/scoring
 USER node
 EXPOSE 8080
 CMD ["node", "dist/index.js"]

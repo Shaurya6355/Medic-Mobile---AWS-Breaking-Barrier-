@@ -12,7 +12,7 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 import * as path from "node:path";
-import { DEFAULT_MODEL_ID, PROJECT_TAG_KEY, PROJECT_TAG_VALUE, resolveUiOrigins } from "./data-stack";
+import { baseModelId, DEFAULT_MODEL_ID, PROJECT_TAG_KEY, PROJECT_TAG_VALUE, resolveUiOrigins } from "./data-stack";
 
 // Lambda hard limit is 15 minutes. LEASE_MS must exceed it so a live invocation is never taken over.
 const FUNCTION_TIMEOUT = Duration.minutes(15);
@@ -59,6 +59,8 @@ export const API_ROUTES: readonly string[] = [
   "POST /runs/{id}/versions/{n}/restore",
   // Timing and cost of a run. Read-only: reads the same step records as GET /runs/{id}.
   "GET /runs/{id}/metrics",
+  // Advisory quote-support scores of a version (Backend/src/scoring). Read-only: reads one S3 object.
+  "GET /runs/{id}/versions/{n}/scores",
 ];
 
 export interface OrchestratorLambdaStackProps extends StackProps {
@@ -99,6 +101,12 @@ export class OrchestratorLambdaStack extends Stack {
     }
     const ctxPrices = this.node.tryGetContext("prices") as unknown;
     const ctxBudget = this.node.tryGetContext("runBudgetUsd") as unknown;
+    // Optional quote-support scoring after the checks (Backend/src/scoring): the judge model's Bedrock ID.
+    const ctxJudge = this.node.tryGetContext("judgeModelId") as unknown;
+    if (ctxJudge !== undefined && ctxJudge !== null && ctxJudge !== "" && typeof ctxJudge !== "string") {
+      throw new Error("context judgeModelId must be a Bedrock model or inference profile ID");
+    }
+    const judgeModelId = typeof ctxJudge === "string" && ctxJudge !== "" ? ctxJudge : undefined;
 
     const logGroup = new logs.LogGroup(this, "FunctionLogs", { retention: logs.RetentionDays.TWO_WEEKS });
 
@@ -122,6 +130,7 @@ export class OrchestratorLambdaStack extends Stack {
     if (ctxPrices !== undefined && ctxPrices !== null && ctxPrices !== "") {
       environment.PRICES_JSON = typeof ctxPrices === "string" ? ctxPrices : JSON.stringify(ctxPrices);
     }
+    if (judgeModelId !== undefined) environment.JUDGE_MODEL_ID = judgeModelId;
 
     // Optional cap on the recorded cost of one run (Backend RUN_BUDGET_USD).
     if (ctxBudget !== undefined && ctxBudget !== null && ctxBudget !== "") {
@@ -158,6 +167,19 @@ export class OrchestratorLambdaStack extends Stack {
     this.function.role!.addManagedPolicy(props.appPolicy);
     // With AgentCore the Lambda never calls Bedrock itself, so it gets no model invoke permission.
     if (modelBackend === "bedrock") this.function.role!.addManagedPolicy(props.bedrockPolicy!);
+    // The scorer calls the judge model from this function in either backend, so it gets its own grant.
+    if (judgeModelId !== undefined) {
+      this.function.addToRolePolicy(
+        new iam.PolicyStatement({
+          sid: "BedrockInvokeJudge",
+          actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+          resources: [
+            this.formatArn({ service: "bedrock", resource: "inference-profile", resourceName: judgeModelId }),
+            `arn:${this.partition}:bedrock:*::foundation-model/${baseModelId(judgeModelId)}`,
+          ],
+        }),
+      );
+    }
 
     // Revision loop (DEC-037): POST /runs/{id}/revisions/{rid}/confirm answers 202 at once because the
     // proposal call to Bedrock (step 2) can take longer than the 30 s API Gateway limit. In lambda mode
@@ -215,7 +237,8 @@ export class OrchestratorLambdaStack extends Stack {
     });
 
     // HTTP API with explicit routes only. NO AUTHENTICATION YET.
-    this.httpApi = new apigwv2.CfnApi(this, "HttpApi", {
+    // Logical id "HttpApiV2": the API was replaced once to move routes to key-based ids (see below).
+    this.httpApi = new apigwv2.CfnApi(this, "HttpApiV2", {
       name: `${this.stackName}-http-api`,
       protocolType: "HTTP",
       corsConfiguration: {
@@ -233,8 +256,14 @@ export class OrchestratorLambdaStack extends Stack {
       // Maximum for HTTP APIs; do not lower. Long work (revision step 2) runs in the background.
       timeoutInMillis: API_INTEGRATION_TIMEOUT_MS,
     });
-    API_ROUTES.forEach((routeKey, i) => {
-      new apigwv2.CfnRoute(this, `Route${i}`, {
+    // Route logical ids come from the route key, never the list position: an index-based id shifts when a
+    // route is inserted, and CloudFormation then creates a "new" route whose key still exists (409).
+    const routeIds = new Set<string>();
+    API_ROUTES.forEach((routeKey) => {
+      const id = `Route${routeKey.replace(/[^A-Za-z0-9]/g, "")}`;
+      if (routeIds.has(id)) throw new Error(`Duplicate route logical id ${id} for ${routeKey}`);
+      routeIds.add(id);
+      new apigwv2.CfnRoute(this, id, {
         apiId: this.httpApi.ref,
         routeKey,
         target: `integrations/${integration.ref}`,
