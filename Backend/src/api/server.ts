@@ -9,6 +9,7 @@ import { loadAwsRates } from "../metrics/awsRates.js";
 import { withDeadline } from "../shutdown.js";
 import { parseS3Event } from "../trigger/s3Event.js";
 import { saveNewVersion } from "./saveVersion.js";
+import { registerClinicianRoutes, type ClinicianDeps } from "./clinicianRoutes.js";
 import { LAMBDA_BACKGROUND_DEADLINE_MS, runBackground } from "./background.js";
 import type { RunMode } from "./background.js";
 import {
@@ -72,6 +73,10 @@ export interface ServerDeps {
   eventsConcurrency?: number;
   eventsDeadlineMs?: number;
   backgroundDeadlineMs?: number;
+  // Called after a clinician reject returned the run to awaiting_officer (re-triggers the officer agent). Errors are logged.
+  onRejected?: (runId: string) => Promise<void>;
+  // Chat settings; without them POST /runs/:id/chat answers 503.
+  chat?: ClinicianDeps["chat"];
 }
 
 const BODY_LIMIT = 5 * 1024 * 1024;
@@ -207,6 +212,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (!latest) return reply.code(409).send({ error: "no_base_version" });
     const req_ = parseBody(SaveVersionRequest, req.body, reply);
     if (!req_) return reply;
+    if (req_.authorRole === "program_officer") return reply.code(403).send({ error: "agent_only" });
     if (req_.parentVersion !== latest.n) {
       req.log.debug({ parentVersion: req_.parentVersion, latest: latest.n }, "stale parentVersion");
       return reply.code(409).send({ error: "conflict" });
@@ -328,6 +334,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const body = parseBody(RejectRequest, req.body, reply);
     if (!body) return reply;
     const res = await signoff.reject(req.params.id, n, body);
+    if (deps.onRejected) {
+      const runId = req.params.id;
+      await background(deps.onRejected(runId), (err) => app.log.error({ runId, errName: errName(err) }, "onRejected failed"));
+    }
     return reply.code(201).send(res);
   });
 
@@ -378,6 +388,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     );
     return reply.code(202).send({ runId });
   });
+
+  registerClinicianRoutes(app, { store, artifacts, signoff, validator, onVersionSaved, now, ...(deps.chat ? { chat: deps.chat } : {}) });
 
   // AgentCore Runtime HTTP contract. The busy flag comes from the in-process active set.
   app.get(routes.pattern.ping, async () => {
