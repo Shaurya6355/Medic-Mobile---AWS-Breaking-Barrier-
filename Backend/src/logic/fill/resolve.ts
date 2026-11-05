@@ -702,7 +702,8 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
     oqs.push({
       question: clipText(`The guideline reader could not settle this (${u.id}): ${u.what_is_unclear}`),
       affects: affectsOf([u.id], `Unclear item ${u.id}`),
-      route_to: "program_officer",
+      // A passage the reader could not settle can carry clinical meaning, so a clinician decides it.
+      route_to: "clinician",
       ...(src.length > 0 ? { source: src } : {}),
     });
   }
@@ -756,7 +757,9 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
     oqs.push({
       question: "How many days should the follow-up task stay open after it is due? The guideline gives the due day only.",
       affects: scheduledFollowups,
-      route_to: "program_officer",
+      // Task schedules go to a clinician (Medic's risk routing: relevance, calculations, constraints, task
+      // conditions and schedules always go to a clinician).
+      route_to: "clinician",
     });
   }
   if (integerQuestions.length > 0) {
@@ -767,7 +770,8 @@ export function resolveDraft(draft: Draft, ex: Ex, opts: ResolveOptions): Resolv
     oqs.push({
       question: clipText(`The entry limits (${limits}) and their messages are the team's choice, not the guideline's. Are they sensible?`),
       affects: integerQuestions,
-      route_to: "program_officer",
+      // Entry limits are constraints: a clinician decides them (same routing rule as above).
+      route_to: "clinician",
     });
   }
   if (ageRuleId !== undefined && scope !== undefined) {
