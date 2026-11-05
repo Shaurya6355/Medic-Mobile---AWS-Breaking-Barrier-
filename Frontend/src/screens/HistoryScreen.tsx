@@ -3,6 +3,7 @@ import * as api from "../api";
 import type { AuditRow, Workflow } from "../domain/types";
 import type { Actions } from "../actions";
 import { VersionsPanel } from "../components/panels";
+import { PageHead, SectionHead } from "../components/Page";
 
 /** History = audit log + version history. */
 export function HistoryScreen({ w, act }: { w: Workflow | null; act: Actions }) {
@@ -13,9 +14,10 @@ export function HistoryScreen({ w, act }: { w: Workflow | null; act: Actions }) 
   }, [w]);
 
   return (
-    <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
+    <div style={{ display: "grid", gap: 32, minWidth: 0 }}>
+      <PageHead eyebrow={["Step 05", "Every step, with its version and hash"]} title="History" />
       <section className="panel">
-        <div className="ph"><h2>Audit log</h2><span className="ver">Append-only · {audit.length} events</span></div>
+        <SectionHead icon="history" tone="blue" title="Audit log" sub={"Append-only · " + audit.length + " events"} />
         {audit.length ? (
           <div className="tw">
             <table>
