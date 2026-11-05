@@ -93,35 +93,34 @@ describe("whole chain with fakes (DEC-019)", () => {
       ["checks", "succeeded"],
     ]);
     const s1 = await status(1);
-    expect(s1.gates.canOfficerSign).toBe(false);
+    // Every question a person must answer is the clinician's, so nothing holds the officer agent back here.
+    expect(s1.gates.canOfficerSign).toBe(true);
+    expect((await body(1)).open_questions.filter((q) => q.route_to === "program_officer")).toEqual([]);
 
-    // 2. blocked and refused
+    // 2. the clinician cannot sign before the officer agent; nobody but the agent signs as officer
     expect((await sign(1, "program_officer", "o1", s1.modelSha)).json().error).toBe("agent_only");
-    await expect(signoff.signAsAgent("it", 1, s1.modelSha)).rejects.toMatchObject({ status: 422, code: "blocked" });
     expect((await sign(1, "clinician", "c1", s1.modelSha)).statusCode).toBe(409);
     await expect(compile(1)).rejects.toBeInstanceOf(ApprovalError);
 
-    // 3. officer fixes -> v2, signs; clinician blocked
-    const n2 = await saveAsAgent(resolveForDemo(await body(1), "program_officer"));
-    const s2 = await status(n2);
-    await signoff.signAsAgent("it", n2, s2.modelSha);
-    expect((await sign(n2, "clinician", "c1", s2.modelSha)).statusCode).toBe(422);
+    // 3. the agent signs v1; the clinician is blocked by the open questions
+    await signoff.signAsAgent("it", 1, s1.modelSha);
+    expect((await sign(1, "clinician", "c1", s1.modelSha)).statusCode).toBe(422);
 
-    // 4. clinician answers -> v3: zero signatures, officer again, then clinician; same person refused
-    const n3 = await save(n2, "c1", resolveForDemo(await body(n2), "clinician"));
+    // 4. clinician answers -> v2: zero signatures, officer agent again, then clinician; same person refused
+    const n3 = await save(1, "c1", resolveForDemo(await body(1), "clinician"));
     const s3 = await status(n3);
     expect(s3.signatures).toEqual([]);
-    expect((await status(n2)).status).toBe("superseded");
+    expect((await status(1)).status).toBe("superseded");
     await signoff.signAsAgent("it", n3, s3.modelSha);
     expect((await sign(n3, "clinician", OFFICER_AGENT_ID, s3.modelSha)).statusCode).toBe(400);
-    expect((await sign(n3, "clinician", "c1", s2.modelSha)).statusCode).toBe(409);
+    expect((await sign(n3, "clinician", "c1", s1.modelSha)).statusCode).toBe(409);
     const locked = await sign(n3, "clinician", "c1", s3.modelSha);
     expect(locked.statusCode).toBe(201);
     expect(locked.json().status).toBe("locked");
     expect((await store.getRun("it"))!.state).toBe("locked");
 
     // 5. compile: unlocked refused, locked built from exactly the signed sha
-    await expect(compile(n2)).rejects.toBeInstanceOf(ApprovalError);
+    await expect(compile(1)).rejects.toBeInstanceOf(ApprovalError);
     const built = await compile(n3);
     expect(built.manifest.buildKind).toBe("release");
     expect(built.manifest.modelSha).toBe(s3.modelSha);

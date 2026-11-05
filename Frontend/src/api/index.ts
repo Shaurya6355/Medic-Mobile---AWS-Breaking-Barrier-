@@ -344,6 +344,11 @@ export async function approve(id: string): Promise<Workflow> {
   if (!LIVE || !w.remote) return mutate(id, x => wf.approveAll(x));
   wf.approveAll(w); // the same local gate first: no blocking checks, every question answered
   const locked = await signOnBackend(w);
+  if (locked.n > w.remote.n + 1) {
+    // The officer agent saved a fix of its own on top of the clinician's version; that is the version that was signed.
+    const latest = await fetchLatest(w.remote.runId);
+    await mutate(id, x => wf.replaceFromBackend(x, latest.model, latest.remote, "Officer agent saved version " + latest.remote.n + " after your review"));
+  }
   return mutate(id, x => wf.approveAll(x, locked));
 }
 
@@ -360,6 +365,16 @@ async function signOnBackend(w: Workflow): Promise<{ n: number; modelSha: string
   for (let i = 0; i < 60 && st.status === "awaiting_officer"; i++) {
     await wait(1000);
     st = await call<StatusView>(base + "/versions/" + n + "/status");
+  }
+  // The officer agent may save a newer version of its own (a fix) and sign that one: follow the chain to the newest version.
+  for (let hop = 0; hop < 5 && st.status === "superseded"; hop++) {
+    const all = await call<VersionRec[]>(base + "/versions");
+    n = all[all.length - 1].n;
+    st = await call<StatusView>(base + "/versions/" + n + "/status");
+    for (let i = 0; i < 60 && st.status === "awaiting_officer"; i++) {
+      await wait(1000);
+      st = await call<StatusView>(base + "/versions/" + n + "/status");
+    }
   }
   if (st.status !== "awaiting_clinician") {
     throw new Error("Version " + n + " was saved, but the officer agent has not signed it (status: " + st.status.replace(/_/g, " ") + "). It may have left a comment on the version; check its findings.");
