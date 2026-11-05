@@ -18,6 +18,8 @@ Docs/superpowers
 **/.env
 **/.env.*
 !**/.env.example
+# Frontend/.env holds only the public API URL (no secrets), so it is committed.
+!Frontend/.env
 /v1.json
 /cough-pathway-logic-tree-v0.9.json
 /logic-model

@@ -6,8 +6,9 @@ React 19 + Vite. The clinician reviews the logic model (View tab: flowchart, tes
 
 ```
 npm ci
-npm run dev                                   # sample data, no backend
-VITE_API_URL=<APIURL> npm run dev             # against the orchestrator API (Backend/src)
+npm run dev                                   # against the deployed API (VITE_API_URL in Frontend/.env)
+VITE_API_URL= npm run dev                     # sample data, no backend
+VITE_API_URL=<APIURL> npm run dev             # against another orchestrator API (Backend/src)
 npm run build && npm run lint
 ```
 
