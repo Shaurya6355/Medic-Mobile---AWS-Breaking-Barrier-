@@ -237,7 +237,7 @@ export async function openForRelease(args: { guidelineId: string; pathway: strin
 export const saveEdit = (id: string, patch: { item: ItemId; field: string; patch: Patch }) => mutate(id, w => wf.applyEdit(w, patch.item, patch.field, patch.patch));
 export const undo = (id: string) => mutate(id, wf.undoEdit);
 /* ---------- Live mode: the backend assistant and the feedback loop (Backend/src/chat, Backend/src/revision) ---------- */
-interface ChatReply { reply: string; citations: { kind: string; ref: string; quote?: string }[] }
+interface ChatReply { reply: string; citations: { kind: string; ref: string; quote?: string }[]; action?: { type: "keep"; ids: string[] } | { type: "keep_all" } }
 interface RevisionRec { id: string; status: "instruction_ready" | "applying" | "applied" | "no_change" | "failed" | string; instruction: string; error?: string; toVersion?: number; applied?: unknown[]; refused?: { reason?: string; detail?: string }[]; questionsAdded?: string[] }
 
 /** The newest logic model version of a run, as the review screen needs it. */
@@ -252,21 +252,60 @@ async function fetchLatest(runId: string): Promise<{ model: Spec; remote: NonNul
   return { model, remote: { runId, n: last.n, modelSha: fc.modelSha, base: clone(model), claimText: fc.claimText, findings: [...flat(fc, "clinician"), ...flat(fo, "program_officer")] } };
 }
 
+/** The selected rule, question, result or value as loaded on the page (unsaved edits included), for the assistant. */
+function selectedItemJson(m: Spec, sel?: string): string | undefined {
+  const i = sel?.indexOf(":") ?? -1;
+  if (!sel || i < 1) return undefined;
+  const id = sel.slice(i + 1), rec = m as unknown as Record<string, unknown>;
+  for (const k of ["rules", "questions", "outcomes", "derived"]) {
+    const list = rec[k];
+    const hit = Array.isArray(list) ? (list as { id?: unknown }[]).find(x => x?.id === id) : undefined;
+    if (hit) return JSON.stringify(hit).slice(0, 8000);
+  }
+  return undefined;
+}
+/** Everything on the review page the assistant answers from: the version, the selected item, the open questions and the checks. */
+function pageContext(w: Workflow, sel?: string) {
+  const r = w.remote!, item = selectedItemJson(w.model, sel);
+  return {
+    version: r.n,
+    ...(sel ? { selected: sel } : {}),
+    ...(item ? { selectedItem: item } : {}),
+    openQuestions: w.flags.slice(0, 60).map(f => ({ id: f.id, title: f.title.slice(0, 500), answered: !!f.res })),
+    findings: r.findings.slice(0, 80).map(f => ({ severity: f.severity, message: f.message.slice(0, 600) })),
+  };
+}
+/** A chat line that tells the assistant to keep or accept something; the backend assistant decides which questions, so the local rules must not swallow it. */
+const KEEP_INTENT = /\b(keep|accept|agree)\b/i;
+
 /** A message to the assistant. Live: what the local rules understand stays local (what-if patients, explain a rule,
-    propose a change, undo); everything else is answered by the backend assistant (Claude on Bedrock, grounded in
+    propose a change, undo); everything else (and any keep or accept instruction) is answered by the backend assistant (Claude on Bedrock, grounded in
     the guideline pages, with citations). */
-export async function chat(id: string, text: string): Promise<Workflow> {
+export async function chat(id: string, text: string, sel?: string): Promise<Workflow> {
   const w = load(id);
   if (!LIVE || !w.remote) return mutate(id, x => wf.chat(x, text));
-  const local = wf.chat(w, text);
+  const t = text.trim();
+  // A keep/accept instruction goes straight to the assistant; the rest tries the local rules first.
+  const local = KEEP_INTENT.test(t) && t ? wf.addMsgs(w, { from: "clinician", text: t }, { from: "agent", text: FALLBACK_TEXT }) : wf.chat(w, text);
   const last = local.chat[local.chat.length - 1];
   if (!last || last.from !== "agent" || last.text !== FALLBACK_TEXT) { workflows[id] = local; return respond(local); }
-  // Not understood locally: ask the backend. History = the conversation so far, without the local fallback reply.
-  const history = local.chat.slice(0, -1).slice(-12).map(m => ({ from: m.from === "clinician" ? "user" : "assistant", text: m.text.slice(0, 1500) }));
+  // The page is the context (below); the history is only the last few turns, for follow-ups.
+  const history = local.chat.slice(0, -1).slice(-3).map(m => ({ from: m.from === "clinician" ? "user" : "assistant", text: m.text.slice(0, 1500) }));
   try {
-    const r = await call<ChatReply>("/runs/" + w.remote.runId + "/chat", { method: "POST", body: JSON.stringify({ userId: me(), role: "clinician", messages: history }) });
+    const r = await call<ChatReply>("/runs/" + w.remote.runId + "/chat", { method: "POST", body: JSON.stringify({ userId: me(), role: "clinician", messages: history, context: pageContext(local, sel) }) });
     const src = [...new Set(r.citations.map(c => (c.kind === "page" ? "page " : c.kind + " ") + c.ref))];
-    const next = wf.replaceLastMsg(local, { from: "agent", text: r.reply + (src.length ? "\n\nSources: " + src.join(", ") : "") });
+    let next = wf.replaceLastMsg(local, { from: "agent", text: r.reply + (src.length ? "\n\nSources: " + src.join(", ") : "") });
+    if (r.action) {
+      // The backend checked the ids against the page; the app keeps only questions that are still open, exactly as the Keep button does.
+      const open = next.flags.filter(f => !f.res).map(f => f.id);
+      const ids = r.action.type === "keep_all" ? open : r.action.ids.filter(x => open.includes(x));
+      try {
+        for (const q of ids) next = wf.answerFlag(next, q, "keep");
+        next = wf.addMsgs(next, { from: "agent", text: ids.length ? "Kept as drafted: " + ids.map(q => q.slice(2)).join(", ") + "." : "Nothing was left open to keep." });
+      } catch (e) {
+        next = wf.addMsgs(next, { from: "agent", text: "I could not keep those: " + (e instanceof Error ? e.message : String(e)) });
+      }
+    }
     workflows[id] = next;
     return respond(next);
   } catch (e) {

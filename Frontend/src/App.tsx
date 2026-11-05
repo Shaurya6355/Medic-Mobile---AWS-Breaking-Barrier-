@@ -62,7 +62,7 @@ export default function App() {
     openForRelease: args => run(api.openForRelease(args), () => nav("/release")),
     edit: (item, field, patch) => { if (w) run(api.saveEdit(w.id, { item, field, patch })); },
     undo: () => { if (w) run(api.undo(w.id)); },
-    chat: text => { if (w) run(api.chat(w.id, text), x => { const s = x.chat[x.chat.length - 1]?.select; if (s) setSel(s); }); },
+    chat: text => { if (w) run(api.chat(w.id, text, sel), x => { const s = x.chat[x.chat.length - 1]?.select; if (s) setSel(s); }); },
     feedback: text => { if (w) run(api.feedback(w.id, text, sel)); },
     confirmRevision: msgId => { if (w) run(api.confirmRevision(w.id, msgId, setW)); },
     cancelRevision: msgId => { if (w) run(api.cancelRevision(w.id, msgId)); },

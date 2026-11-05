@@ -178,14 +178,14 @@ export function registerClinicianRoutes(app: FastifyInstance, deps: ClinicianDep
     };
     const result = await answerChat(
       { store, artifacts, signoff, model: metered, modelId: chat.modelId, now: deps.now },
-      { runId, userId: body.userId, messages: body.messages },
+      { runId, userId: body.userId, messages: body.messages, context: body.context },
     );
 
     // Trace, never model memory: one jsonl line per turn plus an audit pointer (no text in the audit).
     const at = deps.now();
     const key = artifactKey(runId, "chat", `${new Date(at).toISOString().slice(0, 10)}.jsonl`);
     const question = [...body.messages].reverse().find((m) => m.from === "user")?.text ?? "";
-    const line = JSON.stringify({ at, userId: body.userId, question, reply: result.reply, citations: result.citations, ...used, modelId: chat.modelId }) + "\n";
+    const line = JSON.stringify({ at, userId: body.userId, question, reply: result.reply, citations: result.citations, action: result.action ?? null, ...used, modelId: chat.modelId }) + "\n";
     try {
       let prev = "";
       try {
