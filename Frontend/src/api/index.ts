@@ -272,7 +272,7 @@ function pageContext(w: Workflow, sel?: string) {
     ...(w.undo.length ? { unsavedEdits: true } : {}),
     ...(sel ? { selected: sel } : {}),
     ...(item ? { selectedItem: item } : {}),
-    openQuestions: w.flags.slice(0, 60).map(f => ({ id: f.id, title: f.title.slice(0, 500), answered: !!f.res })),
+    openQuestions: w.flags.slice(0, 60).map((f, i) => ({ n: i + 1, id: f.id, title: f.title.slice(0, 500), answered: !!f.res })),
     findings: r.findings.slice(0, 80).map(f => ({ severity: f.severity, message: f.message.slice(0, 600) })),
   };
 }
