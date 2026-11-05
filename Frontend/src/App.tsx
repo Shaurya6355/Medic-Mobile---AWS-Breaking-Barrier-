@@ -59,6 +59,7 @@ export default function App() {
 
   const act: Actions = {
     createDraft: args => run(api.createDraft(args), () => nav("/review")),
+    openWorkflow: id => run(api.openWorkflow(id), x => { setSel("scope"); nav(["verify", "deploy", "done"].includes(x.state) ? "/release" : "/review"); }),
     openForRelease: args => run(api.openForRelease(args), () => nav("/release")),
     edit: (item, field, patch) => { if (w) run(api.saveEdit(w.id, { item, field, patch })); },
     undo: () => { if (w) run(api.undo(w.id)); },
