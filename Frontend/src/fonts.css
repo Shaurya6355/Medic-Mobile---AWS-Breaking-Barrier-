@@ -1,0 +1,4 @@
+/* Clarika Geometric: licensed files go in public/fonts (see public/fonts/README.md). An installed copy wins. */
+@font-face{font-family:"Clarika Geometric";font-weight:400;font-style:normal;font-display:swap;src:local("Clarika Geometric"),local("ClarikaGeometric-Regular"),url("/fonts/ClarikaGeometric-Regular.woff2") format("woff2")}
+@font-face{font-family:"Clarika Geometric";font-weight:500;font-style:normal;font-display:swap;src:local("Clarika Geometric Medium"),local("ClarikaGeometric-Medium"),url("/fonts/ClarikaGeometric-Medium.woff2") format("woff2")}
+@font-face{font-family:"Clarika Geometric";font-weight:600 700;font-style:normal;font-display:swap;src:local("Clarika Geometric Bold"),local("ClarikaGeometric-Bold"),url("/fonts/ClarikaGeometric-Bold.woff2") format("woff2")}

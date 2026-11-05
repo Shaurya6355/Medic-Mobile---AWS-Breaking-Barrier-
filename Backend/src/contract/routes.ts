@@ -18,6 +18,8 @@ const pattern = {
   revision: "/runs/:id/revisions/:rid",
   revisionConfirm: "/runs/:id/revisions/:rid/confirm",
   resume: "/runs/:id/resume",
+  // Advisory quote-support scores of a version (src/scoring): an AI opinion, never a gate.
+  scores: "/runs/:id/versions/:n/scores",
   // Clinician features: activity feed, chat, tree (flow + edits), history (diff, change record, restore).
   activity: "/runs/:id/activity",
   chat: "/runs/:id/chat",
@@ -58,6 +60,7 @@ const proxiable = [
   pattern.diff,
   pattern.change,
   pattern.restore,
+  pattern.scores,
   pattern.metrics,
 ] as const;
 
@@ -84,6 +87,7 @@ export const routes = {
   diff: (id: string, a: number, b: number) => `/runs/${id}/versions/${a}/diff/${b}`,
   change: (id: string, n: number) => `/runs/${id}/versions/${n}/change`,
   restore: (id: string, n: number) => `/runs/${id}/versions/${n}/restore`,
+  scores: (id: string, n: number) => `/runs/${id}/versions/${n}/scores`,
   metrics: (id: string) => `/runs/${id}/metrics`,
   ping: () => "/ping",
   invocations: () => "/invocations",

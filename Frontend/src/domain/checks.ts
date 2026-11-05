@@ -10,19 +10,20 @@ import type { Check, CheckKey, Evidence } from "./types";
 export type StageStatus = "pass" | "warn" | "fail" | "skipped" | "missing";
 export interface Part { name: string; ok: boolean; text: string }
 export interface Stage {
-  key: CheckKey; n: string; name: string; asks: string; owner: "agent" | "clinician";
+  key: CheckKey; n: string; name: string; desc: string; asks: string; owner: "agent" | "clinician";
   status: StageStatus; summary: string; issues: Check[]; parts?: Part[]; uses?: string;
 }
 
-export const STAGES: { key: CheckKey; n: string; name: string; asks: string; owner: "agent" | "clinician" }[] = [
-  { key: "schema", n: "1", name: "Schema check", asks: "Gate: does the draft have every box, with valid values?", owner: "agent" },
-  { key: "quote", n: "2a", name: "Quote check", asks: "Does each quoted passage exist in the guideline, on the page it cites?", owner: "agent" },
-  { key: "number", n: "2b", name: "Number check", asks: "Does each number in a rule match the quote it cites?", owner: "agent" },
-  { key: "logic", n: "3", name: "Logic checks", asks: "Run generated sample patients through the rules: four checks.", owner: "agent" },
-  { key: "golden", n: "4", name: "Golden cases", asks: "Do the hand-made test cases get the expected classification?", owner: "clinician" },
-  { key: "cross", n: "5", name: "Cross check", asks: "Do two independent drafts (A and B) agree?", owner: "clinician" },
+/* name and desc are the plain-language labels the clinician sees; asks is the technical question behind each. */
+export const STAGES: { key: CheckKey; n: string; name: string; desc: string; asks: string; owner: "agent" | "clinician" }[] = [
+  { key: "schema", n: "1", name: "Nothing is missing", desc: "Every question, rule and result is filled in, with allowed values.", asks: "Gate: does the draft have every box, with valid values?", owner: "agent" },
+  { key: "quote", n: "2", name: "Quotes match the guideline", desc: "Each quoted sentence is really in the guideline, on the page it names.", asks: "Does each quoted passage exist in the guideline, on the page it cites?", owner: "agent" },
+  { key: "number", n: "3", name: "Numbers match the guideline", desc: "Each number in a rule, like 40 breaths a minute, matches its quote.", asks: "Does each number in a rule match the quote it cites?", owner: "agent" },
+  { key: "logic", n: "4", name: "Every child gets one answer", desc: "Thousands of pretend patients run through the rules; none fall through a gap.", asks: "Run generated sample patients through the rules: four checks.", owner: "agent" },
+  { key: "golden", n: "5", name: "Known cases come out right", desc: "Hand-picked test patients get the result a clinician expects.", asks: "Do the hand-made test cases get the expected classification?", owner: "clinician" },
+  { key: "cross", n: "6", name: "Two drafts agree", desc: "A second, independent AI draft gives the same result for the same child.", asks: "Do two independent drafts (A and B) agree?", owner: "clinician" },
 ];
-export const stageName = (k: CheckKey) => { const s = STAGES.find(x => x.key === k)!; return s.n + " " + s.name; };
+export const stageName = (k: CheckKey) => STAGES.find(x => x.key === k)!.name;
 
 const statusOf = (issues: Check[]): StageStatus => (issues.some(c => c.sev === "blocking") ? "fail" : issues.length ? "warn" : "pass");
 const short = (q: string) => (q.length > 90 ? q.slice(0, 87) + "…" : q);
@@ -78,7 +79,7 @@ export function checkStages(m: Spec, ev: Evidence): Stage[] {
   const hit = cache.get(m);
   if (hit && hit.ev === ev) return hit.stages;
   const out: Stage[] = [];
-  const add = (key: CheckKey, s: Omit<Stage, "key" | "n" | "name" | "asks" | "owner" | "status"> & { status?: StageStatus }) => {
+  const add = (key: CheckKey, s: Omit<Stage, "key" | "n" | "name" | "desc" | "asks" | "owner" | "status"> & { status?: StageStatus }) => {
     const info = STAGES.find(x => x.key === key)!;
     out.push({ ...info, ...s, status: s.status ?? statusOf(s.issues) });
   };

@@ -1,6 +1,7 @@
 import { instrumentModel } from "../metrics/calls.js";
 import { cost, type PriceTable } from "../metrics/cost.js";
 import type { CallRecord, StepRecord } from "../domain/types.js";
+import { safeLog, type Log } from "../log.js";
 import { TransientError, usageOf, type Step, type StepContext, type StepUsage } from "./step.js";
 
 export interface RunStepOptions {
@@ -18,6 +19,8 @@ export interface RunStepOptions {
   firstAttempt?: number;
   // Labels the recorded model calls (which path reached the model). Default "unknown".
   modelBackend?: CallRecord["backend"];
+  // One line per attempt start and end (ids, timings, tokens, short error). Default: no logging.
+  log?: Log;
 }
 
 // Longest error text stored on a StepRecord; the audit copy is shorter.
@@ -42,6 +45,7 @@ export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions
   let last: StepRecord | undefined;
   const first = opts.firstAttempt ?? 1;
   const lastAttempt = first + opts.maxAttempts - 1;
+  const log = safeLog(opts.log);
 
   for (let attempt = first; attempt <= lastAttempt; attempt++) {
     const startedAt = ctx.now();
@@ -84,6 +88,7 @@ export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions
       artifactRefs: {},
     };
     await store.appendStep(base);
+    log("step started", { runId: run.runId, step: step.name, attempt });
     await store.appendAudit(run.runId, {
       at: startedAt,
       type: "step_started",
@@ -121,6 +126,18 @@ export async function runStep(step: Step, ctx: StepContext, opts: RunStepOptions
 
     await store.updateStep(run.runId, step.name, attempt, patch);
     last = { ...base, ...patch };
+    log(last.status === "succeeded" ? "step succeeded" : "step failed", {
+      runId: run.runId,
+      step: step.name,
+      attempt,
+      ms: last.latencyMs,
+      modelCalls: calls.length,
+      inputTokens: last.inputTokens,
+      outputTokens: last.outputTokens,
+      ...(last.modelId !== undefined ? { modelId: last.modelId } : {}),
+      ...(last.costUsd !== undefined ? { costUsd: last.costUsd } : {}),
+      ...(last.status === "succeeded" ? { refs: last.artifactRefs } : { transient, willRetry: transient && attempt < lastAttempt, error: (last.error ?? "").slice(0, 500) }),
+    });
 
     if (last.status === "succeeded") {
       await store.appendAudit(run.runId, {

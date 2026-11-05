@@ -9,8 +9,16 @@ describe("parseModelJson", () => {
   it("returns value for valid JSON", () => {
     expect(parseModelJson('{"a":1,"b":"x"}', schema)).toEqual({ a: 1, b: "x" });
   });
-  it("throws ModelOutputError with raw for fenced JSON", () => {
-    const raw = '```json\n{"a":1,"b":"x"}\n```';
+  it("accepts one code fence around the whole reply, with or without a json tag", () => {
+    expect(parseModelJson('```json\n{"a":1,"b":"x"}\n```', schema)).toEqual({ a: 1, b: "x" });
+    expect(parseModelJson('  ```JSON\r\n{\n  "a": 1,\n  "b": "x"\n}\r\n```\n', schema)).toEqual({ a: 1, b: "x" });
+    expect(parseModelJson('```\n{"a":1,"b":"x"}\n```', schema)).toEqual({ a: 1, b: "x" });
+  });
+  it("a fenced reply still has to match the schema", () => {
+    expect(() => parseModelJson('```json\n{"a":"no"}\n```', schema)).toThrow(/schema validation/);
+  });
+  it("throws ModelOutputError with raw for text around fenced JSON", () => {
+    const raw = 'Here is the JSON:\n```json\n{"a":1,"b":"x"}\n```';
     try {
       parseModelJson(raw, schema);
       expect.unreachable();
@@ -18,6 +26,11 @@ describe("parseModelJson", () => {
       expect(e).toBeInstanceOf(ModelOutputError);
       expect((e as ModelOutputError).raw).toBe(raw);
       expect((e as Error).message).toContain(raw);
+    }
+  });
+  it("refuses two fenced blocks, an unclosed fence and a fence with text after it", () => {
+    for (const raw of ['```json\n{"a":1,"b":"x"}\n```\n```json\n{"a":2,"b":"y"}\n```', '```json\n{"a":1,"b":"x"}', '```json\n{"a":1,"b":"x"}\n```\nDone.']) {
+      expect(() => parseModelJson(raw, schema), raw).toThrow(ModelOutputError);
     }
   });
   it("throws ModelOutputError with raw for invalid JSON", () => {

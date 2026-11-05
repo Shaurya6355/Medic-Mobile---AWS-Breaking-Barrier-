@@ -18,7 +18,7 @@ const data = new OrchestratorDataStack(app, "OrchestratorDataStack", { env });
 const modelBackend = (app.node.tryGetContext("modelBackend") as string | undefined) ?? "bedrock";
 // AgentCore is opt-in (not organiser-approved yet, DEC-008): the default deploy never creates it.
 const agentCore = modelBackend === "agentcore" ? new OrchestratorAgentCoreStack(app, "OrchestratorAgentCoreStack", { env }) : undefined;
-const lambda = new OrchestratorLambdaStack(app, "OrchestratorLambdaStack", {
+new OrchestratorLambdaStack(app, "OrchestratorLambdaStack", {
   env,
   runsTable: data.runsTable,
   stepsTable: data.stepsTable,
@@ -34,6 +34,8 @@ const lambda = new OrchestratorLambdaStack(app, "OrchestratorLambdaStack", {
 });
 new OrchestratorWebStack(app, "OrchestratorWebStack", {
   env,
-  apiUrl: lambda.httpApi.attrApiEndpoint,
+  // A plain string, not lambda.httpApi.attrApiEndpoint: a cross-stack reference locks the API (it cannot be
+  // replaced while the web stack imports its URL). The frontend gets the URL from VITE_API_URL at build time.
+  apiUrl: (app.node.tryGetContext("apiUrl") as string | undefined) ?? "See the APIURL output of OrchestratorLambdaStack",
 });
 Tags.of(app).add(PROJECT_TAG_KEY, PROJECT_TAG_VALUE);

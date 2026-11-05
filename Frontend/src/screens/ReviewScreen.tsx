@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { allItems, nodeSig } from "../domain/logic";
 import { gate, verLabel } from "../domain/workflow";
+import { hashOf } from "../domain/data";
 import { checkStages } from "../domain/checks";
 import type { Check, CheckKey, Role, Workflow } from "../domain/types";
 import type { Actions } from "../actions";
@@ -10,6 +11,8 @@ import { CheckBar } from "../components/Checks";
 import { GoldenCases } from "../components/Golden";
 import { Chat } from "../components/Chat";
 import { RuleTable } from "../components/RuleTable";
+import { Icon } from "../components/Icon";
+import { SectionHead } from "../components/Page";
 
 type Tab = "view" | "edit";
 const readTab = (): Tab => { try { return localStorage.getItem("reviewTab") === "edit" ? "edit" : "view"; } catch { return "view"; } };
@@ -25,6 +28,26 @@ function markersFor(w: Workflow, checks: Check[]) {
   w.flags.filter(f => !f.res).forEach(f => { tone[f.about] = "open"; add(f.about, "fl", "Question"); });
   checks.filter(c => c.sev === "blocking").forEach(c => { tone[c.id] = "bad"; });
   return { mk, tone };
+}
+
+/** The high-emphasis card: what the AI agent handed over and what still stops approval. */
+function HandOver({ ready, blocking, asks, ver, state, onAnswer }: { ready: boolean; blocking: number; asks: number; ver: string; state: Workflow["state"]; onAnswer: () => void }) {
+  const title = state !== "clinician" ? "Approved" : ready ? "Ready to approve" : asks ? asks + " question" + (asks > 1 ? "s" : "") + " for you" : blocking + " problem" + (blocking > 1 ? "s" : "") + " to fix";
+  const desc = state !== "clinician" ? "This version is signed and read-only." : ready ? "Checks pass and every question is answered. Approve when the flow looks right." : asks ? "The AI agent needs your answer before this version can be approved. One at a time." : "Fix the blocking checks before approving this version.";
+  return (
+    <section className="score" aria-label="AI agent hand-over">
+      <span className="score-k">AI agent hand-over</span>
+      <h2 className="score-t">{title}</h2>
+      <p className="score-d">{desc}</p>
+      {state === "clinician" && asks ? <button type="button" className="score-btn" onClick={onAnswer}>{"Answer " + (asks > 1 ? "the questions" : "the question")}<Icon name="arrow_forward" size={18} /></button> : null}
+      <dl className="score-rows">
+        <div><dt>Blocking checks</dt><dd>{blocking}</dd></div>
+        <div className={asks ? "accent" : ""}><dt>Open questions</dt><dd>{asks}</dd></div>
+        <div><dt>Version</dt><dd className="mono">{ver}</dd></div>
+      </dl>
+      <Icon name="fact_check" size={120} className="score-wm" />
+    </section>
+  );
 }
 
 export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflow | null; role: Role; sel: string; setSel: (id: string) => void; act: Actions; checks: Check[] }) {
@@ -45,6 +68,11 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
 
   const canEdit = role === "clinician" && w.state === "clinician";
   const stages = checkStages(w.model, w.evidence);
+  const failing = stages.filter(x => x.status === "fail");
+  const notes = stages.filter(x => x.status === "warn" || x.status === "missing").length;
+  const light = failing.length ? { tone: "red", text: failing.length + " check" + (failing.length > 1 ? "s need" : " needs") + " you" }
+    : notes ? { tone: "amber", text: "Checks passed · " + notes + " with notes to look at" }
+    : { tone: "green", text: "All " + stages.length + " checks passed" };
   const g = gate(w, checks);
   const { mk, tone } = markersFor(w, checks);
   const edited = Object.values(mk).filter(l => l.some(([c]) => c === "ed")).length;
@@ -56,9 +84,9 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
   return (
     <div className="rv">
       <div className="rvhead">
-        <div>
-          <h1>{w.guideline?.pathway ?? "Pathway"}</h1>
-          <div className="ver">{(w.guideline?.name ?? "") + " · " + verLabel(w) + (w.state !== "clinician" ? " · approved, read-only" : "")}</div>
+        <div className="phead">
+          <div className="eyebrow"><span className="eb-a">{"Logic model " + verLabel(w)}</span><span className="eb-sep" aria-hidden="true">•</span><span>{(w.guideline?.name ?? "") + (w.state !== "clinician" ? " · approved, read-only" : "")}</span></div>
+          <h1 className="display">{w.guideline?.pathway ?? "Pathway"}</h1>
         </div>
         <div className="vtabs" role="tablist" aria-label="Mode">
           <button type="button" role="tab" aria-selected={tab === "view"} onClick={() => setTab("view")}>View</button>
@@ -67,23 +95,29 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
           </button>
         </div>
         <div className="rvact">
-          {!chatOn ? <button type="button" className="btn" onClick={() => setChat(true)}>Assistant{g.asks.length ? " (" + g.asks.length + ")" : ""}</button> : null}
+          {!chatOn ? <button type="button" className="btn" onClick={() => setChat(true)}><Icon name="forum" size={18} />Assistant</button> : null}
           {canEdit ? (
             <>
-              {tab === "edit" ? <button type="button" className="btn" disabled={!w.undo.length} onClick={act.undo}>Undo</button> : null}
+              {tab === "edit" ? <button type="button" className="btn" disabled={!w.undo.length} onClick={act.undo}><Icon name="undo" size={18} />Undo</button> : null}
               <button type="button" className="btn primary" disabled={!g.ready || approving} title={why || "Approve this version and send it to the IT approver"}
                 onClick={async () => { setApproving(true); try { await act.approveAll(); } finally { setApproving(false); } }}>
-                {approving ? <><span className="spin" aria-hidden="true" />Saving and signing...</> : "Approve and send to IT"}
+                {approving ? <><span className="spin" aria-hidden="true" />Saving and signing...</> : <><Icon name="send" size={18} />Approve and send to IT</>}
               </button>
             </>
           ) : null}
         </div>
       </div>
-      {canEdit && why ? <div className="note rvwhy">{why[0].toUpperCase() + why.slice(1) + "."}</div> : null}
 
-      <CheckBar stages={stages} open={openCheck} setOpen={k => { setOpenCheck(k); if (!k && location.hash) history.replaceState(null, "", location.pathname + location.search); }} onSelect={setSel} />
+      <section className="checkbox" aria-label="Safety checks">
+        <div className={"tlight " + light.tone}>
+          <span className="tl-dot" aria-hidden="true" />
+          <span className="tl-text"><b>Safety checks</b>{" · " + light.text}</span>
+          <span className="note">Click a check for details</span>
+        </div>
+        <CheckBar stages={stages} open={openCheck} setOpen={k => { setOpenCheck(k); if (!k && location.hash) history.replaceState(null, "", location.pathname + location.search); }} onSelect={setSel} />
+      </section>
 
-      <div className={"rvbody" + (chatOn ? "" : " nochat")}>
+      <div className={"rvbody" + (tab === "edit" && !chatOn ? " solo" : "")}>
         {tab === "view" ? (
           <div className="rvmain tabpane" key="view">
             {edited ? (
@@ -94,6 +128,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
               </div>
             ) : null}
             <section className="panel flowpanel">
+              <SectionHead icon="account_tree" tone="teal" title="Decision flow" sub="Rules in priority order. The first rule that matches decides the outcome." />
               <Flow m={w.model} selected={sel === "scope" ? undefined : sel} onSelect={setSel} markers={mk} tone={tone} label="Decision flow" />
             </section>
             <section className="panel"><GoldenCases m={w.model} onSelect={setSel} /></section>
@@ -105,11 +140,15 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
               <button type="button" className="linkb" onClick={() => setTab("view")}>{edited ? "See " + edited + " change" + (edited > 1 ? "s" : "") + " in the flowchart" : "Open the flowchart"}</button>
             </div>
             <section className="panel">
+              <SectionHead icon="table_view" tone="grey" title="Rule table" sub={canEdit ? "Edit any cell. Changes show in the View flowchart." : "Read-only."} />
               <RuleTable w={w} canEdit={canEdit} checks={checks} sel={sel} onSelect={setSel} edit={edit} markers={mk} />
             </section>
           </div>
         )}
-        {chatOn ? <Chat w={w} act={act} canAct={canEdit} onSelect={id => { setSel(id); }} onChange={toEdit} onClose={() => setChat(false)} /> : null}
+        {tab === "edit" && !chatOn ? null : <div className="rvside">
+          {tab === "view" ? <HandOver ready={g.ready} blocking={g.blockIds.length} asks={g.asks.length} ver={verLabel(w) + " · " + (w.approved?.hash ?? hashOf(w.model))} state={w.state} onAnswer={() => { setChat(true); setTimeout(() => document.querySelector(".qcard")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50); }} /> : null}
+          {chatOn ? <Chat w={w} act={act} canAct={canEdit} onSelect={id => { setSel(id); }} onChange={toEdit} onClose={() => setChat(false)} /> : null}
+        </div>}
       </div>
     </div>
   );
