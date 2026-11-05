@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { artifactKey } from "../../src/artifacts/artifactStore.js";
-import { answerChat, UNGROUNDED, type ChatDeps } from "../../src/chat/chat.js";
+import { answerChat, OFF_TOPIC, UNGROUNDED, type ChatDeps } from "../../src/chat/chat.js";
 import { retrieve } from "../../src/chat/retrieve.js";
 import { runTool } from "../../src/chat/tools.js";
 import { evaluate } from "../../src/logic/index.js";
@@ -22,6 +22,22 @@ async function setup(responses: ReturnType<typeof j>[], withBlocks = blocksText)
 const step = (step: string, costUsd: number | undefined, i: number): StepRecord => ({
   runId: "r1", step, attempt: i, status: "succeeded", startedAt: 1, latencyMs: 10 * i, inputTokens: 100 * i, outputTokens: 5 * i,
   ...(costUsd !== undefined ? { costUsd } : {}), artifactRefs: {},
+});
+
+describe("off-topic questions", () => {
+  it("a plain-text refusal from the model becomes the reply, with no citations", async () => {
+    const { deps } = await setup([{ raw: 'I cannot answer questions about the weather in Seattle.' }]);
+    const out = await answerChat(deps, { runId: "r1", userId: "u", messages: msgs("what is the weather in seattle") });
+    expect(out).toEqual({ reply: "I cannot answer questions about the weather in Seattle.", citations: [] });
+  });
+  it("the JSON refusal works too", async () => {
+    const { deps } = await setup([j({ reply: OFF_TOPIC, citations: [] })]);
+    expect((await answerChat(deps, { runId: "r1", userId: "u", messages: msgs("5+6") })).reply).toBe(OFF_TOPIC);
+  });
+  it("broken JSON is still a fault, not a reply", async () => {
+    const { deps } = await setup([{ raw: '{"reply": "half' }]);
+    await expect(answerChat(deps, { runId: "r1", userId: "u", messages: msgs("hi") })).rejects.toThrow();
+  });
 });
 
 describe("chat", () => {

@@ -30,6 +30,8 @@ import { unpricedModelIds } from "./metrics/cost.js";
 import { recordProcess } from "./metrics/record.js";
 import { summarize } from "./metrics/usage.js";
 import { DynamoStore } from "./store/dynamoStore.js";
+import { createLogger } from "./observability/logger.js";
+import { observeModel, observeStore } from "./observability/observe.js";
 import { startQueueConsumer } from "./trigger/queueConsumer.js";
 
 const PRESIGN_EXPIRES_SECONDS = 900;
@@ -47,9 +49,8 @@ async function readPrompt(name: string, file: string): Promise<string> {
 const resumeSweepIntervalMs = (leaseMs: number): number => Math.max(1, Math.min(60000, Math.floor(leaseMs / 2)));
 
 // Never log env values, request bodies or message bodies.
-const log = (msg: string, detail?: object): void => {
-  console.log(JSON.stringify({ at: new Date().toISOString(), msg, ...detail }));
-};
+const logger = createLogger({ base: { service: "orchestrator" } });
+const log = (msg: string, detail?: object): void => logger.info(msg, detail as Record<string, unknown>);
 
 async function main(): Promise<void> {
   const cfg = loadConfig(process.env);
@@ -57,13 +58,16 @@ async function main(): Promise<void> {
   if (unpriced.length > 0) log("warning: no price in PRICES_JSON for these models; their cost will be missing from totals", { models: unpriced });
 
   const doc = DynamoDBDocumentClient.from(new DynamoDBClient({ region: cfg.region }));
-  const store = new DynamoStore(doc, cfg.tables);
+  // Every step, audit event, version, signature and model call is logged and measured (CloudWatch).
+  const store = observeStore(new DynamoStore(doc, cfg.tables), logger);
   const s3 = new S3Client({ region: cfg.region });
   const artifacts = new S3ArtifactStore(s3, cfg.artifactBucket);
-  const model =
+  const model = observeModel(
     cfg.modelBackend === "agentcore"
       ? createAgentCoreModelClient({ region: cfg.region, runtimeArn: cfg.agentCoreRuntimeArn as string })
-      : createStrandsModelClient({ region: cfg.region });
+      : createStrandsModelClient({ region: cfg.region }),
+    logger,
+  );
 
   // The officer agent is built after the orchestrator and signoff; the hooks below reach it through this holder.
   const triggers: { agent?: OfficerAgent } = {};
@@ -198,6 +202,7 @@ async function main(): Promise<void> {
     maxPages: cfg.maxPages,
     runMode: cfg.runMode,
     logger: false,
+    observe: logger,
   });
 
   const abort = new AbortController();

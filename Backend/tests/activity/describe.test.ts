@@ -22,6 +22,15 @@ describe("describeAudit", () => {
     expect(f.items[4]!.text).toContain("unclear cut-off");
     expect(f.runState).toBe("locked");
   });
+  it("shows why the officer agent escalated (it writes `why`), and hides the refused-paths detail", () => {
+    const f = describeAudit([
+      { at: 1, type: "officer_agent_escalated", detail: { n: 1, why: "2 fix attempts used", remaining: ["OPEN_QUESTION"] } },
+      { at: 2, type: "officer_agent_refused_paths", detail: { n: 1, paths: "/rules/0/when" } },
+    ], "awaiting_officer");
+    expect(f.items[0]!.text).toContain("2 fix attempts used");
+    expect(f.items[1]!.kind).toBe("agent_note");
+    expect(f.items[1]!.text).not.toContain("/rules/0/when");
+  });
   it("cursor and after", () => {
     const first = describeAudit(ev.slice(0, 3), "ingesting");
     expect(first.cursor).toBe(3);

@@ -1,3 +1,4 @@
+import { revisionFillPrompt } from "../../src/revision/engine.js";
 import { OFFICER_AGENT_ID } from "../../src/signoff/identity.js";
 import { SignoffError } from "../../src/signoff/signoff.js";
 import { saveVersion } from "../../src/versions/saveVersion.js";
@@ -199,8 +200,8 @@ describe("revision loop, whole chain with fakes", () => {
     const done = (await t.getRevision(rev.id)).json();
     expect(t.calls).toHaveLength(2);
     const call2 = t.calls[1]!;
-    expect(call2.system.startsWith(fillPromptText)).toBe(true);
-    expect(call2.system).toBe(`${fillPromptText}\n\n${reviseText}`);
+    expect(call2.system.startsWith(revisionFillPrompt(fillPromptText))).toBe(true);
+    expect(call2.system).toBe(`${revisionFillPrompt(fillPromptText)}\n\n${reviseText}`);
     expect(call2.system).not.toContain("EDITED-BY-PERSON");
     expect(call2.system).not.toContain("looks wrong");
     const texts = call2.content.map((c) => (c.type === "text" ? c.text : ""));
@@ -393,7 +394,7 @@ describe("revision loop, whole chain with fakes", () => {
     const done = (await t.confirm(rev.id)).json();
 
     const call = t.calls[1]!;
-    expect(call.system).toBe(`${fillPromptText}\n\n${reviseText}`);
+    expect(call.system).toBe(`${revisionFillPrompt(fillPromptText)}\n\n${reviseText}`);
     expect(call.system).not.toContain("INJECTED-MARKER-7731");
     const commentBlock = call.content.map((c) => (c.type === "text" ? c.text : "")).find((x) => x.startsWith("<<<REVIEWER_COMMENT"))!;
     expect(commentBlock.match(/<<<END_REVIEWER_COMMENT>>>/g)).toHaveLength(1);

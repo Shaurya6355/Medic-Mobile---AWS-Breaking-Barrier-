@@ -10,6 +10,7 @@ import { withDeadline } from "../shutdown.js";
 import { parseS3Event } from "../trigger/s3Event.js";
 import { registerClinicianRoutes, type ClinicianDeps } from "./clinicianRoutes.js";
 import { LAMBDA_BACKGROUND_DEADLINE_MS, runBackground } from "./background.js";
+import type { Logger } from "../observability/logger.js";
 import type { RunMode } from "./background.js";
 import {
   ConfirmRevisionRequest,
@@ -64,6 +65,8 @@ export interface ServerDeps {
   now?: () => number;
   maxInvocationResponseBytes?: number;
   logger?: boolean;
+  // Structured request logs and latency/error metrics (CloudWatch). /ping is not logged.
+  observe?: Logger;
   // Default "container". In "lambda" mode background work is awaited before responding
   // and POST /events (Lambda Web Adapter pass-through) is registered.
   runMode?: RunMode;
@@ -125,6 +128,21 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const background = (work: Promise<unknown>, onError: (e: unknown) => void, onDeadline?: () => void): Promise<void> =>
     runBackground(runMode, work, onError, bgDeadline, onDeadline);
   const app = Fastify({ logger: deps.logger ?? false, bodyLimit: BODY_LIMIT });
+  const obs = deps.observe;
+  if (obs) {
+    app.addHook("onResponse", async (req, reply) => {
+      const route = req.routeOptions.url ?? "unmatched";
+      if (route === routes.pattern.ping) return;
+      const ms = Math.round(reply.elapsedTime);
+      const fields = { method: req.method, route, status: reply.statusCode, durationMs: ms, runId: (req.params as { id?: string } | undefined)?.id };
+      if (reply.statusCode >= 500) obs.error("http.request", fields);
+      else if (reply.statusCode >= 400) obs.warn("http.request", fields);
+      else obs.info("http.request", fields);
+      obs.metric("HttpLatencyMs", ms, "Milliseconds", { Route: `${req.method} ${route}` });
+      if (reply.statusCode >= 500) obs.metric("Http5xx", 1, "Count", { Route: `${req.method} ${route}` });
+      else if (reply.statusCode >= 400) obs.metric("Http4xx", 1, "Count", { Route: `${req.method} ${route}` });
+    });
+  }
   const signoff = deps.signoff ?? new Signoff({ store, artifacts, now });
 
   app.setErrorHandler((err: Error, req, reply) => {
@@ -145,6 +163,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return reply.code(status).send({ error: "invalid_request", issues: [] });
     }
     req.log.error({ errName: err.name }, "unhandled error");
+    // The cause of the 5xx for CloudWatch (name and a short message; no request data).
+    obs?.error("http.unhandled", { route: req.routeOptions.url, method: req.method, errName: err.name, error: err.message.slice(0, 300) });
     return reply.code(500).send({ error: "internal" });
   });
 
