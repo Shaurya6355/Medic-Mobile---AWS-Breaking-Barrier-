@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { allItems, nodeSig } from "../domain/logic";
+import { allItems, itemLabel, nodeSig } from "../domain/logic";
 import { gate, verLabel } from "../domain/workflow";
 import { hashOf } from "../domain/data";
 import { checkStages } from "../domain/checks";
-import type { Check, CheckKey, Role, Workflow } from "../domain/types";
+import type { Check, CheckKey, Escalation, Role, Workflow } from "../domain/types";
 import type { Actions } from "../actions";
 import { Flow, type Markers, type Tone } from "../components/Flow";
 import { CheckBar } from "../components/Checks";
@@ -53,6 +53,39 @@ function HandOver({ ready, blocking, asks, ver, state, onAnswer, weak }: { ready
         <div><dt>Version</dt><dd className="mono">{ver}</dd></div>
       </dl>
       <Icon name="fact_check" size={120} className="score-wm" />
+    </section>
+  );
+}
+
+/** The officer agent stopped without signing: what it left, so the clinician can fix it instead of hitting a dead end. */
+function EscalationCard({ e, canEdit, show, fix }: { e: Escalation; canEdit: boolean; show: (id: string) => void; fix: (id: string) => void }) {
+  return (
+    <section className="esc" role="alert" aria-label="Officer agent could not sign">
+      <div className="esc-head">
+        <Icon name="report" size={22} />
+        <div>
+          <b>{"The officer agent could not sign version " + e.n}</b>
+          <p className="note">{e.items.length
+            ? "These are the program officer's checks. Fix them in the table, then Approve again: your edit makes a new version and the agent checks it again."
+            : "It left the comment below. Change what it points at, then Approve again: your edit makes a new version and the agent checks it again."}</p>
+        </div>
+      </div>
+      {e.items.length ? (
+        <ul className="esc-list">
+          {e.items.map((x, i) => (
+            <li key={i}>
+              <span>{x.message}</span>
+              {x.about ? (
+                <span className="esc-act">
+                  <button type="button" className="lnk" onClick={() => show(x.about!)}>{"Show " + itemLabel(x.about)}</button>
+                  {canEdit ? <button type="button" className="btn tiny" onClick={() => fix(x.about!)}>Fix it</button> : null}
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <details className="esc-more"><summary>The agent's comment</summary><p>{e.text}</p></details>
     </section>
   );
 }
@@ -117,6 +150,8 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
           ) : null}
         </div>
       </div>
+
+      {w.escalation && w.state === "clinician" ? <EscalationCard e={w.escalation} canEdit={canEdit} show={id => { setSel(id); setTab("view"); }} fix={id => { setSel(id); setTab("edit"); }} /> : null}
 
       <section className="checkbox" aria-label="Safety checks">
         <div className={"tlight " + light.tone}>
