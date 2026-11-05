@@ -88,6 +88,49 @@ describe("clinician routes", () => {
     expect(JSON.stringify(audit)).not.toContain("what now?");
   });
 
+  describe("keeping open questions from the chat", () => {
+    const open = m2.open_questions.filter((x) => x.route_to === "clinician" && x.status === "open");
+    const ctx = (over: object = {}) => ({
+      version: 2,
+      openQuestions: m2.open_questions.map((x) => ({ id: "F-" + x.id, title: x.question.slice(0, 80), answered: x.status !== "open" })),
+      findings: [],
+      ...over,
+    });
+    const ask = (server: Awaited<ReturnType<typeof setup>>["server"], context: object) =>
+      server.inject({ method: "POST", url: routes.chat("r1"), payload: { ...who, messages: [{ from: "user", text: "keep it" }], context } });
+
+    it("saves the keep as a new clinician version with the question resolved", async () => {
+      const target = open[0]!;
+      const { server, store } = await setup([j({ reply: "Keeping it.", citations: [], action: { type: "keep", ids: ["F-" + target.id] } })]);
+      const res = await ask(server, ctx());
+      expect(res.statusCode).toBe(200);
+      expect(res.json().kept).toMatchObject({ version: 3, ids: [target.id] });
+      expect(res.json().reply).toMatch(/Saved as version 3/);
+      const v3 = (await store.listVersions("r1")).find((v) => v.n === 3)!;
+      expect([v3.author, v3.authorRole, v3.origin]).toEqual(["dr.amy", "clinician", "chat_keep"]);
+      expect(v3.signatures ?? []).toHaveLength(0);
+    });
+
+    it("keep_all resolves every open question for the clinician", async () => {
+      const { server, store } = await setup([j({ reply: "Keeping all.", citations: [], action: { type: "keep_all" } })]);
+      const res = await ask(server, ctx());
+      expect(res.json().kept.ids.sort()).toEqual(open.map((x) => x.id).sort());
+      expect((await store.listVersions("r1")).map((v) => v.n)).toEqual([1, 2, 3]);
+    });
+
+    it("refuses with unsaved edits, or when the page is behind, and saves nothing", async () => {
+      const act = { type: "keep", ids: ["F-" + open[0]!.id] };
+      const a = await setup([j({ reply: "ok", citations: [], action: act })]);
+      expect((await ask(a.server, ctx({ unsavedEdits: true }))).json().reply).toMatch(/not saved yet/);
+      expect((await a.store.listVersions("r1")).map((v) => v.n)).toEqual([1, 2]);
+      const b = await setup([j({ reply: "ok", citations: [], action: act })]);
+      const stale = await ask(b.server, ctx({ version: 1 }));
+      expect(stale.json().kept).toBeUndefined();
+      expect(stale.json().reply).toMatch(/newest is version 2/);
+      expect((await b.store.listVersions("r1")).map((v) => v.n)).toEqual([1, 2]);
+    });
+  });
+
   it("chat does not refuse an ordinary question that mentions instructions", async () => {
     const { server, model } = await setup([j({ reply: "See page 6.", citations: [] })]);
     const res = await server.inject({ method: "POST", url: routes.chat("r1"), payload: { ...who, messages: [{ from: "user", text: "What do the booklet instructions say about the prompt for fast breathing?" }] } });

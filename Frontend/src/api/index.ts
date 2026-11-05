@@ -237,7 +237,7 @@ export async function openForRelease(args: { guidelineId: string; pathway: strin
 export const saveEdit = (id: string, patch: { item: ItemId; field: string; patch: Patch }) => mutate(id, w => wf.applyEdit(w, patch.item, patch.field, patch.patch));
 export const undo = (id: string) => mutate(id, wf.undoEdit);
 /* ---------- Live mode: the backend assistant and the feedback loop (Backend/src/chat, Backend/src/revision) ---------- */
-interface ChatReply { reply: string; citations: { kind: string; ref: string; quote?: string }[]; action?: { type: "keep"; ids: string[] } | { type: "keep_all" } }
+interface ChatReply { reply: string; citations: { kind: string; ref: string; quote?: string }[]; kept?: { version: number; ids: string[]; skipped: string[] } }
 interface RevisionRec { id: string; status: "instruction_ready" | "applying" | "applied" | "no_change" | "failed" | string; instruction: string; error?: string; toVersion?: number; applied?: unknown[]; refused?: { reason?: string; detail?: string }[]; questionsAdded?: string[] }
 
 /** The newest logic model version of a run, as the review screen needs it. */
@@ -269,6 +269,7 @@ function pageContext(w: Workflow, sel?: string) {
   const r = w.remote!, item = selectedItemJson(w.model, sel);
   return {
     version: r.n,
+    ...(w.undo.length ? { unsavedEdits: true } : {}),
     ...(sel ? { selected: sel } : {}),
     ...(item ? { selectedItem: item } : {}),
     openQuestions: w.flags.slice(0, 60).map(f => ({ id: f.id, title: f.title.slice(0, 500), answered: !!f.res })),
@@ -295,15 +296,15 @@ export async function chat(id: string, text: string, sel?: string): Promise<Work
     const r = await call<ChatReply>("/runs/" + w.remote.runId + "/chat", { method: "POST", body: JSON.stringify({ userId: me(), role: "clinician", messages: history, context: pageContext(local, sel) }) });
     const src = [...new Set(r.citations.map(c => (c.kind === "page" ? "page " : c.kind + " ") + c.ref))];
     let next = wf.replaceLastMsg(local, { from: "agent", text: r.reply + (src.length ? "\n\nSources: " + src.join(", ") : "") });
-    if (r.action) {
-      // The backend checked the ids against the page; the app keeps only questions that are still open, exactly as the Keep button does.
-      const open = next.flags.filter(f => !f.res).map(f => f.id);
-      const ids = r.action.type === "keep_all" ? open : r.action.ids.filter(x => open.includes(x));
+    if (r.kept) {
+      // The backend saved the keep as a new version (what the Keep button does, done there). Load it, so the questions show as closed.
+      const keptIds = r.kept.ids.map(q => "F-" + q);
+      const closed = { ...next, flags: next.flags.map(f => keptIds.includes(f.id) ? { ...f, res: { choice: "keep" as const, note: "", by: "Clinician" } } : f) };
       try {
-        for (const q of ids) next = wf.answerFlag(next, q, "keep");
-        next = wf.addMsgs(next, { from: "agent", text: ids.length ? "Kept as drafted: " + ids.map(q => q.slice(2)).join(", ") + "." : "Nothing was left open to keep." });
+        const latest = await fetchLatest(w.remote.runId);
+        next = wf.replaceFromBackend(closed, latest.model, latest.remote, "Kept as drafted in the chat: " + r.kept.ids.join(", ") + "; version " + latest.remote.n);
       } catch (e) {
-        next = wf.addMsgs(next, { from: "agent", text: "I could not keep those: " + (e instanceof Error ? e.message : String(e)) });
+        next = wf.addMsgs(closed, { from: "agent", text: "Saved on the backend, but I could not reload the new version: " + (e instanceof Error ? e.message : String(e)) + " Reload the review." });
       }
     }
     workflows[id] = next;

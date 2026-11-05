@@ -59,7 +59,7 @@ export function structuralDiff(before: unknown, after: unknown, cap = 200): { pa
 const idemKey = (runId: string, key: string): string => artifactKey(runId, "idempotency", `${sha256(key)}.json`);
 
 function noteFor(i: SaveVersionInput, diffCount: number): string {
-  const who = i.origin === "officer_agent" ? "The officer agent" : i.origin === "tree_edit" ? `${i.author} (tree edit)` : i.origin === "restore" ? `${i.author} (restore)` : i.author;
+  const who = i.origin === "officer_agent" ? "The officer agent" : i.origin === "tree_edit" ? `${i.author} (tree edit)` : i.origin === "chat_keep" ? `${i.author} (kept in chat)` : i.origin === "restore" ? `${i.author} (restore)` : i.author;
   return `${who} saved version from version ${i.parentVersion}; ${diffCount} place${diffCount === 1 ? "" : "s"} changed.`;
 }
 

@@ -42,6 +42,7 @@ export const ChatTurn = z.union([
 
 export interface ChatContext {
   version: number;
+  unsavedEdits?: boolean | undefined;
   selected?: string | undefined;
   selectedItem?: string | undefined;
   openQuestions: { id: string; title: string; answered: boolean }[];
@@ -55,8 +56,10 @@ export interface ChatMessage {
 export interface ChatResult {
   reply: string;
   citations: Citation[];
-  /** Only ever a keep of open questions the page showed; the app applies it. */
+  /** Only ever a keep of open questions the page showed. The API route carries it out (keepInChat) and answers with `kept` instead. */
   action?: ChatAction;
+  /** Set by the route once the keep is saved as a new version. */
+  kept?: { version: number; ids: string[]; skipped: string[] };
 }
 
 export const MAX_TOOL_ROUNDS = 3;

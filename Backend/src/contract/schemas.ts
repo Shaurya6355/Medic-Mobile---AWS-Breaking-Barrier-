@@ -223,6 +223,8 @@ export const ChatRequest = z
     context: z
       .object({
         version: z.number().int().min(1),
+        /** Edits on the page that are not saved yet: a keep would replace them, so it is refused. */
+        unsavedEdits: z.boolean().optional(),
         selected: z.string().max(200).optional(),
         /** JSON of the selected rule, question, result or value as loaded on the page (unsaved edits included). */
         selectedItem: z.string().max(8000).optional(),
