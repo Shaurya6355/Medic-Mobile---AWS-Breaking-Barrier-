@@ -13,6 +13,8 @@ const pattern = {
   sign: "/runs/:id/versions/:n/signatures/:role",
   // The clinician's rejection with a comment (AR-06, RR-02; DEC-020).
   reject: "/runs/:id/versions/:n/reject",
+  // The clinician accepts blocking findings they decide ("keep", with a reason).
+  acknowledge: "/runs/:id/versions/:n/acknowledge",
   // Revision loop: comments on a version -> AI instruction (POST creates, GET lists) -> confirm -> new version.
   revisions: "/runs/:id/versions/:n/revisions",
   revision: "/runs/:id/revisions/:rid",
@@ -48,6 +50,7 @@ const proxiable = [
   pattern.status,
   pattern.sign,
   pattern.reject,
+  pattern.acknowledge,
   pattern.revisions,
   pattern.revision,
   pattern.revisionConfirm,
@@ -75,6 +78,7 @@ export const routes = {
   status: (id: string, n: number) => `/runs/${id}/versions/${n}/status`,
   sign: (id: string, n: number, role: string) => `/runs/${id}/versions/${n}/signatures/${role}`,
   reject: (id: string, n: number) => `/runs/${id}/versions/${n}/reject`,
+  acknowledge: (id: string, n: number) => `/runs/${id}/versions/${n}/acknowledge`,
   revisions: (id: string, n: number) => `/runs/${id}/versions/${n}/revisions`,
   revision: (id: string, rid: string) => `/runs/${id}/revisions/${rid}`,
   revisionConfirm: (id: string, rid: string) => `/runs/${id}/revisions/${rid}/confirm`,

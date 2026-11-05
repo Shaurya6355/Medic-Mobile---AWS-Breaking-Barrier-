@@ -124,6 +124,18 @@ export const findingsKey = (runId: string, sha: string, inputsSha: string): stri
  */
 export const flagsKey = (runId: string, sha: string, inputsSha: string): string =>
   artifactKey(runId, "flags", CHECKS_VERSION, `${sha}-${String(inputsSha).slice(0, 16)}.json`);
+/**
+ * The clinician's acceptances of findings ("keep"): one record per run, findingId -> who, why, when. A finding id is
+ * the hash of its check, code, subjects and params, so it stays the same while the problem is the same. Only a
+ * blocking finding the clinician decides can be accepted (acknowledge in signoff.ts); it then counts as information.
+ */
+export type Acknowledgement = { by: string; note: string; at: number; n: number };
+export const acksKey = (runId: string): string => artifactKey(runId, "acks", "acknowledgements.json");
+export async function loadAcks(artifacts: ArtifactStore, runId: string): Promise<Record<string, Acknowledgement>> {
+  const raw = await optionalJson(artifacts, acksKey(runId));
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return raw as Record<string, Acknowledgement>;
+}
 export const ingestBlocksKey = (runId: string): string => artifactKey(runId, "ingest", "input_blocks.json");
 export const extractionKey = (runId: string): string => artifactKey(runId, "extract", "extraction_output.json");
 
@@ -307,6 +319,10 @@ async function analyse(io: StoreIo, runId: string, n: number, loaded: LoadedVers
     // Read by the open-question check (validation/context.ts HistoryContext).
     history,
   } as Parameters<typeof runChecks>[0]);
+  const acks = await loadAcks(io.artifacts, runId);
+  const findings = res.findings.map((f): Finding =>
+    f.severity === "blocking" && f.decidedBy === "clinician" && acks[f.id] !== undefined ? { ...f, severity: "info" } : f,
+  );
   return buildRecord(
     {
       checksVersion: CHECKS_VERSION,
@@ -328,7 +344,7 @@ async function analyse(io: StoreIo, runId: string, n: number, loaded: LoadedVers
       checksNotRun: notRun(ctx, inputs),
       claim: res.claim,
       claimText: res.claimText,
-      findings: res.findings,
+      findings,
     },
     loaded.model !== undefined,
   );

@@ -98,6 +98,30 @@ describe("GET status", () => {
   });
 });
 
+describe("POST acknowledge (clinician keeps blocking findings)", () => {
+  it("accepted findings stop blocking, are recorded, and the clinician can then sign", async () => {
+    const m = officerFixed();
+    const sha = shaOf(m);
+    const { server, signoff, store } = await setup([m], "awaiting_officer");
+    await signoff.signAsAgent("r1", 1, sha);
+    const blocked = await sign(server, 1, "clinician", { role: "clinician", userId: "clinician-1", modelSha: sha });
+    expect(blocked.statusCode).toBe(422);
+    const f = (await server.inject({ method: "GET", url: `${routes.findings("r1", 1)}?audience=clinician` })).json();
+    const ids = f.groups.flatMap((g: { findings: { id: string; severity: string; yours: boolean }[] }) => g.findings).filter((x: { severity: string; yours: boolean }) => x.severity === "blocking" && x.yours).map((x: { id: string }) => x.id);
+    expect(ids.length).toBeGreaterThan(0);
+    const short = await server.inject({ method: "POST", url: routes.acknowledge("r1", 1), payload: { role: "clinician", userId: "clinician-1", findingIds: ids, note: "ok" } });
+    expect(short.statusCode).toBe(400);
+    const wrong = await server.inject({ method: "POST", url: routes.acknowledge("r1", 1), payload: { role: "clinician", userId: "clinician-1", findingIds: ["0".repeat(64)], note: "Kept as correct by the clinician." } });
+    expect([wrong.statusCode, wrong.json().error]).toEqual([422, "not_acceptable"]);
+    const ok = await server.inject({ method: "POST", url: routes.acknowledge("r1", 1), payload: { role: "clinician", userId: "clinician-1", findingIds: ids, note: "Kept as correct by the clinician." } });
+    expect(ok.statusCode).toBe(201);
+    expect(ok.json().gates.canClinicianSign).toBe(true);
+    expect((await store.listAudit("r1")).some((a: { type: string }) => a.type === "findings_accepted")).toBe(true);
+    const signed = await sign(server, 1, "clinician", { role: "clinician", userId: "clinician-1", modelSha: sha });
+    expect(signed.statusCode).toBe(201);
+  });
+});
+
 describe("POST sign", () => {
   it("422 while blockers for that role remain, with the blockers in plain words", async () => {
     const { server, signoff } = await setup();

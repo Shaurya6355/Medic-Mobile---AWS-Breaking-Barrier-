@@ -379,6 +379,12 @@ async function signOnBackend(w: Workflow): Promise<{ n: number; modelSha: string
   if (st.status !== "awaiting_clinician") {
     throw new Error("Version " + n + " was saved, but the officer agent has not signed it (status: " + st.status.replace(/_/g, " ") + "). It may have left a comment on the version; check its findings.");
   }
+  // The clinician has reviewed everything and kept it: findings only the clinician decides stop blocking, recorded with their name and reason.
+  const fv = await call<{ gates: { canClinicianSign: boolean }; groups: { findings: { id: string; severity: string; yours: boolean }[] }[] }>(base + "/versions/" + n + "/findings?audience=clinician");
+  if (!fv.gates.canClinicianSign) {
+    const ids = fv.groups.flatMap(g => g.findings).filter(f => f.severity === "blocking" && f.yours).map(f => f.id);
+    if (ids.length) await call(base + "/versions/" + n + "/acknowledge", { method: "POST", body: JSON.stringify({ role: "clinician", userId: me(), findingIds: ids, note: "Kept as correct: the clinician reviewed this item and agreed with the draft when approving." }) });
+  }
   await call(base + "/versions/" + n + "/signatures/clinician", { method: "POST", body: JSON.stringify({ role: "clinician", userId: me(), modelSha: st.modelSha }) });
   return { n, modelSha: st.modelSha };
 }

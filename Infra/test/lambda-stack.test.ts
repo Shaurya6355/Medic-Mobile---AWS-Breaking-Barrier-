@@ -143,7 +143,7 @@ describe("http api", () => {
         "POST /runs", "GET /runs", "GET /runs/{id}", "GET /runs/{id}/versions", "POST /runs/{id}/versions",
         "GET /runs/{id}/versions/{n}", "GET /runs/{id}/versions/{n}/comments", "POST /runs/{id}/versions/{n}/comments",
         "GET /runs/{id}/versions/{n}/findings", "GET /runs/{id}/versions/{n}/flags", "GET /runs/{id}/versions/{n}/status", "POST /runs/{id}/versions/{n}/signatures/{role}",
-        "POST /runs/{id}/versions/{n}/reject", "POST /runs/{id}/resume", "GET /runs/{id}/metrics",
+        "POST /runs/{id}/versions/{n}/reject", "POST /runs/{id}/versions/{n}/acknowledge", "POST /runs/{id}/resume", "GET /runs/{id}/metrics",
         "POST /runs/{id}/versions/{n}/revisions", "GET /runs/{id}/versions/{n}/revisions",
         "GET /runs/{id}/revisions/{rid}", "POST /runs/{id}/revisions/{rid}/confirm",
         "GET /runs/{id}/activity", "POST /runs/{id}/chat", "GET /runs/{id}/versions/{n}/flow",

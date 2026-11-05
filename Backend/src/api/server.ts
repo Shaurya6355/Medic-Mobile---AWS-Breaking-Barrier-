@@ -28,6 +28,7 @@ import {
   LambdaSqsEnvelope,
   LambdaSqsRecord,
   RejectRequest,
+  AcknowledgeRequest,
   SaveVersionRequest,
   SignRequest,
 } from "../contract/schemas.js";
@@ -370,6 +371,16 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       await background(deps.onRejected(runId), (err) => app.log.error({ runId, errName: errName(err) }, "onRejected failed"));
     }
     return reply.code(201).send(res);
+  });
+
+  // The clinician accepts blocking findings they decide ("keep"): recorded with name and reason, then they stop blocking.
+  app.post<{ Params: { id: string; n: string } }>(routes.pattern.acknowledge, async (req, reply) => {
+    const n = parseVersionNumber(req.params.n, reply);
+    if (n === undefined) return reply;
+    // AUTH SEAM (DEC-015): role and userId from the body until Cognito, as for signatures.
+    const body = parseBody(AcknowledgeRequest, req.body, reply);
+    if (!body) return reply;
+    return reply.code(201).send(await signoff.acknowledge(req.params.id, n, body));
   });
 
   // ---------- revision loop ----------
