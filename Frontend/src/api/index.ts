@@ -11,7 +11,8 @@ import * as wf from "../domain/workflow";
 import { FALLBACK_TEXT } from "../domain/agent";
 import { sampleScores } from "../domain/scores";
 import { AUTH, currentUser, idToken, signIn } from "../auth";
-import type { AuditRow, Guideline, GuidelineType, ItemId, Model, Patch, QuoteScores, Spec, Workflow } from "../domain/types";
+import { item } from "../../../shared/pathway/index.ts";
+import type { AuditRow, Escalation, Guideline, GuidelineType, ItemId, Model, Patch, QuoteScores, Spec, Workflow } from "../domain/types";
 
 export const API_URL: string | undefined = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || undefined;
 /** True when guidelines come from the backend pipeline rather than sample data. */
@@ -178,6 +179,33 @@ async function loadScores(runId: string, n: number, model: Model): Promise<Quote
   }
 }
 
+/* ---------- Officer agent escalation ---------- */
+const SUBJECT_ITEM: Record<string, (id: string) => ItemId> = {
+  scope: () => item.scope, question: item.q, derived: item.d, rule: item.rule,
+  outcome: item.out, action: id => item.out(id.split("/")[0]), follow_up: item.fu,
+};
+/** The officer agent's escalation on the newest version, or null. Never throws: without it the review still works. */
+async function loadEscalation(runId: string): Promise<Escalation | null> {
+  try {
+    const vs = await call<VersionRec[]>("/runs/" + runId + "/versions");
+    const n = vs[vs.length - 1]?.n;
+    if (n === undefined) return null;
+    const base = "/runs/" + runId + "/versions/" + n;
+    const cs = await call<{ itemRef: string; text: string; createdAt: number }[]>(base + "/comments");
+    const c = cs.filter(x => x.itemRef === "agent:escalation").pop();
+    if (!c) return null;
+    const fo = await call<{ groups: { severity: string; findings: { message: string; yours?: boolean; subjects?: { kind: string; id: string }[] }[] }[] }>(base + "/findings?audience=program_officer");
+    const items = fo.groups.filter(g => g.severity === "blocking").flatMap(g => g.findings).filter(f => f.yours !== false).map(f => {
+      const s = f.subjects?.find(x => SUBJECT_ITEM[x.kind]);
+      return { message: f.message, about: s ? SUBJECT_ITEM[s.kind](s.id) : null };
+    });
+    return { n, text: c.text, items };
+  } catch {
+    return null;
+  }
+}
+class OfficerNotSigned extends Error {}
+
 /* ---------- Workflow ---------- */
 export async function createDraft(args: { guidelineId: string; pathway: string; pages: number[] }): Promise<Workflow> {
   const id = "wf-" + seq++;
@@ -188,9 +216,10 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
     if (!last) throw new Error("This run has no logic model version yet. Wait for the pipeline to finish.");
     const v = await call<{ body: unknown }>("/runs/" + g.id + "/versions/" + last.n);
     const model = loadSpec(v.body, "The backend's logic model (version " + last.n + ")");
-    const [[fc, fo], scores] = await Promise.all([
+    const [[fc, fo], scores, escalation] = await Promise.all([
       Promise.all(["clinician", "program_officer"].map(a => call<FindingsView>("/runs/" + g.id + "/versions/" + last.n + "/findings?audience=" + a))),
       loadScores(g.id, last.n, model),
+      loadEscalation(g.id),
     ]);
     const flat = (f: FindingsView, role: "clinician" | "program_officer") => f.groups.flatMap(gr => gr.findings.map(x => ({ severity: gr.severity, message: x.message, check: x.check, role })));
     const remote = { runId: g.id, n: last.n, modelSha: fc.modelSha, base: clone(model), claimText: fc.claimText, findings: [...flat(fc, "clinician"), ...flat(fo, "program_officer")] };
@@ -200,7 +229,7 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
       event: "Loaded logic model version " + last.n + " from the backend (run " + g.id + ")",
       note: "modelSha " + fc.modelSha.slice(0, 12) + " · " + fc.claimText,
     });
-    workflows[id] = { ...workflows[id], scores };
+    workflows[id] = { ...workflows[id], scores, escalation };
     return clone(workflows[id]);
   }
   const g = guidelines.find(x => x.id === args.guidelineId);
@@ -408,7 +437,16 @@ export async function approve(id: string): Promise<Workflow> {
   const w = load(id);
   if (!LIVE || !w.remote) return mutate(id, x => wf.approveAll(x));
   wf.approveAll(w); // the same local gate first: no blocking checks, every question answered
-  const locked = await signOnBackend(w);
+  let locked: { n: number; modelSha: string };
+  try {
+    locked = await signOnBackend(w);
+  } catch (e) {
+    if (!(e instanceof OfficerNotSigned)) throw e;
+    // The agent gave up and left its reasons: show them on the review screen instead of a dead-end error.
+    const esc = await loadEscalation(w.remote.runId);
+    if (!esc) throw new Error(e.message.replace(/ It may have left.*$/, "") + " It may still be working: try Approve again in a minute.");
+    return mutate(id, x => ({ ...x, escalation: esc }));
+  }
   if (locked.n > w.remote.n + 1) {
     // The officer agent saved a fix of its own on top of the clinician's version; that is the version that was signed.
     const latest = await fetchLatest(w.remote.runId);
@@ -442,7 +480,7 @@ async function signOnBackend(w: Workflow): Promise<{ n: number; modelSha: string
     }
   }
   if (st.status !== "awaiting_clinician") {
-    throw new Error("Version " + n + " was saved, but the officer agent has not signed it (status: " + st.status.replace(/_/g, " ") + "). It may have left a comment on the version; check its findings.");
+    throw new OfficerNotSigned("Version " + n + " was saved, but the officer agent has not signed it (status: " + st.status.replace(/_/g, " ") + "). It may have left a comment on the version; check its findings.");
   }
   // The clinician has reviewed everything and kept it: findings only the clinician decides stop blocking, recorded with their name and reason.
   const fv = await call<{ gates: { canClinicianSign: boolean }; groups: { findings: { id: string; severity: string; yours: boolean }[] }[] }>(base + "/versions/" + n + "/findings?audience=clinician");

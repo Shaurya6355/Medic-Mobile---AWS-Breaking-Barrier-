@@ -1021,6 +1021,16 @@ h1.display,.rvhead h1.display{font-weight:600;letter-spacing:-.8px}
 .qs-quote blockquote{margin:0;font-size:14px;line-height:20px;color:var(--muted);border-left:3px solid var(--subtle);padding-left:10px}
 .qs-stale{margin:0;color:var(--chg)}
 .chat-top{display:grid;gap:12px;min-width:0}
+.esc{display:grid;gap:12px;padding:16px 20px;border-radius:8px;background:var(--s-low);box-shadow:inset 4px 0 0 var(--chg);margin-bottom:16px}
+.esc-head{display:flex;gap:12px;align-items:flex-start}
+.esc-head b{font-size:16px;line-height:24px}
+.esc-head .note{margin:2px 0 0}
+.esc-list{margin:0;padding:0 0 0 34px;display:grid;gap:8px;font-size:14px;line-height:20px}
+.esc-list li{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.esc-act{display:inline-flex;gap:12px;align-items:center;white-space:nowrap}
+.esc-more{padding-left:34px;font-size:14px;color:var(--muted)}
+.esc-more summary{cursor:pointer}
+.esc-more p{white-space:pre-wrap;margin:8px 0 0}
 .chat-top:empty{display:none}
 .qs-card{display:grid;gap:12px;padding:16px;border-radius:8px;background:var(--s-low);min-width:0}
 .qs-card .qs-detail{padding:12px}
