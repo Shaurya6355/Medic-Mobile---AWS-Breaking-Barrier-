@@ -7,6 +7,8 @@ import { JsonDiff } from "../components/JsonDiff";
 import { Flow, type Markers } from "../components/Flow";
 import { allItems, changedVs } from "../domain/logic";
 import { useState } from "react";
+import { Icon } from "../components/Icon";
+import { PageHead } from "../components/Page";
 
 type Tab = "flow" | "json" | "form";
 /** What IT approves: the flow (live or new), the logic model JSON diff and the form diff, all built from the approved hash. */
@@ -64,15 +66,10 @@ export function ReleaseScreen({ w, role, act }: { w: Workflow | null; role: Role
 
   return (
     <>
-      <div className="top">
-        <div>
-          <h1>Release {a.ver}</h1>
-          <div className="ver">{"v3 " + V3_HASH + " → " + a.ver + " " + a.hash + " · built from the approved hash only"}</div>
-        </div>
-        {w.state === "verify" ? <button type="button" className="btn primary" onClick={act.runVerify}>Run synthetic check</button>
-          : w.state === "deploy" ? <button type="button" className="btn primary" disabled={role !== "it"} onClick={act.approveDeploy}>Approve deploy</button>
-          : <span className="st ok">Deployed</span>}
-      </div>
+      <PageHead eyebrow={[w.state === "verify" ? "Step 03" : w.state === "deploy" ? "Step 04" : "Step 05", "v3 " + V3_HASH + " → " + a.ver + " " + a.hash + " · built from the approved hash only"]} title={"Release " + a.ver}
+        actions={w.state === "verify" ? <button type="button" className="btn primary" onClick={act.runVerify}><Icon name="science" size={18} />Run synthetic check</button>
+          : w.state === "deploy" ? <button type="button" className="btn primary" disabled={role !== "it"} onClick={act.approveDeploy}><Icon name="rocket_launch" size={18} />Approve deploy</button>
+          : <span className="st ok">Deployed</span>} />
       {w.state === "deploy" && role !== "it" ? <div className="note">Only the IT approver can approve the deploy. The clinician approved the content, so they can't also deploy it.</div> : null}
 
       {!v ? (

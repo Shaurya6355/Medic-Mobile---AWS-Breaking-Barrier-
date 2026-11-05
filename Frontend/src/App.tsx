@@ -9,8 +9,9 @@ import { GuidelinesScreen } from "./screens/GuidelinesScreen";
 import { ReviewScreen } from "./screens/ReviewScreen";
 import { ReleaseScreen } from "./screens/ReleaseScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
+import { Icon } from "./components/Icon";
 
-const SCREENS: [string, string][] = [["/guidelines", "Guidelines"], ["/review", "Review"], ["/release", "Release"], ["/history", "History"]];
+const SCREENS: [string, string, string][] = [["/guidelines", "Guidelines", "menu_book"], ["/review", "Review", "fact_check"], ["/release", "Release", "rocket_launch"], ["/history", "History", "history"]];
 const EMPTY = initialWorkflow("none");
 
 export default function App() {
@@ -60,41 +61,51 @@ export default function App() {
   const actionPath = stage.owner === role || stage.owner === "system" ? stage.path : null;
 
   return (
-    <>
-      <header className="apphead">
-        <div className="hin">
-          <span className="brand">Guideline to Form</span>
-          <nav className="nav" aria-label="Screens">
-            {SCREENS.map(([p, l]) => (
-              <NavLink key={p} to={p} className={({ isActive }) => (isActive ? "on" : "")}>
-                {l}{actionPath === p ? <span className="ndot" aria-label="your next step is here" /> : null}
-              </NavLink>
-            ))}
-          </nav>
-          <label className="nx-who" htmlFor="role">
+    <div className="shell">
+      <aside className="sidenav" aria-label="Screens">
+        <div className="sn-brand"><img src="/logo.jpg" alt="" width={32} height={32} /><span>Guideline to Form</span></div>
+        <nav className="sn-nav">
+          {SCREENS.map(([p, l, ic]) => (
+            <NavLink key={p} to={p} className={({ isActive }) => (isActive ? "on" : "")}>
+              {({ isActive }) => (
+                <>
+                  <Icon name={ic} fill={isActive} />
+                  <span className="sn-l">{l}</span>
+                  {actionPath === p ? <span className="ndot" aria-label="your next step is here" /> : null}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+        <p className="sn-foot">Mock-up. Example data based on the WHO IMCI 2008 to 2014 revision. Not clinical advice.</p>
+      </aside>
+      <div className="shell-main">
+        <header className="topbar">
+          <span className="tb-ctx"><Icon name="medical_information" size={20} />No-Code CHT configuration</span>
+          <label className="tb-who" htmlFor="role">
             Viewing as
             <select id="role" value={role} onChange={e => setRole(e.target.value as Role)}>
               {(Object.keys(ROLE_NAME) as Role[]).map(k => <option key={k} value={k}>{ROLE_NAME[k]}</option>)}
             </select>
           </label>
-        </div>
-      </header>
-      <NextStrip w={cur} role={role} checks={checks} path={pathname} act={act} go={nav} pick={pick} />
-      <main className="app">
-        {error ? <div className="banner" role="alert">{error}</div> : null}
-        <Routes>
-          <Route path="/" element={<Navigate to="/guidelines" replace />} />
-          <Route path="/guidelines" element={<GuidelinesScreen w={w} role={role} act={act} />} />
-          <Route path="/review" element={<ReviewScreen w={w} role={role} sel={sel} setSel={setSel} act={act} checks={checks} />} />
-          <Route path="/release" element={<ReleaseScreen w={w} role={role} act={act} />} />
-          <Route path="/history" element={<HistoryScreen w={w} act={act} />} />
-          <Route path="*" element={<Navigate to="/guidelines" replace />} />
-        </Routes>
-        <div className="foot">
-          <span>Mock-up. Example data based on the WHO IMCI 2008 to 2014 revision. Not clinical advice.</span>
-          <span>{"“Viewing as” stands in for two separate logins."}</span>
-        </div>
-      </main>
-    </>
+          <span className="tb-av" title={"Viewing as " + ROLE_NAME[role]}><Icon name="person" size={20} fill /></span>
+        </header>
+        <main className="app">
+          <NextStrip w={cur} role={role} checks={checks} path={pathname} act={act} go={nav} pick={pick} />
+          {error ? <div className="banner" role="alert">{error}</div> : null}
+          <Routes>
+            <Route path="/" element={<Navigate to="/guidelines" replace />} />
+            <Route path="/guidelines" element={<GuidelinesScreen w={w} role={role} act={act} />} />
+            <Route path="/review" element={<ReviewScreen w={w} role={role} sel={sel} setSel={setSel} act={act} checks={checks} />} />
+            <Route path="/release" element={<ReleaseScreen w={w} role={role} act={act} />} />
+            <Route path="/history" element={<HistoryScreen w={w} act={act} />} />
+            <Route path="*" element={<Navigate to="/guidelines" replace />} />
+          </Routes>
+          <div className="foot">
+            <span>{"“Viewing as” stands in for two separate logins."}</span>
+          </div>
+        </main>
+      </div>
+    </div>
   );
 }

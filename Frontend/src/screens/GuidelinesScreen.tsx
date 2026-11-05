@@ -5,6 +5,8 @@ import { PATHWAYS, fnv } from "../domain/data";
 import { verLabel } from "../domain/workflow";
 import type { Guideline, PipelineStep, Role, Workflow } from "../domain/types";
 import type { Actions } from "../actions";
+import { Icon } from "../components/Icon";
+import { PageHead, SectionHead } from "../components/Page";
 
 /** "14-15, 18" -> [14, 15, 18] */
 function parsePages(s: string, max: number): number[] {
@@ -109,12 +111,14 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
   };
 
   return (
+    <>
+      <PageHead eyebrow={["Step 01", "Guideline to form review"]} title="Guidelines" />
     <div className="grid2 g-lib">
       <section className="panel">
-        <div className="ph"><h2>Guideline library</h2><span className="ver">{lib.length} files{api.LIVE ? " · live pipeline" : " · sample data"}</span></div>
+        <SectionHead icon="library_books" tone="blue" title="Guideline library" sub={lib.length + " files" + (api.LIVE ? " · live pipeline" : " · sample data")} />
         <input ref={fileInput} type="file" multiple accept={api.LIVE ? ".pdf" : api.ACCEPT} hidden onChange={onPick} />
         <div className="btnrow">
-          <button type="button" className="btn primary" disabled={role !== "clinician"} onClick={() => fileInput.current?.click()}>Upload guideline</button>
+          <button type="button" className="btn primary" disabled={role !== "clinician"} onClick={() => fileInput.current?.click()}><Icon name="upload_file" size={18} />Upload guideline</button>
           <span className="note">{api.LIVE ? "PDF only; the backend runs ingest, extract, logic drafting and checks" : "PDF, Word, spreadsheet, image or web page"}</span>
         </div>
         {loadErr ? <div className="banner" role="alert">{loadErr}</div> : null}
@@ -136,9 +140,7 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
 
       {f ? (
         <section className="panel">
-          <span className="note">Selected guideline</span>
-          <h2 className="big">{f.name}</h2>
-          <div className="mono note">{f.s3Uri ?? "s3://guidelines/" + f.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-") + " · sha256 " + fnv(f.name)}</div>
+          <SectionHead icon="description" title={f.name} sub={<span className="mono">{f.s3Uri ?? "s3://guidelines/" + f.name.toLowerCase().replace(/[^a-z0-9.]+/g, "-") + " · sha256 " + fnv(f.name)}</span>} />
 
           <PipelineLoader g={f} />
 
@@ -182,5 +184,6 @@ export function GuidelinesScreen({ w, role, act }: { w: Workflow | null; role: R
         <section className="panel"><p className="note">Pick a guideline on the left.</p></section>
       ) : null}
     </div>
+    </>
   );
 }
