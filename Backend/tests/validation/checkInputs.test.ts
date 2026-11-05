@@ -1,5 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { MemoryArtifactStore } from "../../src/artifacts/artifactStore.js";
+import { DEFAULT_GOLDEN_CASES_PATH, defaultCheckInputs } from "../../src/signoff/checkInputs.js";
 import { loadGoldenCasesFile, runChecks, withCheckInputs } from "../../src/validation/index.js";
 import { demoSettings, matchedCtx, rawGoldenCases } from "./helpers.js";
 
@@ -25,5 +27,16 @@ describe("supplying test cases and form settings to the checks (red team 1, item
     const ctx = withCheckInputs(matchedCtx(), {});
     expect("goldenCases" in ctx).toBe(false);
     expect("compileSettings" in ctx).toBe(false);
+  });
+});
+
+describe("default golden cases", () => {
+  it("are the 12 Medic-confirmed cases GF01 to GF12, bundled with the image", async () => {
+    expect(DEFAULT_GOLDEN_CASES_PATH).toMatch(/golden[\\/]golden-confirmed\.json$/);
+    const inputs = await defaultCheckInputs(new MemoryArtifactStore(), {})("any-run");
+    expect(inputs.goldenCases?.map((c) => c.id)).toEqual(Array.from({ length: 12 }, (_, i) => `GF${String(i + 1).padStart(2, "0")}`));
+  });
+  it("can be switched off with GOLDEN_CASES_PATH=none", async () => {
+    expect((await defaultCheckInputs(new MemoryArtifactStore(), { GOLDEN_CASES_PATH: "none" })("any-run")).goldenCases).toBeUndefined();
   });
 });

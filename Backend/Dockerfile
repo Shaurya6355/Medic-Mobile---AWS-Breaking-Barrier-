@@ -33,11 +33,12 @@ COPY --from=build /app/dist ./dist
 COPY package.json ./
 COPY extraction/prepare_input.py extraction/final_prompt.txt extraction/fill_prompt.txt extraction/revise_instruction_prompt.txt extraction/revise_prompt.txt ./extraction/
 COPY scoring/score_version.py ./scoring/score_version.py
+COPY golden ./golden
 # COPY keeps the build machine's file modes, and Lambda runs the image as a non-root user that does not own
 # these files: an owner-only file on a laptop (-rw-------) is then unreadable. a+rX makes every file readable
 # and every directory traversable. (Not COPY --chmod: it also sets the created directories' mode, and 0644
 # directories cannot be entered.)
-RUN chmod -R a+rX /app/extraction /app/scoring
+RUN chmod -R a+rX /app/extraction /app/scoring /app/golden
 USER node
 EXPOSE 8080
 CMD ["node", "dist/index.js"]
