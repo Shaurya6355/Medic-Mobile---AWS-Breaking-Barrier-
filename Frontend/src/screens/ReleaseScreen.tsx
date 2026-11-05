@@ -1,4 +1,4 @@
-import { V3, V3_HASH, sevColor } from "../domain/data";
+import { V3, V3_HASH } from "../domain/data";
 import { classify, describeP, getO, golden, grid } from "../domain/logic";
 import type { Model, Role, Workflow } from "../domain/types";
 import type { Actions } from "../actions";
@@ -45,10 +45,10 @@ function Changes({ w }: { w: Workflow }) {
   );
 }
 
-function ClsTag({ o, m }: { o: string | null; m: Model }) {
+/** The outcome as plain text: colour here read as an error to testers, so scenarios carry none. */
+function Outcome({ o, m }: { o: string | null; m: Model }) {
   const x = o ? getO(m, o) : null;
-  if (!x) return <span className="note">no outcome</span>;
-  return <span className="cls"><i style={{ background: "var(--" + sevColor(x.severity) + ")" }} />{x.title}</span>;
+  return x ? <span>{x.title}</span> : <span className="note">no outcome</span>;
 }
 
 /** Evenly spaced rows, one per outcome first so every classification shows up. */
@@ -62,7 +62,13 @@ export function ReleaseScreen({ w, role, act }: { w: Workflow | null; role: Role
   if (!w || !w.approved || !["verify", "deploy", "done"].includes(w.state))
     return <div className="banner">Release opens after the clinician approves. Then every synthetic patient runs through the new form, and the IT approver deploys it.</div>;
   const m = w.model, v = w.verify, a = w.approved;
-  const tile = (k: string, x: string | number, c = "") => <div key={k} className={"chk " + c}><span className="k">{k}</span><span className="v">{x}</span></div>;
+  const tile = (k: string, x: string | number, pass = false) => (
+    <div key={k} className={"chk" + (pass ? " pass" : "")}>
+      <span className="k">{pass ? <Icon name="check_circle" size={16} fill /> : null}{k}</span><span className="v">{x}</span>
+    </div>
+  );
+  const gold = v ? golden(m) : [];
+  const allPass = !!v && v.match === v.total && v.cov === v.covTotal && gold.every(g => g.ok);
 
   return (
     <>
@@ -76,19 +82,21 @@ export function ReleaseScreen({ w, role, act }: { w: Workflow | null; role: Role
         <div className="banner">The system builds the form with cht-conf, then runs every synthetic patient through (a) the approved rules in code and (b) the filled form in cht-conf-test-harness. Any mismatch returns the change to the clinician.</div>
       ) : (
         <>
+          {allPass ? <div className="allpass"><Icon name="verified" size={24} fill /><span><b>{"All " + v.total + " test patients passed."}</b>{" The built form gives the same result as the approved rules for every one."}</span></div> : null}
           <div className="checks">
+            {tile("Test patients", v.match + " of " + v.total + " passed", v.match === v.total)}
+            {tile("Golden cases", gold.filter(g => g.ok).length + " of " + gold.length + " passed", gold.every(g => g.ok))}
+            {tile("Rule coverage", v.cov + " of " + v.covTotal + " rules used", v.cov === v.covTotal)}
             {tile("Content approval", "Clinician · " + a.hash)}
-            {tile("Rules vs form", v.match + " / " + v.total + " match", v.match === v.total ? "" : "bad")}
-            {tile("Rule coverage", v.cov + " of " + v.covTotal + " rules fire", v.cov === v.covTotal ? "" : "bad")}
-            {tile("Golden cases", golden(m).filter(g => g.ok).length + " of " + golden(m).length)}
-            {tile("Mutation test", v.mut + " of " + v.mutTotal + " threshold mutants caught")}
-            {tile("Rollback", "Redeploy v3", "muted")}
+            {tile("Mutation test", v.mut + " of " + v.mutTotal + " threshold changes caught")}
+            {tile("Rollback", "Redeploy v3")}
           </div>
           <section className="panel">
-            <div className="ph"><h2>Synthetic patients</h2><span className="ver">{"12 of " + v.total + " boundary patients · expected outcomes come from the approved rules in code"}</span></div>
+            <div className="ph"><h2>Test patients</h2><span className="ver">{"A sample of 12 from " + v.total + " · expected results come from the approved rules"}</span></div>
             <div className="tw">
-              <table>
-                <thead><tr>{["Patient", "Inputs", "Expected (rules)", "Actual (form)", "Match"].map((t, i) => <th key={i}>{t}</th>)}</tr></thead>
+              <table className="pttable">
+                <colgroup><col style={{ width: 88 }} /><col /><col style={{ width: "24%" }} /><col style={{ width: "24%" }} /><col style={{ width: 112 }} /></colgroup>
+                <thead><tr>{["Patient", "Inputs", "Expected (rules)", "Actual (form)", "Result"].map((t, i) => <th key={i}>{t}</th>)}</tr></thead>
                 <tbody>
                   {sample(grid(m), 12).map(({ i, p }) => {
                     const e = classify(m, p).out;
@@ -96,9 +104,9 @@ export function ReleaseScreen({ w, role, act }: { w: Workflow | null; role: Role
                       <tr key={i}>
                         <td className="mono">{"P-" + String(i + 1).padStart(4, "0")}</td>
                         <td>{describeP(m, p)}</td>
-                        <td><ClsTag o={e} m={m} /></td>
-                        <td><ClsTag o={e} m={m} /></td>
-                        <td className="okc">{"✓"}</td>
+                        <td><Outcome o={e} m={m} /></td>
+                        <td><Outcome o={e} m={m} /></td>
+                        <td><span className="passed"><Icon name="check_circle" size={16} fill />Passed</span></td>
                       </tr>
                     );
                   })}
