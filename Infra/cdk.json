@@ -3,6 +3,7 @@
   "watch": { "include": ["**"], "exclude": ["README.md", "cdk*.json", "node_modules", "test", "cdk.out"] },
   "context": {
     "uiOrigins": ["http://localhost:5173"],
-    "modelId": "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    "modelId": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "prices": { "us.anthropic.claude-sonnet-4-5-20250929-v1:0": { "inPerMTok": 3, "outPerMTok": 15 } }
   }
 }

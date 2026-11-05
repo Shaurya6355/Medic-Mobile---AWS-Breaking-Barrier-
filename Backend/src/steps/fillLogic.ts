@@ -103,7 +103,12 @@ export function createFillLogicStep(opts: FillLogicOptions): Step {
       const tryResolve = (d: Draft | undefined, problems: string[]): { model?: ResolvedModel; problems: string[] } => {
         if (d === undefined) return { problems };
         const r = resolveDraft(d, ex, resolveOpts);
-        return r.ok ? { model: r.model, problems: [] } : { problems: r.problems };
+        if (!r.ok) return { problems: r.problems };
+        // No human program officer: every question a person must answer goes to the clinician (a team choice or a missing
+        // publisher cannot be settled by the officer agent, and nobody else may answer officer-routed questions). The
+        // officer agent keeps fixing everything else (citations, wording, checks) by itself.
+        const open_questions = r.model.open_questions.map((q) => (q.route_to === "clinician" ? q : { ...q, route_to: "clinician" as const }));
+        return { model: { ...r.model, open_questions }, problems: [] };
       };
 
       // First attempt.
