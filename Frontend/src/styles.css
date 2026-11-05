@@ -1020,6 +1020,16 @@ h1.display,.rvhead h1.display{font-weight:600;letter-spacing:-.8px}
 .qs-lab{font-size:12px;font-weight:600;color:var(--muted)}
 .qs-quote blockquote{margin:0;font-size:14px;line-height:20px;color:var(--muted);border-left:3px solid var(--subtle);padding-left:10px}
 .qs-stale{margin:0;color:var(--chg)}
+.chat-top{display:grid;gap:12px;min-width:0}
+.chat-top:empty{display:none}
+.qs-card{display:grid;gap:12px;padding:16px;border-radius:8px;background:var(--s-low);min-width:0}
+.qs-card .qs-detail{padding:12px}
+.qs-card .qs-dl{grid-template-columns:96px minmax(0,1fr)}
+.qs-chead{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.qs-caveat{margin:0;font-size:12px;line-height:16px}
+.qs-qnote{margin:0;font-size:14px;line-height:20px;padding:8px 12px;border-radius:8px;border:1px dashed var(--subtle);background:var(--surface)}
+.qs-qnote.old{color:var(--muted)}
+.score-link{font:inherit;font-weight:600;color:inherit;background:none;border:0;padding:0;text-decoration:underline;cursor:pointer}
 
 /* Sign-in (DEC-015) */
 .signin{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg)}

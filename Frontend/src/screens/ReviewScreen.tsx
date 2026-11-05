@@ -13,8 +13,8 @@ import { Chat } from "../components/Chat";
 import { RuleTable } from "../components/RuleTable";
 import { Icon } from "../components/Icon";
 import { SectionHead } from "../components/Page";
-import { QuoteScoresPanel } from "../components/QuoteScores";
-import { scoreBadge, scoreIndex, type ItemScore } from "../domain/scores";
+import { ItemQuoteCard } from "../components/QuoteScores";
+import { readFirst, scoreBadge, scoreIndex, type ItemScore } from "../domain/scores";
 
 type Tab = "view" | "edit";
 const readTab = (): Tab => { try { return localStorage.getItem("reviewTab") === "edit" ? "edit" : "view"; } catch { return "view"; } };
@@ -35,7 +35,7 @@ function markersFor(w: Workflow, checks: Check[], scores: Map<string, ItemScore>
 }
 
 /** The high-emphasis card: what the AI agent handed over and what still stops approval. */
-function HandOver({ ready, blocking, asks, ver, state, onAnswer }: { ready: boolean; blocking: number; asks: number; ver: string; state: Workflow["state"]; onAnswer: () => void }) {
+function HandOver({ ready, blocking, asks, ver, state, onAnswer, weak }: { ready: boolean; blocking: number; asks: number; ver: string; state: Workflow["state"]; onAnswer: () => void; weak?: { n: number; open: () => void } }) {
   const title = state !== "clinician" ? "Approved" : ready ? "Ready to approve" : asks ? asks + " question" + (asks > 1 ? "s" : "") + " for you" : blocking + " problem" + (blocking > 1 ? "s" : "") + " to fix";
   const desc = state !== "clinician" ? "This version is signed and read-only." : ready ? "Checks pass and every question is answered. Approve when the flow looks right." : asks ? "The AI agent needs your answer before this version can be approved. One at a time." : "Fix the blocking checks before approving this version.";
   return (
@@ -47,6 +47,9 @@ function HandOver({ ready, blocking, asks, ver, state, onAnswer }: { ready: bool
       <dl className="score-rows">
         <div><dt>Blocking checks</dt><dd>{blocking}</dd></div>
         <div className={asks ? "accent" : ""}><dt>Open questions</dt><dd>{asks}</dd></div>
+        {weak ? <div title="Advisory: quotes the scoring model thinks may not support their item. Not a check; never blocks approval.">
+          <dt>Weak quotes</dt><dd>{weak.n ? <button type="button" className="score-link" onClick={weak.open}>{weak.n + " · read first"}</button> : "0"}</dd>
+        </div> : null}
         <div><dt>Version</dt><dd className="mono">{ver}</dd></div>
       </dl>
       <Icon name="fact_check" size={120} className="score-wm" />
@@ -80,6 +83,8 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
   const g = gate(w, checks);
   const scores = scoreIndex(w.scores, w.model);
   const { mk, tone } = markersFor(w, checks, scores);
+  const weak = readFirst(scores);
+  const itemCard = <ItemQuoteCard s={w.scores} m={w.model} idx={scores} id={sel} />;
   const edited = Object.values(mk).filter(l => l.some(([c]) => c === "ed")).length;
   const edit = (item: string, field: string, patch: Parameters<Actions["edit"]>[2]) => act.edit(item, field, patch);
   const toEdit = (about: string) => { setSel(about); setTab("edit"); setChatRaw(x => ({ ...x, edit: true })); };
@@ -136,7 +141,6 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
               <SectionHead icon="account_tree" tone="teal" title="Decision flow" sub="Rules in priority order. The first rule that matches decides the outcome." />
               <Flow m={w.model} selected={sel === "scope" ? undefined : sel} onSelect={setSel} markers={mk} tone={tone} label="Decision flow" />
             </section>
-            {w.scores ? <section className="panel"><QuoteScoresPanel s={w.scores} m={w.model} idx={scores} sel={sel} onSelect={setSel} /></section> : null}
             <section className="panel"><GoldenCases m={w.model} onSelect={setSel} /></section>
           </div>
         ) : (
@@ -152,8 +156,9 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
           </div>
         )}
         {tab === "edit" && !chatOn ? null : <div className="rvside">
-          {tab === "view" ? <HandOver ready={g.ready} blocking={g.blockIds.length} asks={g.asks.length} ver={verLabel(w) + " · " + (w.approved?.hash ?? hashOf(w.model))} state={w.state} onAnswer={() => { setChat(true); setTimeout(() => document.querySelector(".qcard")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50); }} /> : null}
-          {chatOn ? <Chat w={w} act={act} canAct={canEdit} onSelect={id => { setSel(id); }} onChange={toEdit} onClose={() => setChat(false)} /> : null}
+          {tab === "view" ? <HandOver ready={g.ready} blocking={g.blockIds.length} asks={g.asks.length} ver={verLabel(w) + " · " + (w.approved?.hash ?? hashOf(w.model))} state={w.state} onAnswer={() => { setChat(true); setTimeout(() => document.querySelector(".qcard")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50); }}
+            weak={w.scores?.status === "scored" ? { n: weak.length, open: () => { if (weak[0]) { setSel(weak[0].id); setTimeout(() => document.querySelector(".qs-card")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50); } } } : undefined} /> : null}
+          {chatOn ? <Chat w={w} act={act} canAct={canEdit} onSelect={id => { setSel(id); }} onChange={toEdit} onClose={() => setChat(false)} scores={scores} item={itemCard} /> : itemCard}
         </div>}
       </div>
     </div>
