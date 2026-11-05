@@ -227,8 +227,8 @@ describe("app policy", () => {
     const b = bedrockStmts()[0];
     expect(actions(b).sort()).toEqual(["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]);
     const json = JSON.stringify(resources(b));
-    expect(json).toContain("inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0");
-    expect(json).toContain("foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0");
+    expect(json).toContain("inference-profile/us.anthropic.claude-haiku-5-5");
+    expect(json).toContain("foundation-model/anthropic.claude-haiku-5-5");
     expect(json).toContain(":bedrock:*::foundation-model/");
     expect(json).not.toMatch(/\d{12}/);
   });
