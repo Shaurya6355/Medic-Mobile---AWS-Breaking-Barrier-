@@ -37,6 +37,11 @@ python3 eval_scorer.py --model ../tests/fixtures/logic/v1.json \
     --blocks ../extraction/input_blocks.json --out eval.json
 ```
 
+To judge with Llama 4 Scout 17B (the team's cross-check model, DEC-021), use its US geo inference ID from the
+Bedrock model card: `JUDGE_MODEL_ID=us.meta.llama4-scout-17b-instruct-v1:0`. Bedrock supports tool use for it but
+not while streaming, so the judge calls Bedrock without streaming. Since Llama also does the cross-check, the
+judge is still a different model from the Claude drafter, but not independent of the cross-check.
+
 The credentials need `bedrock:InvokeModel` on the judge model. The deployed Lambda's policy
 (`Infra/lib/data-stack.ts`) covers `MODEL_ID` only, so running this in AWS needs that policy extended.
 
@@ -58,5 +63,20 @@ It prints one slide line, for example:
 clinician reads F of 32 quoted items closely and glances at the rest." Each clean-model flag is either a real
 gap or a false alarm: look at each one and say which on the slide.
 
-Not done yet: calling this from the API (a `GET /runs/:id/versions/:n/scores` route, Python deps in the
-Lambda image, IAM for the judge model) and a confidence column in the review UI.
+## In the pipeline
+
+Upload PDF -> ingest -> extract -> fill_logic -> **checks, then scoring** -> awaiting the program officer.
+
+- On when `JUDGE_MODEL_ID` is set (CDK: `-c judgeModelId=<id>`), off otherwise. `src/scoring/scoreVersion.ts`
+  wraps the checks step: the checks run first and decide the step; then `score_version.py` scores the version
+  the checks checked. A scoring failure never fails the run: the step record carries `scoresStatus: failed`
+  and `scoresError` (the end of the script's stderr, e.g. the Bedrock error).
+- Stored at `runs/<runId>/scores/<modelSha>.json`, so scores always belong to exact content.
+- Read with `GET /runs/:id/versions/:n/scores`: `{status: "scored", summary, items, ...}` or
+  `{status: "not_scored"}` (scoring off or failed, or a later saved version, which is not scored yet).
+- The judge's tokens are the checks step's usage, so its cost shows in `GET /runs/:id/metrics`.
+- Image: Strands Evals in its own venv at `/opt/scoring` (about 130 MB). IAM: a `BedrockInvokeJudge`
+  statement on the Lambda role for the judge model only.
+
+Not done yet: scoring versions saved later by the program officer (only version 1, from the upload, is
+scored), and a confidence column in the review UI.

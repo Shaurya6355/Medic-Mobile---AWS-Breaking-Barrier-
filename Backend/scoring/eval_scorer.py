@@ -26,7 +26,11 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from score_version import Judge, score_model, strands_judge
+from score_version import Judge, JudgeUnavailable, collect_items, page_texts, score_item, score_model, strands_judge
+
+
+def _log(msg: str) -> None:
+    print(msg, file=sys.stderr, flush=True)
 
 
 def _find(xs: list, id_: str) -> dict:
@@ -98,21 +102,28 @@ MUTATIONS = {**GAPS, **CONTROL}
 
 
 def run_eval(model: dict, blocks: dict | None, judge: Judge, samples: int, threshold: float, workers: int) -> dict:
-    clean = score_model(model, blocks, judge, samples, threshold, workers)
+    _log(f"scoring the clean model ({len(collect_items(model)[0])} items x {samples} samples)...")
+    clean = score_model(model, blocks, judge, samples, threshold, workers, progress=True)
     by_item = {r["item"]: r for r in clean["items"]}
     results = []
     usage = dict(clean["usage"])
-    for name, (target, what, fn) in MUTATIONS.items():
+    pages = page_texts(blocks)
+    for k, (name, (target, what, fn)) in enumerate(MUTATIONS.items(), 1):
         m = copy.deepcopy(model)
         fn(m)
-        scored = score_model(m, blocks, judge, samples, threshold, workers)
-        usage["inputTokens"] += scored["usage"]["inputTokens"]
-        usage["outputTokens"] += scored["usage"]["outputTokens"]
-        hit = next((r for r in scored["items"] if r["item"] == target), None)
+        # A mutation changes only its target item (tested), so only that item is scored again.
+        item = next((i for i in collect_items(m)[0] if i.path == target), None)
+        _log(f"mutation {k}/{len(MUTATIONS)} {name}: scoring {target}")
+        hit = score_item(item, pages, judge, samples, threshold) if item is not None else None
+        if hit is not None:
+            usage["inputTokens"] += hit["usage"]["inputTokens"]
+            usage["outputTokens"] += hit["usage"]["outputTokens"]
         before = by_item.get(target)
         results.append({
             "mutation": name, "group": "gap" if name in GAPS else "control", "target": target, "error": what,
-            "caught": bool(hit and hit["flag"]),
+            # A flag only counts when the judge actually scored the item; an unreachable judge catches nothing.
+            "caught": bool(hit and hit["flag"] and hit["score"] is not None),
+            "judge_errors": hit.get("errors") if hit else None,
             "score_clean": before["score"] if before else None,
             "score_mutant": hit["score"] if hit else None,
             "why": hit["why"] if hit else "target item not scored",
@@ -122,7 +133,8 @@ def run_eval(model: dict, blocks: dict | None, judge: Judge, samples: int, thres
     control = [r for r in results if r["group"] == "control"]
     gaps_caught = sum(1 for r in gaps if r["caught"])
     control_caught = sum(1 for r in control if r["caught"])
-    clean_flags = [{"item": r["item"], "score": r["score"], "why": r["why"], "judge_reason": r.get("lowest_reason")}
+    clean_flags = [{"item": r["item"], "score": r["score"], "why": r["why"], "judge_reason": r.get("lowest_reason"),
+                    **({"errors": r["errors"]} if r.get("errors") else {})}
                    for r in clean["items"] if r["flag"]]
     unstable = [r["item"] for r in clean["items"] if r["agreement"] is not None and r["agreement"] < 1.0]
     s = clean["summary"]
@@ -160,7 +172,13 @@ def main(argv: list[str] | None = None) -> int:
     model = json.loads(Path(a.model).read_text())
     blocks = json.loads(Path(a.blocks).read_text()) if a.blocks else None
     t0 = time.time()
-    out = run_eval(model, blocks, strands_judge(a.judge_model, a.region, a.temperature), a.samples, a.threshold, a.workers)
+    try:
+        out = run_eval(model, blocks, strands_judge(a.judge_model, a.region, a.temperature), a.samples, a.threshold, a.workers)
+    except JudgeUnavailable as e:
+        _log(f"STOPPED: nothing was scored. The judge ({a.judge_model}) failed on the first item:")
+        for err in dict.fromkeys(e.errors):
+            _log(f"  {err}")
+        return 2
     out["run"] = {"judge_model": a.judge_model, "samples": a.samples, "temperature": a.temperature,
                   "threshold": a.threshold, "seconds": round(time.time() - t0, 1)}
     Path(a.out).write_text(json.dumps(out, indent=2, ensure_ascii=False))

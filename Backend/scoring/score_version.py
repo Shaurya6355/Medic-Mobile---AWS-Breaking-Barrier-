@@ -118,6 +118,14 @@ def judge_input(item: Item, pages: dict[int, str]) -> str:
     return "\n".join(parts)
 
 
+class JudgeUnavailable(RuntimeError):
+    """Every judge call for the first item failed: nothing was scored."""
+
+    def __init__(self, errors: list[str]):
+        self.errors = errors
+        super().__init__("the judge could not be reached; first error: " + errors[0])
+
+
 # A judge takes (input, output) and returns (score, test_pass, reason, usage).
 Judge = Callable[[str, str], tuple[float, bool, str | None, dict[str, int]]]
 
@@ -129,7 +137,10 @@ def strands_judge(model_id: str, region: str, temperature: float) -> Judge:
     from strands_evals.evaluators import OutputEvaluator
     from strands_evals.types.evaluation import EvaluationData, EvaluationOutput
 
-    bedrock = BedrockModel(model_id=model_id, region_name=region, temperature=temperature, max_tokens=1024)
+    # streaming=False: the judge answers through a tool call, and Bedrock does not support tool use while
+    # streaming for some models (Meta Llama, for one). The judge does not need streaming.
+    bedrock = BedrockModel(model_id=model_id, region_name=region, temperature=temperature, max_tokens=1024,
+                           streaming=False)
 
     class QuoteSupportEvaluator(OutputEvaluator):
         """OutputEvaluator.evaluate, keeping the judge's token usage for the cost record."""
@@ -191,11 +202,29 @@ def score_item(item: Item, pages: dict[int, str], judge: Judge, samples: int, th
 
 
 def score_model(model: dict, blocks: dict | None, judge: Judge, samples: int = 3, threshold: float = 0.7,
-                workers: int = 8) -> dict:
+                workers: int = 8, progress: bool = False) -> dict:
     items, skipped = collect_items(model)
     pages = page_texts(blocks)
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        scored = list(pool.map(lambda it: score_item(it, pages, judge, samples, threshold), items))
+    done = [0]
+
+    def one(it: Item) -> dict:
+        r = score_item(it, pages, judge, samples, threshold)
+        if progress:
+            done[0] += 1
+            print(f"  {done[0]}/{len(items)} {it.path}: {r['score']}{'  FLAG' if r['flag'] else ''}",
+                  file=sys.stderr, flush=True)
+        return r
+
+    if not items:
+        scored = []
+    else:
+        # Fail fast: if the first item cannot be judged at all (no credentials, no model access, a model
+        # that cannot return the answer), stop with the real error instead of flagging every item.
+        first = one(items[0])
+        if first["score"] is None:
+            raise JudgeUnavailable(first.get("errors") or ["no error text"])
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            scored = [first] + list(pool.map(one, items[1:]))
     # Flagged first, lowest score first: the order the reviewer should read them in.
     scored.sort(key=lambda r: (not r["flag"], r["score"] if r["score"] is not None else -1, r["item"]))
     total = {"inputTokens": sum(r["usage"]["inputTokens"] for r in scored),
@@ -231,8 +260,15 @@ def main(argv: list[str] | None = None) -> int:
     model = json.loads(model_bytes)
     blocks = json.loads(Path(a.blocks).read_text()) if a.blocks else None
     started = time.time()
-    result = score_model(model, blocks, strands_judge(a.judge_model, a.region, a.temperature),
-                         a.samples, a.threshold, a.workers)
+    print(f"scoring with {a.judge_model}...", file=sys.stderr, flush=True)
+    try:
+        result = score_model(model, blocks, strands_judge(a.judge_model, a.region, a.temperature),
+                             a.samples, a.threshold, a.workers, progress=True)
+    except JudgeUnavailable as e:
+        print(f"STOPPED: nothing was scored. The judge ({a.judge_model}) failed on the first item:", file=sys.stderr)
+        for err in dict.fromkeys(e.errors):
+            print(f"  {err}", file=sys.stderr)
+        return 2
     result["run"] = {
         "judge": "strands_evals.OutputEvaluator", "judge_model": a.judge_model, "region": a.region,
         "samples": a.samples, "temperature": a.temperature, "threshold": a.threshold,

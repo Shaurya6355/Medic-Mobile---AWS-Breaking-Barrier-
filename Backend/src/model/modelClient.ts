@@ -36,10 +36,22 @@ export class ModelOutputError extends UsageError {
 
 const RAW_IN_MESSAGE = 200;
 
+// One markdown code fence around the whole reply (```json ... ``` or ``` ... ```). Models add it even when the
+// prompt forbids it (seen from Claude on the extract step, Nov 2026); the cross-check script tolerates it too.
+const WHOLE_REPLY_FENCE = /^\s*```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```\s*$/i;
+
+/** The reply without one code fence wrapped around all of it; any other text is returned unchanged. */
+export function stripWholeReplyFence(raw: string): string {
+  const m = WHOLE_REPLY_FENCE.exec(raw);
+  return m ? m[1]! : raw;
+}
+
 export function parseModelJson<T>(raw: string, schema: z.ZodType<T>, usage?: StepUsage): T {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    // Strict JSON, after removing at most one fence around the whole reply. Text around the JSON, several
+    // blocks, or broken JSON are still refused: nothing is searched for or repaired.
+    parsed = JSON.parse(stripWholeReplyFence(raw));
   } catch {
     // Only the start of raw goes in the message; the full text stays on .raw.
     const start = raw.length > RAW_IN_MESSAGE ? `${raw.slice(0, RAW_IN_MESSAGE)}...` : raw;

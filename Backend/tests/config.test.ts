@@ -23,16 +23,6 @@ describe("loadConfig", () => {
     expect(path.basename(path.dirname(c.fillPrompt))).toBe("extraction");
     expect(c.fillModelId).toBe("us.m");
   });
-  it("reads chat settings with defaults", () => {
-    expect(loadConfig(base)).toMatchObject({ chatModelId: "us.m", chatMaxCostUsd: 1, chatRatePerMin: 10 });
-    expect(loadConfig({ ...base, CHAT_MODEL_ID: "us.c", CHAT_MAX_COST_USD: "0.5", CHAT_RATE_PER_MIN: "3" })).toMatchObject({ chatModelId: "us.c", chatMaxCostUsd: 0.5, chatRatePerMin: 3 });
-    expect(() => loadConfig({ ...base, CHAT_MAX_COST_USD: "-1" })).toThrow(/CHAT_MAX_COST_USD/);
-  });
-  it("reads officer agent and chat token settings with defaults", () => {
-    expect(loadConfig(base)).toMatchObject({ officerAgentModelId: "us.m", officerAgentMaxCostUsd: 2, chatMaxTokens: 200000 });
-    expect(loadConfig({ ...base, OFFICER_AGENT_MODEL_ID: "us.a", OFFICER_AGENT_MAX_COST_USD: "0.5", CHAT_MAX_TOKENS: "5000" })).toMatchObject({ officerAgentModelId: "us.a", officerAgentMaxCostUsd: 0.5, chatMaxTokens: 5000 });
-    expect(() => loadConfig({ ...base, OFFICER_AGENT_MAX_COST_USD: "0" })).toThrow(/OFFICER_AGENT_MAX_COST_USD/);
-  });
   it("defaults and reads the revision prompts", () => {
     const d = loadConfig(base);
     expect(path.basename(d.reviseInstructionPrompt)).toBe("revise_instruction_prompt.txt");
@@ -139,5 +129,24 @@ describe("loadConfig", () => {
   });
   it("ignores AGENTCORE_RUNTIME_ARN when the backend is bedrock", () => {
     expect(loadConfig({ ...base, AGENTCORE_RUNTIME_ARN: "junk" }).agentCoreRuntimeArn).toBeUndefined();
+  });
+  it("reads LOG_LEVEL (default info) and refuses an unknown level", () => {
+    expect(loadConfig(base).logLevel).toBe("info");
+    expect(loadConfig({ ...base, LOG_LEVEL: "debug" }).logLevel).toBe("debug");
+    expect(loadConfig({ ...base, LOG_LEVEL: "silent" }).logLevel).toBe("silent");
+    expect(() => loadConfig({ ...base, LOG_LEVEL: "loud" })).toThrow(/LOG_LEVEL/);
+  });
+  it("turns quote scoring on only when JUDGE_MODEL_ID is set", () => {
+    expect(loadConfig(base).scoring).toBeUndefined();
+    expect(loadConfig({ ...base, JUDGE_MODEL_ID: "" }).scoring).toBeUndefined();
+    const c = loadConfig({ ...base, JUDGE_MODEL_ID: "us.judge" });
+    expect(c.scoring).toMatchObject({ judgeModelId: "us.judge", pythonBin: "python3", samples: 3 });
+    expect(path.basename(c.scoring!.scriptPath)).toBe("score_version.py");
+    expect(path.basename(path.dirname(c.scoring!.scriptPath))).toBe("scoring");
+  });
+  it("reads SCORING_PYTHON, SCORING_SCRIPT and SCORING_SAMPLES", () => {
+    const c = loadConfig({ ...base, JUDGE_MODEL_ID: "us.judge", SCORING_PYTHON: "/opt/scoring/bin/python", SCORING_SCRIPT: "/s.py", SCORING_SAMPLES: "1" });
+    expect(c.scoring).toEqual({ judgeModelId: "us.judge", pythonBin: "/opt/scoring/bin/python", scriptPath: "/s.py", samples: 1 });
+    expect(() => loadConfig({ ...base, JUDGE_MODEL_ID: "us.judge", SCORING_SAMPLES: "10" })).toThrow(/SCORING_SAMPLES/);
   });
 });
