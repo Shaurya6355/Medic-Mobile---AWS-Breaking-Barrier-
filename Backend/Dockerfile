@@ -31,8 +31,10 @@ ENV NODE_ENV=production \
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
-COPY extraction/prepare_input.py extraction/final_prompt.txt extraction/fill_prompt.txt extraction/revise_instruction_prompt.txt extraction/revise_prompt.txt ./extraction/
-COPY scoring/score_version.py ./scoring/score_version.py
+# --chmod: COPY keeps the build machine's file modes, and Lambda runs the image as a non-root user that does not
+# own these files. A file that is owner-only on a laptop (-rw-------) is then unreadable ("Permission denied").
+COPY --chmod=0644 extraction/prepare_input.py extraction/final_prompt.txt extraction/fill_prompt.txt extraction/revise_instruction_prompt.txt extraction/revise_prompt.txt ./extraction/
+COPY --chmod=0644 scoring/score_version.py ./scoring/score_version.py
 USER node
 EXPOSE 8080
 CMD ["node", "dist/index.js"]
