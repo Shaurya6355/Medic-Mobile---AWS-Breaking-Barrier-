@@ -58,12 +58,15 @@ export interface AgentDeps {
   region?: string;
 }
 
-/** Real factory: mirrors Backend/src/model/strands.ts (temperature 0, no printer, no SDK retries). */
+/** Claude Haiku 5.5 rejects any temperature but its default, so none is sent for it (as in Backend/src/model/strands.ts). */
+const NO_TEMPERATURE = /claude-haiku-5/;
+
+/** Real factory: mirrors Backend/src/model/strands.ts (temperature 0 except Haiku 5.5, no printer, no SDK retries). */
 export const createStrandsAgent: AgentFactory = (opts) => {
   const model = new BedrockModel({
     region: opts.region,
     modelId: opts.modelId,
-    temperature: 0,
+    ...(NO_TEMPERATURE.test(opts.modelId) ? {} : { temperature: 0 }),
     maxTokens: opts.maxTokens,
   });
   // retryStrategy null: retries are owned by the orchestrator (503 transient).
