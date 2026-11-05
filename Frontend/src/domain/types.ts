@@ -19,6 +19,18 @@ export interface Evidence {
   pages: Page[] | null; pagesFrom: string;
   /** Draft B for the cross check. Null when the pipeline gave none. */
   draftB: Spec | null; draftBFrom: string;
+  /** Live mode: the backend's own cross-check of the loaded version (GET /runs/:id/versions/:n/flags).
+      Used instead of draftB when present; null when the route could not be read. */
+  cross?: CrossFlags | null;
+}
+
+/** One flag of the backend's flags document (Backend/src/validation/flags.ts), as the cross check shows it. */
+export interface CrossFlag { severity: "blocking" | "warning" | "info"; code: string; subjects: { kind: string; id: string }[]; messages: { clinician: string; program_officer: string } }
+/** The backend's flags document, the parts the front end reads. */
+export interface CrossFlags {
+  n: number; comparison: "ran" | "not_run" | "second_draft_invalid"; notice: string;
+  summary: { flagCount: number; compared?: number; differing?: number; skipped?: number };
+  flags: CrossFlag[];
 }
 
 /** An open question from the logic model, put to the clinician by the AI agent. */

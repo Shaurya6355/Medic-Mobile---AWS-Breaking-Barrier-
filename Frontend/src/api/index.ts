@@ -11,7 +11,7 @@ import * as wf from "../domain/workflow";
 import { FALLBACK_TEXT } from "../domain/agent";
 import { sampleScores } from "../domain/scores";
 import { AUTH, currentUser, idToken, signIn } from "../auth";
-import type { AuditRow, Guideline, GuidelineType, ItemId, Model, Patch, QuoteScores, Spec, Workflow } from "../domain/types";
+import type { AuditRow, CrossFlags, Guideline, GuidelineType, ItemId, Model, Patch, QuoteScores, Spec, Workflow } from "../domain/types";
 
 export const API_URL: string | undefined = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || undefined;
 /** True when guidelines come from the backend pipeline rather than sample data. */
@@ -177,6 +177,18 @@ async function loadScores(runId: string, n: number, model: Model): Promise<Quote
   }
 }
 
+/* ---------- Cross check (advisory) ---------- */
+/** The backend's cross-check flags of version n. Never throws: null leaves the stage saying it could not load. */
+async function loadCross(runId: string, n: number): Promise<CrossFlags | null> {
+  try {
+    return await call<CrossFlags>("/runs/" + runId + "/versions/" + n + "/flags");
+  } catch {
+    return null;
+  }
+}
+/** The workflow with the cross check of a newly loaded backend version. */
+const withCross = (w: Workflow, cross: CrossFlags | null): Workflow => ({ ...w, evidence: { ...w.evidence, cross } });
+
 /* ---------- Workflow ---------- */
 export async function createDraft(args: { guidelineId: string; pathway: string; pages: number[] }): Promise<Workflow> {
   const id = "wf-" + seq++;
@@ -187,13 +199,14 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
     if (!last) throw new Error("This run has no logic model version yet. Wait for the pipeline to finish.");
     const v = await call<{ body: unknown }>("/runs/" + g.id + "/versions/" + last.n);
     const model = loadSpec(v.body, "The backend's logic model (version " + last.n + ")");
-    const [[fc, fo], scores] = await Promise.all([
+    const [[fc, fo], scores, cross] = await Promise.all([
       Promise.all(["clinician", "program_officer"].map(a => call<FindingsView>("/runs/" + g.id + "/versions/" + last.n + "/findings?audience=" + a))),
       loadScores(g.id, last.n, model),
+      loadCross(g.id, last.n),
     ]);
     const flat = (f: FindingsView, role: "clinician" | "program_officer") => f.groups.flatMap(gr => gr.findings.map(x => ({ severity: gr.severity, message: x.message, check: x.check, role })));
     const remote = { runId: g.id, n: last.n, modelSha: fc.modelSha, base: clone(model), claimText: fc.claimText, findings: [...flat(fc, "clinician"), ...flat(fo, "program_officer")] };
-    const evidence = { pages: null, pagesFrom: "Guideline text stays in the backend; its own quote check is in the backend findings", draftB: null, draftBFrom: "The backend does not return a second draft" };
+    const evidence = { pages: null, pagesFrom: "Guideline text stays in the backend; its own quote check is in the backend findings", draftB: null, draftBFrom: "The backend runs the cross check itself", cross };
     workflows[id] = wf.createDraft(wf.initialWorkflow(id), { id: g.id, name: g.name, pathway: args.pathway, pages: args.pages }, {
       model, evidence, remote,
       event: "Loaded logic model version " + last.n + " from the backend (run " + g.id + ")",
@@ -216,15 +229,18 @@ interface ChatReply { reply: string; citations: { kind: string; ref: string; quo
 interface RevisionRec { id: string; status: "instruction_ready" | "applying" | "applied" | "no_change" | "failed" | string; instruction: string; error?: string; toVersion?: number; applied?: unknown[]; refused?: { reason?: string; detail?: string }[]; questionsAdded?: string[] }
 
 /** The newest logic model version of a run, as the review screen needs it. */
-async function fetchLatest(runId: string): Promise<{ model: Spec; remote: NonNullable<Workflow["remote"]> }> {
+async function fetchLatest(runId: string): Promise<{ model: Spec; remote: NonNullable<Workflow["remote"]>; cross: CrossFlags | null }> {
   const vs = await call<VersionRec[]>("/runs/" + runId + "/versions");
   const last = vs[vs.length - 1];
   if (!last) throw new Error("This run has no logic model version yet.");
   const v = await call<{ body: unknown }>("/runs/" + runId + "/versions/" + last.n);
   const model = loadSpec(v.body, "The backend's logic model (version " + last.n + ")");
-  const [fc, fo] = await Promise.all(["clinician", "program_officer"].map(a => call<FindingsView>("/runs/" + runId + "/versions/" + last.n + "/findings?audience=" + a)));
+  const [[fc, fo], cross] = await Promise.all([
+    Promise.all(["clinician", "program_officer"].map(a => call<FindingsView>("/runs/" + runId + "/versions/" + last.n + "/findings?audience=" + a))),
+    loadCross(runId, last.n),
+  ]);
   const flat = (f: FindingsView, role: "clinician" | "program_officer") => f.groups.flatMap(gr => gr.findings.map(x => ({ severity: gr.severity, message: x.message, check: x.check, role })));
-  return { model, remote: { runId, n: last.n, modelSha: fc.modelSha, base: clone(model), claimText: fc.claimText, findings: [...flat(fc, "clinician"), ...flat(fo, "program_officer")] } };
+  return { model, cross, remote: { runId, n: last.n, modelSha: fc.modelSha, base: clone(model), claimText: fc.claimText, findings: [...flat(fc, "clinician"), ...flat(fo, "program_officer")] } };
 }
 
 /** A message to the assistant. Live: what the local rules understand stays local (what-if patients, explain a rule,
@@ -317,7 +333,7 @@ export async function confirmRevision(id: string, msgId: number, onUpdate: (w: W
     const changed = latest.remote.n > was;
     const why = (rev.refused ?? []).map(r => r.detail || r.reason).filter(Boolean).join("; ");
     let next = wf.setRevisionState(w, msgId, changed ? "applied" : "no_change");
-    if (changed) next = wf.replaceFromBackend(next, latest.model, latest.remote, "AI revision of your feedback; version " + was + " -> " + latest.remote.n);
+    if (changed) next = withCross(wf.replaceFromBackend(next, latest.model, latest.remote, "AI revision of your feedback; version " + was + " -> " + latest.remote.n), latest.cross);
     next = wf.addMsgs(next, { from: "agent", text: changed
       ? "Done. The backend saved version " + latest.remote.n + " and the review shows it now (" + (rev.applied?.length ?? 0) + " edit" + (rev.applied?.length === 1 ? "" : "s") + " by the AI" + (rev.questionsAdded?.length ? ", " + rev.questionsAdded.length + " new open question" + (rev.questionsAdded.length === 1 ? "" : "s") : "") + ")."
       : "I did not change the model." + (why ? " My proposed edit was refused by the safety check: " + why + "." : " Nothing needed changing.") });
@@ -347,7 +363,7 @@ export async function approve(id: string): Promise<Workflow> {
   if (locked.n > w.remote.n + 1) {
     // The officer agent saved a fix of its own on top of the clinician's version; that is the version that was signed.
     const latest = await fetchLatest(w.remote.runId);
-    await mutate(id, x => wf.replaceFromBackend(x, latest.model, latest.remote, "Officer agent saved version " + latest.remote.n + " after your review"));
+    await mutate(id, x => withCross(wf.replaceFromBackend(x, latest.model, latest.remote, "Officer agent saved version " + latest.remote.n + " after your review"), latest.cross));
   }
   return mutate(id, x => wf.approveAll(x, locked));
 }

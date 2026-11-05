@@ -5,7 +5,7 @@
 import { analyze, applyPatch, item, crossCheck, literals, numberResults, quoteResults, type ItemId, type Spec } from "../../../shared/pathway/index.ts";
 import { GOLDEN } from "./data";
 import { classify, describeP, golden, grid, itemLabel, outName } from "./logic";
-import type { Check, CheckKey, Evidence } from "./types";
+import type { Check, CheckKey, CrossFlags, Evidence } from "./types";
 
 export type StageStatus = "pass" | "warn" | "fail" | "skipped" | "missing";
 export interface Part { name: string; ok: boolean; text: string }
@@ -70,7 +70,35 @@ function cross(m: Spec, b: Spec): Pick<Stage, "issues" | "summary"> {
     issues.push({ kind: "cross", sev: "warning", id: d.ruleA ? item.rule(d.ruleA) : item.scope,
       text: ds.length + " sample patient" + (ds.length > 1 ? "s" : "") + ": draft A says " + outName(m, d.a) + ", draft B says " + outName(b, d.b) + ". E.g. " + describeP(m, d.answers) + "." });
   });
-  return { summary: r.disagree.length ? "The drafts disagree on " + r.disagree.length + " of " + r.patients + " sample patients" : "The drafts agree on all " + r.patients + " sample patients", issues };
+  return { summary: (r.patients - r.disagree.length) + "/" + r.patients + " sample patients agree", issues };
+}
+
+/** A backend finding's subject as the item the review screen marks. Actions sit under their outcome. */
+function subjectItem(s: { kind: string; id: string } | undefined): ItemId {
+  switch (s?.kind) {
+    case "question": return item.q(s.id);
+    case "derived": return item.d(s.id);
+    case "rule": return item.rule(s.id);
+    case "outcome": return item.out(s.id);
+    case "action": return item.out(s.id.split("/")[0]);
+    case "follow_up": return item.fu(s.id);
+    default: return item.scope;
+  }
+}
+
+/** The cross check as the backend ran it on the loaded version (live mode). Every flag is a warning: none blocks signing. */
+function backendCross(c: CrossFlags): Omit<Stage, "key" | "n" | "name" | "desc" | "asks" | "owner"> {
+  const uses = "Backend cross-check of version " + c.n;
+  if (c.comparison === "not_run")
+    return { status: "missing", issues: [], uses, summary: "Not run: the backend has no second draft for this run." };
+  const issues: Check[] = c.flags.filter(f => f.severity !== "info").map(f => ({ kind: "cross", sev: "warning", id: subjectItem(f.subjects[0]), text: f.messages.clinician }));
+  if (c.comparison === "second_draft_invalid")
+    return { status: "warn", issues, uses, summary: "The second draft could not be read, so the drafts were not compared." };
+  const s = c.summary;
+  const summary = s.compared === undefined
+    ? (issues.length ? issues.length + " difference" + (issues.length > 1 ? "s" : "") + " between the drafts" : "The drafts agree")
+    : (s.compared - (s.differing ?? 0)) + "/" + s.compared + " sample patients agree";
+  return { status: statusOf(issues), issues, uses, summary };
 }
 
 const cache = new WeakMap<Spec, { ev: Evidence; stages: Stage[] }>();
@@ -123,7 +151,9 @@ export function checkStages(m: Spec, ev: Evidence): Stage[] {
     });
   }
 
-  if (!ev.draftB) add("cross", { status: "missing", issues: [], summary: "Needs draft B, a second independent draft from the model pipeline." });
+  if (ev.cross) add("cross", backendCross(ev.cross));
+  else if (ev.cross === null) add("cross", { status: "missing", issues: [], summary: "Could not load the backend's cross-check for this version." });
+  else if (!ev.draftB) add("cross", { status: "missing", issues: [], summary: "Needs draft B, a second independent draft from the model pipeline." });
   else add("cross", { ...cross(m, ev.draftB), uses: ev.draftBFrom });
 
   cache.set(m, { ev, stages: out });
