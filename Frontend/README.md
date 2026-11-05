@@ -1,6 +1,6 @@
 # Frontend: guideline to form review
 
-React 19 + Vite. The clinician reviews the logic model (View tab: flowchart, test patients, six checks; Edit tab: rule table with a live flow) and talks to an assistant. An AI agent stands in for the program officer. The IT approver deploys.
+React 19 + Vite. The clinician reviews the logic model (View tab: flowchart, test patients, six checks; Edit tab: rule table; edits show in the View flowchart) and talks to an assistant. The backend's officer agent stands in for the program officer. The IT approver deploys.
 
 ## Run
 
@@ -27,7 +27,7 @@ cd Frontend && VITE_API_URL=http://localhost:8787 npm run dev      # UI on http:
 | Upload a guideline | `POST /runs {filename}`, then `PUT` the PDF to the returned presigned URL (Content-Type `application/pdf`). The backend reads every page. |
 | Library and progress | `GET /runs`, `GET /runs/:id` (state and steps) |
 | Start the review | `GET /runs/:id/versions`, `GET /runs/:id/versions/:n`, `GET .../findings?audience=clinician` and `program_officer` |
-| Approve | Optional `POST /runs/:id/versions` saved by the AI agent as `program_officer` (answers to questions routed to the program officer); `POST /runs/:id/versions` saved by the clinician (edits and the clinician's answers); `GET .../status` for the modelSha; `POST .../signatures/program_officer` (userId `ai-agent`); `POST .../signatures/clinician`. The version is then locked. |
+| Approve | `POST /runs/:id/versions` saved by the clinician (edits and the clinician's answers); the backend's officer agent then signs it as `program_officer` (the API refuses that role from the UI); the UI polls `GET .../status` until it reads `awaiting_clinician`, then `POST .../signatures/clinician`. The version is then locked. |
 
 Edits, the assistant and the in-browser checks run locally; nothing reaches the backend until Approve. Every open question is written into the model as resolved with a written answer, saved by the role it is routed to, as the backend's open-question check requires. The backend refuses a signature while its gate has blocking findings; the refusal and its blockers show as an error banner.
 

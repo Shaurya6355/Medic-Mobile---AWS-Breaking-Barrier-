@@ -79,7 +79,7 @@ export function ReviewScreen({ w, role, sel, setSel, act, checks }: { w: Workflo
           ) : null}
         </div>
       </div>
-      {canEdit && why ? <div className="note rvwhy">{"Before you can approve: " + why + "."}</div> : null}
+      {canEdit && why ? <div className="note rvwhy">{why[0].toUpperCase() + why.slice(1) + "."}</div> : null}
 
       <CheckBar stages={stages} open={openCheck} setOpen={k => { setOpenCheck(k); if (!k && location.hash) history.replaceState(null, "", location.pathname + location.search); }} onSelect={setSel} />
 
