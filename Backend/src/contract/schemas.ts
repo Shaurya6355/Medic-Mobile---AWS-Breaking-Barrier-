@@ -219,6 +219,21 @@ export const ChatRequest = z
     userId: UserId,
     role: z.literal("clinician"),
     messages: z.array(z.object({ from: z.enum(["user", "assistant"]), text: z.string().min(1).max(4000) }).strict()).min(1).max(20),
+    // What the clinician has open on screen (the review page): the answers are grounded in it, not in the chat history.
+    context: z
+      .object({
+        version: z.number().int().min(1),
+        /** Edits on the page that are not saved yet: a keep would replace them, so it is refused. */
+        unsavedEdits: z.boolean().optional(),
+        selected: z.string().max(200).optional(),
+        /** JSON of the selected rule, question, result or value as loaded on the page (unsaved edits included). */
+        selectedItem: z.string().max(8000).optional(),
+        /** n = the number the clinician sees on the question card ("Question 11 of 14"). */
+        openQuestions: z.array(z.object({ n: z.number().int().min(1).optional(), id: z.string().min(1).max(200), title: z.string().max(500), answered: z.boolean() }).strict()).max(60),
+        findings: z.array(z.object({ severity: z.string().max(20), message: z.string().max(600) }).strict()).max(80),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type ChatRequest = z.input<typeof ChatRequest>;

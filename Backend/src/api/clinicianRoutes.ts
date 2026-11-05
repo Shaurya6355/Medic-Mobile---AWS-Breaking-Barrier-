@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import type { ZodType } from "zod";
 import { artifactKey } from "../artifacts/artifactStore.js";
 import type { ArtifactStore } from "../artifacts/artifactStore.js";
-import { answerChat } from "../chat/chat.js";
+import { answerChat, type ChatContext, type ChatResult } from "../chat/chat.js";
 import { routes } from "../contract/routes.js";
 import { ActivityQuery, ChatRequest, PreviewEditsRequest, RestoreRequest, SaveEditsRequest } from "../contract/schemas.js";
 import { describeAudit } from "../activity/describe.js";
@@ -129,6 +129,53 @@ export function registerClinicianRoutes(app: FastifyInstance, deps: ClinicianDep
     return reply.code(r.status).send({ error: r.error, ...(r.issues ? { issues: r.issues } : {}), ...(r.expected ? { expected: r.expected } : {}) });
   };
   const saveDeps = { store, artifacts, validator: deps.validator, onVersionSaved: deps.onVersionSaved, now: deps.now };
+  const KEPT_TEXT = "Kept as drafted: the clinician reviewed this question and agreed with the draft.";
+  /**
+   * What the Keep button does, done on the backend: the clinician's keep of open questions, asked for in the chat,
+   * is saved as a new version (author = the clinician, role clinician) with each question resolved, so the checks,
+   * the officer agent and the signatures see it like any other clinician edit. The bot only asks (result.action,
+   * ids already checked against the page); this decides again against the stored version: the page must show the
+   * latest version, have no unsaved edits, and each question must be open and routed to the clinician.
+   */
+  const keepInChat = async (runId: string, userId: string, ctx: ChatContext | undefined, r: ChatResult): Promise<ChatResult> => {
+    const { action, ...plain } = r;
+    if (action === undefined || ctx === undefined) return plain;
+    const say = (reply: string): ChatResult => ({ reply, citations: [] });
+    if (ctx.unsavedEdits === true) return say("You have edits that are not saved yet. Approve or undo them first, then ask me again: keeping a question saves a new version and would replace them.");
+    const latest = await latestN(runId);
+    if (ctx.version !== latest) return say(`The page shows version ${ctx.version} but the newest is version ${latest}. Reload the review, then ask me again.`);
+    const loaded = await loadVersion({ store, artifacts }, runId, latest);
+    if (!loaded.model) return say("The newest version is not a valid logic model, so I could not keep anything.");
+    const model = loaded.model as Model;
+    const wanted = action.type === "keep_all" ? ctx.openQuestions.filter((q) => !q.answered).map((q) => q.id) : action.ids;
+    const qids = [...new Set(wanted.map((id) => id.replace(/^F-/, "")))];
+    const open = model.open_questions.filter((q) => qids.includes(q.id) && q.status === "open" && q.route_to === "clinician");
+    const skipped = qids.filter((id) => !open.some((q) => q.id === id));
+    if (open.length === 0) return say("None of those is an open question for the clinician in the newest version, so nothing was kept.");
+    const next = latest + 1;
+    const edited = structuredClone(model);
+    for (const q of edited.open_questions) {
+      if (open.some((o) => o.id === q.id)) {
+        q.status = "resolved";
+        q.resolution = KEPT_TEXT;
+      }
+    }
+    edited.meta = { ...edited.meta, version: next, parent_version: latest, created_by: userId, change_note: `Kept as drafted in the chat by ${userId}: ${open.map((q) => q.id).join(", ")}` };
+    const saved = await saveVersion(saveDeps, {
+      runId,
+      parentVersion: latest,
+      body: edited,
+      author: userId,
+      authorRole: "clinician",
+      origin: "chat_keep",
+      change: { ops: { kind: "keep_questions", ids: open.map((q) => q.id) }, behaviourChanges: [] },
+      idempotencyKey: `chat-keep:${runId}:${latest}:${open.map((q) => q.id).sort().join(",")}`,
+    });
+    if (!saved.ok) return say(`I could not save that (${saved.error}). Nothing was kept.`);
+    const ids = open.map((q) => q.id);
+    const more = skipped.length > 0 ? ` Not kept, because they are not open questions for the clinician: ${skipped.join(", ")}.` : "";
+    return { reply: `Kept as drafted: ${ids.join(", ")}. Saved as version ${saved.n}.${more}`, citations: [], kept: { version: saved.n, ids, skipped } };
+  };
   const idemKey = (h: unknown): string | undefined => (typeof h === "string" && h.length > 0 && h.length <= 200 ? h : undefined);
 
   // Activity feed.
@@ -176,16 +223,18 @@ export function registerClinicianRoutes(app: FastifyInstance, deps: ClinicianDep
         return out;
       },
     };
-    const result = await answerChat(
+    const first = await answerChat(
       { store, artifacts, signoff, model: metered, modelId: chat.modelId, now: deps.now },
-      { runId, userId: body.userId, messages: body.messages },
+      { runId, userId: body.userId, messages: body.messages, context: body.context },
     );
+
+    const result = await keepInChat(runId, body.userId, body.context, first);
 
     // Trace, never model memory: one jsonl line per turn plus an audit pointer (no text in the audit).
     const at = deps.now();
     const key = artifactKey(runId, "chat", `${new Date(at).toISOString().slice(0, 10)}.jsonl`);
     const question = [...body.messages].reverse().find((m) => m.from === "user")?.text ?? "";
-    const line = JSON.stringify({ at, userId: body.userId, question, reply: result.reply, citations: result.citations, ...used, modelId: chat.modelId }) + "\n";
+    const line = JSON.stringify({ at, userId: body.userId, question, reply: result.reply, citations: result.citations, action: first.action ?? null, kept: result.kept ?? null, ...used, modelId: chat.modelId }) + "\n";
     try {
       let prev = "";
       try {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { artifactKey } from "../../src/artifacts/artifactStore.js";
-import { answerChat, OFF_TOPIC, UNGROUNDED, type ChatDeps } from "../../src/chat/chat.js";
+import { answerChat, checkAction, OFF_TOPIC, UNGROUNDED, type ChatDeps } from "../../src/chat/chat.js";
 import { retrieve } from "../../src/chat/retrieve.js";
 import { runTool } from "../../src/chat/tools.js";
 import { evaluate } from "../../src/logic/index.js";
@@ -118,5 +118,48 @@ describe("chat", () => {
     const { deps } = await setup([j({ reply: "Check for danger signs.", citations: [{ kind: "page", ref: "6", quote: "Any DANGER SIGN?" }] })]);
     const r = await answerChat(deps, { runId: "r1", userId: "u", messages: msgs("danger?") });
     expect(r.reply).toBe("Check for danger signs.");
+  });
+});
+
+describe("page context and keep actions", () => {
+  const ctx = {
+    version: 2,
+    selected: "rule:R3",
+    selectedItem: '{"id":"R3"}',
+    openQuestions: [
+      { id: "F-q1", title: "Cough days", answered: false },
+      { id: "F-q2", title: "Chest", answered: true },
+    ],
+    findings: [{ severity: "blocking", message: "A check message" }],
+  };
+
+  it("puts the page in the prompt and only the last turns of the history", async () => {
+    const { deps, model } = await setup([j({ reply: "R3 is flagged because of the check.", citations: [] })]);
+    const many = Array.from({ length: 10 }, (_, i) => ({ from: "user" as const, text: `old message ${i}` }));
+    await answerChat(deps, { runId: "r1", userId: "u", messages: [...many, { from: "user", text: "why is this flagged?" }], context: ctx });
+    const sent = JSON.stringify(model.calls);
+    expect(sent).toContain("A check message");
+    expect(sent).toContain("rule:R3");
+    expect(sent).toContain("why is this flagged?");
+    expect(sent).not.toContain("old message 0");
+  });
+
+  it("returns a keep action only for open questions the page showed", async () => {
+    const { deps } = await setup([j({ reply: "Keeping Cough days.", citations: [], action: { type: "keep", ids: ["F-q1"] } })]);
+    const out = await answerChat(deps, { runId: "r1", userId: "u", messages: msgs("keep the cough days question"), context: ctx });
+    expect(out.action).toEqual({ type: "keep", ids: ["F-q1"] });
+  });
+
+  it("drops an action that names an answered or unknown question, and says nothing changed", async () => {
+    const { deps } = await setup([j({ reply: "Keeping it.", citations: [], action: { type: "keep", ids: ["F-q2"] } })]);
+    const out = await answerChat(deps, { runId: "r1", userId: "u", messages: msgs("keep chest"), context: ctx });
+    expect(out.action).toBeUndefined();
+    expect(out.reply).toMatch(/changed nothing/);
+  });
+
+  it("checkAction: keep_all needs an open question; no context means no action", () => {
+    expect(checkAction({ type: "keep_all" }, ctx)).toEqual({ type: "keep_all" });
+    expect(checkAction({ type: "keep_all" }, { ...ctx, openQuestions: [] })).toBeUndefined();
+    expect(checkAction({ type: "keep_all" }, undefined)).toBeUndefined();
   });
 });

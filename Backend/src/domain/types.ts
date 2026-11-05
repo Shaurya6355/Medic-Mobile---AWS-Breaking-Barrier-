@@ -108,7 +108,7 @@ export interface Version {
   changeSha256?: string;
 }
 
-export type VersionOrigin = "pipeline" | "officer_agent" | "tree_edit" | "restore" | "api";
+export type VersionOrigin = "pipeline" | "officer_agent" | "tree_edit" | "chat_keep" | "restore" | "api";
 
 export type AgentStatus = "started" | "fixing" | "signed" | "escalated" | "over_budget" | "failed";
 
