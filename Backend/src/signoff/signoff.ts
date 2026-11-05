@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ArtifactStore } from "../artifacts/artifactStore.js";
 import { NotFound } from "../artifacts/artifactStore.js";
 import type { CompileSettings } from "../compiler/types.js";
-import { SignerRole, type RejectRequest, type RunState, type SignRequest } from "../contract/schemas.js";
+import { SignerRole, type AcknowledgeRequest, type RejectRequest, type RunState, type SignRequest } from "../contract/schemas.js";
 import { canTransition } from "../domain/stateMachine.js";
 import type { Rejection, Run, Signature, Version } from "../domain/types.js";
 import type { Model } from "../logic/index.js";
@@ -12,6 +12,8 @@ import type { Finding } from "../validation/finding.js";
 import type { FindingGroup } from "../validation/gates.js";
 import {
   VersionNotFound,
+  acksKey,
+  loadAcks,
   computeFindings,
   ensureFindings,
   inputsFor,
@@ -446,6 +448,36 @@ export class Signoff {
       runState = (await this.mustRun(runId)).state;
     }
     return { rejection, status: "rejected", runState };
+  }
+
+  /**
+   * The clinician accepts blocking findings they decide ("keep": this is correct), with a reason (at least a full
+   * sentence). Each is recorded with name, reason and time (artifact + audit) and stops blocking. Only findings
+   * that are blocking now and decided by the clinician can be accepted; anything else is refused whole.
+   * Error codes: 400 invalid_user_id; 403 role_mismatch; 404 not_found; 409 locked / superseded; 422 comment_required / not_acceptable.
+   */
+  async acknowledge(runId: string, n: number, req: AcknowledgeRequest): Promise<{ accepted: number; status: ApprovalStatus; gates: Omit<FindingsRecord["gates"], "blockers"> }> {
+    if (req.role !== "clinician") throw new SignoffError(403, "role_mismatch", "Only the clinician accepts these findings");
+    const userId = Signoff.userIdOf(req.userId);
+    const note = req.note.trim();
+    if (!isMeaningfulText(note)) throw new SignoffError(422, "comment_required", "Say why this is correct (a full sentence)");
+    await this.heal(await this.mustRun(runId));
+    const { record, loaded } = await this.fresh(runId, n);
+    const latest = (await this.io.store.listVersions(runId)).reduce((m, x) => Math.max(m, x.n), 0);
+    if (loaded.version.status === "locked") throw new SignoffError(409, "locked", `Version ${n} is locked; edits make a new version`);
+    if (loaded.version.n !== latest) throw new SignoffError(409, "superseded", `Version ${n} was replaced by version ${latest}`);
+    const open = new Set(record.gates.blockers.clinician);
+    const bad = req.findingIds.filter((id) => !open.has(id));
+    if (bad.length > 0) {
+      throw new SignoffError(422, "not_acceptable", "Only findings that block the clinician's signature, and that the clinician decides, can be accepted", { findingIds: bad });
+    }
+    const acks = await loadAcks(this.io.artifacts, runId);
+    const at = this.io.now();
+    for (const id of req.findingIds) acks[id] = { by: userId, note, at, n };
+    await this.io.artifacts.put(acksKey(runId), JSON.stringify(acks), "application/json");
+    await this.io.store.appendAudit(runId, { at, type: "findings_accepted", detail: { n, userId, modelSha: loaded.sha, note, findingIds: req.findingIds } });
+    const after = await this.fresh(runId, n);
+    return { accepted: req.findingIds.length, status: approvalStatus(after.loaded.version, after.loaded.sha, true), gates: gatesOnly(after.record.gates) };
   }
 
   /**

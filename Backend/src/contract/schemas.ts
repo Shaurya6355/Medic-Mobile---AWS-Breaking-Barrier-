@@ -69,6 +69,18 @@ export const RejectRequest = z
   .strict();
 export type RejectRequest = z.input<typeof RejectRequest>;
 
+// The clinician accepts blocking findings they decide ("keep": this is correct) with a reason. The acceptance is
+// recorded with their name and counts for the findings with those ids. AUTH SEAM as for SignRequest.
+export const AcknowledgeRequest = z
+  .object({
+    role: z.literal("clinician"),
+    userId: UserId,
+    findingIds: z.array(z.string().regex(/^[0-9a-f]{64}$/)).min(1).max(200),
+    note: z.string().trim().min(15).max(5000),
+  })
+  .strict();
+export type AcknowledgeRequest = z.input<typeof AcknowledgeRequest>;
+
 // Revision loop. AUTH SEAM (DEC-015): role and userId from the body until Cognito, as for SignRequest.
 // Step 1: ask the AI to turn the comments on a version into a revision instruction.
 export const CreateRevisionRequest = z

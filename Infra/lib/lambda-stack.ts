@@ -42,6 +42,7 @@ export const API_ROUTES: readonly string[] = [
   "POST /runs/{id}/versions/{n}/signatures/{role}",
   // The clinician's rejection with a comment (AR-06, RR-02; DEC-020). Same DynamoDB actions as a signature.
   "POST /runs/{id}/versions/{n}/reject",
+  "POST /runs/{id}/versions/{n}/acknowledge",
   // Revision loop (DEC-037): comments -> AI instruction -> confirmed -> new version. Revisions are S3
   // artifacts under runs/<id>/revisions/, covered by the existing object policy. Same auth seam as sign-off.
   "POST /runs/{id}/versions/{n}/revisions",
