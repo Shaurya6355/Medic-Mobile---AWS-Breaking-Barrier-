@@ -30,6 +30,7 @@
     "@aws-sdk/lib-dynamodb": "^3.1161.0",
     "@aws-sdk/s3-request-presigner": "^3.1161.0",
     "@strands-agents/sdk": "^1.23.0",
+    "aws-jwt-verify": "^5.2.1",
     "exceljs": "^4.4.0",
     "fastify": "^5.12.8",
     "jszip": "^3.10.2",

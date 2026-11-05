@@ -1,3 +1,4 @@
+import { visibleRuns, type IdentityResolver } from "../auth/identity.js";
 import Fastify from "fastify";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { ZodType } from "zod";
@@ -43,7 +44,7 @@ import type { Store } from "../store/store.js";
 
 // Narrow view of the Orchestrator so the API depends on only what it calls.
 export interface OrchestratorPort {
-  createRun(pages: number[] | undefined, filename: string): Promise<Run>;
+  createRun(pages: number[] | undefined, filename: string, createdBy?: string): Promise<Run>;
   resume(runId: string): Promise<void>;
   prepareResume(runId: string): Promise<void>;
   onUploaded(runId: string): Promise<void>;
@@ -53,6 +54,9 @@ export interface OrchestratorPort {
 }
 
 export interface ServerDeps {
+  // Sign-in (DEC-015). When set, POST /runs and GET /runs need a valid Cognito ID token: the run records who
+  // created it and the list shows each person the runs for their role. Absent (tests, dev:local): no sign-in.
+  identity?: IdentityResolver;
   orchestrator: OrchestratorPort;
   store: Store;
   artifacts: ArtifactStore;
@@ -181,15 +185,19 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         issues: [`pages exceed maximum of ${maxPages}: ${tooBig.join(", ")}`],
       });
     }
-    const run = await orchestrator.createRun(body.pages, body.filename);
+    const who = deps.identity ? await deps.identity(req.headers.authorization) : undefined;
+    if (who === null) return reply.code(401).send({ error: "unauthorized" });
+    const run = await orchestrator.createRun(body.pages, body.filename, who?.userId);
     const uploadUrl = await presign(inputPdfKey(run.runId));
     const res: CreateRunResponse = { runId: run.runId, uploadUrl };
     return reply.code(201).send(res);
   });
 
-  app.get(routes.pattern.runs, async () => {
+  app.get(routes.pattern.runs, async (req, reply) => {
+    const who = deps.identity ? await deps.identity(req.headers.authorization) : undefined;
+    if (who === null) return reply.code(401).send({ error: "unauthorized" });
     const runs = await store.listRuns();
-    return runs.sort((a, b) => b.createdAt - a.createdAt);
+    return (who ? visibleRuns(runs, who) : runs).sort((a, b) => b.createdAt - a.createdAt);
   });
 
   app.get<{ Params: { id: string } }>(routes.pattern.run, async (req, reply) => {

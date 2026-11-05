@@ -21,6 +21,7 @@ import { InProcessDispatcher, LambdaAsyncDispatcher } from "./revision/dispatch.
 import type { RevisionDispatcher } from "./revision/dispatch.js";
 import { RevisionService } from "./revision/service.js";
 import { Signoff } from "./signoff/signoff.js";
+import { cognitoResolver } from "./auth/identity.js";
 import { withScoring } from "./scoring/scoreVersion.js";
 import { createChecksStep } from "./steps/checks.js";
 import { createExtractStep } from "./steps/extract.js";
@@ -190,7 +191,9 @@ async function main(): Promise<void> {
     prices: cfg.prices,
   });
 
+  if (!cfg.cognito) log("warning: COGNITO_USER_POOL_ID is not set; the API has no sign-in and lists every run");
   const app = buildServer({
+    ...(cfg.cognito ? { identity: cognitoResolver(cfg.cognito) } : {}),
     orchestrator,
     store,
     artifacts,

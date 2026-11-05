@@ -8,6 +8,8 @@ export interface Run {
   // Set by a manual resume: attempts of `step` numbered up to `attempt` no longer count against the attempt cap.
   attemptFloor?: { step: string; attempt: number };
   createdAt: number;
+  // Cognito sub of the person who uploaded the guideline (DEC-015). Absent on runs from before sign-in.
+  createdBy?: string;
   docSha256?: string;
   lease?: { owner: string; expiresAt: number };
 }

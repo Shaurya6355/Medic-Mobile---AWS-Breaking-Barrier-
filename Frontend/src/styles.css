@@ -1020,3 +1020,10 @@ h1.display,.rvhead h1.display{font-weight:600;letter-spacing:-.8px}
 .qs-lab{font-size:12px;font-weight:600;color:var(--muted)}
 .qs-quote blockquote{margin:0;font-size:14px;line-height:20px;color:var(--muted);border-left:3px solid var(--subtle);padding-left:10px}
 .qs-stale{margin:0;color:var(--chg)}
+
+/* Sign-in (DEC-015) */
+.signin{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg)}
+.signin-card{width:min(440px,100%);display:grid;gap:16px;padding:32px}
+.signin-card h1{margin:0}
+.signin-card .btn{justify-self:start;min-height:44px;padding:10px 20px}
+.tb-user{display:inline-flex;align-items:center;gap:12px}

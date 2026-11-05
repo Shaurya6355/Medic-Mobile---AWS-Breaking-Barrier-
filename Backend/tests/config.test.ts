@@ -130,6 +130,11 @@ describe("loadConfig", () => {
   it("ignores AGENTCORE_RUNTIME_ARN when the backend is bedrock", () => {
     expect(loadConfig({ ...base, AGENTCORE_RUNTIME_ARN: "junk" }).agentCoreRuntimeArn).toBeUndefined();
   });
+  it("turns sign-in on only with both Cognito settings", () => {
+    expect(loadConfig(base).cognito).toBeUndefined();
+    expect(loadConfig({ ...base, COGNITO_USER_POOL_ID: "us-west-2_abc", COGNITO_CLIENT_ID: "client1" }).cognito).toEqual({ userPoolId: "us-west-2_abc", clientId: "client1" });
+    expect(() => loadConfig({ ...base, COGNITO_USER_POOL_ID: "us-west-2_abc" })).toThrow(/COGNITO_CLIENT_ID/);
+  });
   it("reads LOG_LEVEL (default info) and refuses an unknown level", () => {
     expect(loadConfig(base).logLevel).toBe("info");
     expect(loadConfig({ ...base, LOG_LEVEL: "debug" }).logLevel).toBe("debug");

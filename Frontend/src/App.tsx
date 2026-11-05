@@ -10,12 +10,17 @@ import { ReviewScreen } from "./screens/ReviewScreen";
 import { ReleaseScreen } from "./screens/ReleaseScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
 import { Icon } from "./components/Icon";
+import { AUTH, completeSignIn, currentUser, signIn, signOut, type User } from "./auth";
 
 const SCREENS: [string, string, string][] = [["/guidelines", "Guidelines", "menu_book"], ["/review", "Review", "fact_check"], ["/release", "Release", "rocket_launch"], ["/history", "History", "history"]];
 const EMPTY = initialWorkflow("none");
 
 export default function App() {
   const [role, setRole] = useState<Role>("clinician");
+  // Sign-in (DEC-015): who is signed in, and whether the return from the sign-in page has been handled.
+  const [user, setUser] = useState<User | null>(() => (AUTH ? currentUser() : null));
+  const [authReady, setAuthReady] = useState(!AUTH);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [w, setW] = useState<Workflow | null>(null);
   const [sel, setSel] = useState("scope");
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +30,16 @@ export default function App() {
   const checks = useMemo(() => checksOf(cur), [cur]);
 
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  useEffect(() => {
+    if (!AUTH) return;
+    completeSignIn()
+      .then(back => { setUser(currentUser()); if (back) nav(back, { replace: true }); })
+      .catch(e => setAuthError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setAuthReady(true));
+  }, [nav]);
+  // "Viewing as" offers only the roles this person has.
+  const roles = useMemo<Role[]>(() => (AUTH ? user?.roles ?? [] : (Object.keys(ROLE_NAME) as Role[])), [user]);
+  useEffect(() => { if (roles.length && !roles.includes(role)) setRole(roles[0]); }, [roles, role]);
 
   const run = async (p: Promise<Workflow>, after?: (x: Workflow) => void) => {
     setError(null);
@@ -63,6 +78,31 @@ export default function App() {
   const stage = STAGES.find(s => s.key === cur.state)!;
   const actionPath = stage.owner === role || stage.owner === "system" ? stage.path : null;
 
+  if (AUTH && (!authReady || !user || !user.roles.length)) {
+    return (
+      <main className="signin">
+        <section className="panel signin-card" aria-label="Sign in">
+          <div className="sn-brand"><img src="/logo.jpg" alt="" width={32} height={32} /><span>Guideline to Form</span></div>
+          {!authReady ? <p className="note">Signing you in...</p>
+            : !user ? (
+              <>
+                <h1>Sign in</h1>
+                <p className="note">Use the account your team administrator created for you. You will see the runs for your role.</p>
+                {authError ? <div className="banner" role="alert">{authError}</div> : null}
+                <button type="button" className="btn primary" onClick={() => void signIn()}>Sign in</button>
+              </>
+            ) : (
+              <>
+                <h1>No role yet</h1>
+                <p className="note">{"You are signed in as " + user.email + ", but your account is not in the clinician or IT approver group. Ask your team administrator to add you."}</p>
+                <button type="button" className="btn" onClick={signOut}>Sign out</button>
+              </>
+            )}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div className="shell">
       <aside className="sidenav" aria-label="Screens">
@@ -88,10 +128,11 @@ export default function App() {
           <label className="tb-who" htmlFor="role">
             Viewing as
             <select id="role" value={role} onChange={e => setRole(e.target.value as Role)}>
-              {(Object.keys(ROLE_NAME) as Role[]).map(k => <option key={k} value={k}>{ROLE_NAME[k]}</option>)}
+              {roles.map(k => <option key={k} value={k}>{ROLE_NAME[k]}</option>)}
             </select>
           </label>
-          <span className="tb-av" title={"Viewing as " + ROLE_NAME[role]}><Icon name="person" size={20} fill /></span>
+          <span className="tb-av" title={(user ? user.email + " · " : "") + "Viewing as " + ROLE_NAME[role]}><Icon name="person" size={20} fill /></span>
+          {AUTH && user ? <span className="tb-user"><span className="note">{user.email}</span><button type="button" className="lnk" onClick={signOut}>Sign out</button></span> : null}
         </header>
         <main className="app">
           <NextStrip w={cur} role={role} checks={checks} path={pathname} act={act} go={nav} pick={pick} />
@@ -105,7 +146,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/guidelines" replace />} />
           </Routes>
           <div className="foot">
-            <span>{"“Viewing as” stands in for two separate logins."}</span>
+            <span>{AUTH ? "Signed in with your team account. The run list shows the runs for your role." : "“Viewing as” stands in for two separate logins."}</span>
           </div>
         </main>
       </div>

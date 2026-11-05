@@ -251,3 +251,36 @@ describe("revision loop async self-invoke", () => {
     expect(Number(fn().Properties.Environment.Variables.LEASE_MS)).toBeGreaterThan(fn().Properties.Timeout * 1000);
   });
 });
+
+describe("sign-in (DEC-015)", () => {
+  it("creates a user pool with one group per role, a PKCE client and a hosted domain", () => {
+    const t = build({ uiOrigins: "https://app.example.org" });
+    t.resourceCountIs("AWS::Cognito::UserPool", 1);
+    t.hasResourceProperties("AWS::Cognito::UserPool", { AdminCreateUserConfig: { AllowAdminCreateUserOnly: true } });
+    for (const g of ["program_officer", "clinician", "it"]) t.hasResourceProperties("AWS::Cognito::UserPoolGroup", { GroupName: g });
+    t.hasResourceProperties("AWS::Cognito::UserPoolClient", {
+      GenerateSecret: false,
+      AllowedOAuthFlows: ["code"],
+      CallbackURLs: ["https://app.example.org/"],
+      LogoutURLs: ["https://app.example.org/"],
+    });
+    t.resourceCountIs("AWS::Cognito::UserPoolDomain", 1);
+  });
+  it("puts a JWT authorizer on every route and allows the Authorization header", () => {
+    const t = build();
+    t.hasResourceProperties("AWS::ApiGatewayV2::Authorizer", { AuthorizerType: "JWT", IdentitySource: ["$request.header.Authorization"] });
+    const rs = Object.values(t.findResources("AWS::ApiGatewayV2::Route"));
+    expect(rs.length).toBeGreaterThan(0);
+    expect(rs.every((r) => (r as { Properties: { AuthorizationType?: string } }).Properties.AuthorizationType === "JWT")).toBe(true);
+    t.hasResourceProperties("AWS::ApiGatewayV2::Api", { CorsConfiguration: { AllowHeaders: ["content-type", "authorization"] } });
+  });
+  it("gives the function the pool and client ids", () => {
+    const fn = Object.values(build().findResources("AWS::Lambda::Function"))[0] as { Properties: { Environment: { Variables: Record<string, unknown> } } };
+    expect(Object.keys(fn.Properties.Environment.Variables)).toEqual(expect.arrayContaining(["COGNITO_USER_POOL_ID", "COGNITO_CLIENT_ID"]));
+  });
+  it("can be switched off with -c auth=off", () => {
+    const t = build({ auth: "off" });
+    t.resourceCountIs("AWS::Cognito::UserPool", 0);
+    t.resourceCountIs("AWS::ApiGatewayV2::Authorizer", 0);
+  });
+});
