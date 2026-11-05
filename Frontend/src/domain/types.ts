@@ -79,6 +79,10 @@ export type QuoteScores =
   | { status: "not_scored"; n: number }
   | { status: "failed"; n: number; error?: string };
 
+/** Live: the officer agent stopped on version n without signing and left this for a person (its comment, plus
+    the blocking findings only the program officer decides). The clinician clears them by editing. */
+export interface Escalation { n: number; text: string; items: { message: string; about: ItemId | null }[] }
+
 export interface Workflow {
   id: string;
   guideline: { id: string; name: string; pathway: string; pages: number[] } | null;
@@ -103,6 +107,8 @@ export interface Workflow {
   remote: Remote | null;
   /** Quote-support scores for the reviewed version, when the backend has them. Advisory only. */
   scores?: QuoteScores | null;
+  /** Set when the officer agent escalated the newest version. */
+  escalation?: Escalation | null;
 }
 
 export type GuidelineType = "PDF" | "Word" | "Spreadsheet" | "Image" | "Web or text" | "Other";
@@ -115,4 +121,6 @@ export interface Guideline {
   steps?: PipelineStep[];
   error?: string;
   s3Uri?: string;
+  /** Live: the clinician approved this run and the backend locked a version; the IT approver can open it at Release. */
+  locked?: boolean;
 }

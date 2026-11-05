@@ -11,7 +11,8 @@ import * as wf from "../domain/workflow";
 import { FALLBACK_TEXT } from "../domain/agent";
 import { sampleScores } from "../domain/scores";
 import { AUTH, currentUser, idToken, signIn } from "../auth";
-import type { AuditRow, CrossFlags, Guideline, GuidelineType, ItemId, Model, Patch, QuoteScores, Spec, Workflow } from "../domain/types";
+import { item } from "../../../shared/pathway/index.ts";
+import type { AuditRow, CrossFlags, Escalation, Guideline, GuidelineType, ItemId, Model, Patch, QuoteScores, Spec, Workflow } from "../domain/types";
 
 export const API_URL: string | undefined = import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || undefined;
 /** True when guidelines come from the backend pipeline rather than sample data. */
@@ -60,6 +61,7 @@ function toGuideline(r: Run, steps?: StepRecord[], escalated = false): Guideline
     meta: new Date(r.createdAt).toLocaleString() + " · " + (r.pages ? r.pages.length + " pages" : "all pages") + " · " + (escalated && r.state === "awaiting_officer" ? "needs your review (AI agent could not finish)" : r.state.replace(/_/g, " ")),
     status: failed ? "Failed" : ready ? "Indexed" : "Processing",
     pages: r.pages?.length ?? null,
+    ...(r.state === "locked" ? { locked: true } : {}),
     steps: WORK.map(([s, label], i) => ({ key: s, label, state: ready || i < at ? "done" : i === at ? (failed ? "failed" : "running") : failed && at < 0 && i === WORK.findIndex(([x]) => x === r.currentStep) ? "failed" : "pending" })),
     ...(failed ? { error: "The backend run failed" + (r.currentStep ? " at " + r.currentStep : "") + (err ? ": " + err : "") + ". Resume it with POST /runs/" + r.runId + "/resume." } : {}),
   };
@@ -186,8 +188,35 @@ async function loadCross(runId: string, n: number): Promise<CrossFlags | null> {
     return null;
   }
 }
+
+/* ---------- Officer agent escalation ---------- */
+const SUBJECT_ITEM: Record<string, (id: string) => ItemId> = {
+  scope: () => item.scope, question: item.q, derived: item.d, rule: item.rule,
+  outcome: item.out, action: id => item.out(id.split("/")[0]), follow_up: item.fu,
+};
+/** The officer agent's escalation on the newest version, or null. Never throws: without it the review still works. */
+async function loadEscalation(runId: string): Promise<Escalation | null> {
+  try {
+    const vs = await call<VersionRec[]>("/runs/" + runId + "/versions");
+    const n = vs[vs.length - 1]?.n;
+    if (n === undefined) return null;
+    const base = "/runs/" + runId + "/versions/" + n;
+    const cs = await call<{ itemRef: string; text: string; createdAt: number }[]>(base + "/comments");
+    const c = cs.filter(x => x.itemRef === "agent:escalation").pop();
+    if (!c) return null;
+    const fo = await call<{ groups: { severity: string; findings: { message: string; yours?: boolean; subjects?: { kind: string; id: string }[] }[] }[] }>(base + "/findings?audience=program_officer");
+    const items = fo.groups.filter(g => g.severity === "blocking").flatMap(g => g.findings).filter(f => f.yours !== false).map(f => {
+      const s = f.subjects?.find(x => SUBJECT_ITEM[x.kind]);
+      return { message: f.message, about: s ? SUBJECT_ITEM[s.kind](s.id) : null };
+    });
+    return { n, text: c.text, items };
+  } catch {
+    return null;
+  }
+}
 /** The workflow with the cross check of a newly loaded backend version. */
 const withCross = (w: Workflow, cross: CrossFlags | null): Workflow => ({ ...w, evidence: { ...w.evidence, cross } });
+class OfficerNotSigned extends Error {}
 
 /* ---------- Workflow ---------- */
 export async function createDraft(args: { guidelineId: string; pathway: string; pages: number[] }): Promise<Workflow> {
@@ -199,9 +228,10 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
     if (!last) throw new Error("This run has no logic model version yet. Wait for the pipeline to finish.");
     const v = await call<{ body: unknown }>("/runs/" + g.id + "/versions/" + last.n);
     const model = loadSpec(v.body, "The backend's logic model (version " + last.n + ")");
-    const [[fc, fo], scores, cross] = await Promise.all([
+    const [[fc, fo], scores, escalation, cross] = await Promise.all([
       Promise.all(["clinician", "program_officer"].map(a => call<FindingsView>("/runs/" + g.id + "/versions/" + last.n + "/findings?audience=" + a))),
       loadScores(g.id, last.n, model),
+      loadEscalation(g.id),
       loadCross(g.id, last.n),
     ]);
     const flat = (f: FindingsView, role: "clinician" | "program_officer") => f.groups.flatMap(gr => gr.findings.map(x => ({ severity: gr.severity, message: x.message, check: x.check, role })));
@@ -212,7 +242,7 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
       event: "Loaded logic model version " + last.n + " from the backend (run " + g.id + ")",
       note: "modelSha " + fc.modelSha.slice(0, 12) + " · " + fc.claimText,
     });
-    workflows[id] = { ...workflows[id], scores };
+    workflows[id] = { ...workflows[id], scores, escalation };
     return clone(workflows[id]);
   }
   const g = guidelines.find(x => x.id === args.guidelineId);
@@ -222,6 +252,30 @@ export async function createDraft(args: { guidelineId: string; pathway: string; 
   return respond(workflows[id], 400);
 }
 export const getWorkflow = async (id: string) => respond(load(id));
+
+/** IT approver, in their own browser: open a run the clinician approved (locked on the backend) straight at
+    Release. Loads the newest locked version; nothing on the backend changes. */
+export async function openForRelease(args: { guidelineId: string; pathway: string }): Promise<Workflow> {
+  if (!LIVE) throw new Error("Opening an approved run needs the backend. In sample mode, approve in this browser first.");
+  const g = await getGuideline(args.guidelineId);
+  const base = "/runs/" + g.id;
+  const vs = await call<VersionRec[]>(base + "/versions");
+  const lockedV = [...vs].reverse().find(v => v.status === "locked");
+  if (!lockedV) throw new Error("This run has no approved version yet. The clinician approves it first.");
+  const n = lockedV.n;
+  const [v, st] = await Promise.all([call<{ body: unknown }>(base + "/versions/" + n), call<StatusView>(base + "/versions/" + n + "/status")]);
+  const model = loadSpec(v.body, "The approved logic model (version " + n + ")");
+  const id = "wf-" + seq++;
+  const remote = { runId: g.id, n, modelSha: st.modelSha, base: clone(model), claimText: "", findings: [] };
+  const evidence = { pages: null, pagesFrom: "Guideline text stays in the backend", draftB: null, draftBFrom: "The backend does not return a second draft" };
+  const x = wf.createDraft(wf.initialWorkflow(id), { id: g.id, name: g.name, pathway: args.pathway, pages: [] }, {
+    model, evidence, remote,
+    event: "Opened approved version " + n + " for release (run " + g.id + ")",
+    note: "modelSha " + st.modelSha.slice(0, 12) + " · approved by " + lockedV.author,
+  });
+  workflows[id] = { ...x, state: "verify", approved: { ver: "v" + n, hash: st.modelSha.slice(0, 12), locked: { n, modelSha: st.modelSha } } };
+  return respond(workflows[id]);
+}
 export const saveEdit = (id: string, patch: { item: ItemId; field: string; patch: Patch }) => mutate(id, w => wf.applyEdit(w, patch.item, patch.field, patch.patch));
 export const undo = (id: string) => mutate(id, wf.undoEdit);
 /* ---------- Live mode: the backend assistant and the feedback loop (Backend/src/chat, Backend/src/revision) ---------- */
@@ -359,7 +413,16 @@ export async function approve(id: string): Promise<Workflow> {
   const w = load(id);
   if (!LIVE || !w.remote) return mutate(id, x => wf.approveAll(x));
   wf.approveAll(w); // the same local gate first: no blocking checks, every question answered
-  const locked = await signOnBackend(w);
+  let locked: { n: number; modelSha: string };
+  try {
+    locked = await signOnBackend(w);
+  } catch (e) {
+    if (!(e instanceof OfficerNotSigned)) throw e;
+    // The agent gave up and left its reasons: show them on the review screen instead of a dead-end error.
+    const esc = await loadEscalation(w.remote.runId);
+    if (!esc) throw new Error(e.message.replace(/ It may have left.*$/, "") + " It may still be working: try Approve again in a minute.");
+    return mutate(id, x => ({ ...x, escalation: esc }));
+  }
   if (locked.n > w.remote.n + 1) {
     // The officer agent saved a fix of its own on top of the clinician's version; that is the version that was signed.
     const latest = await fetchLatest(w.remote.runId);
@@ -393,7 +456,7 @@ async function signOnBackend(w: Workflow): Promise<{ n: number; modelSha: string
     }
   }
   if (st.status !== "awaiting_clinician") {
-    throw new Error("Version " + n + " was saved, but the officer agent has not signed it (status: " + st.status.replace(/_/g, " ") + "). It may have left a comment on the version; check its findings.");
+    throw new OfficerNotSigned("Version " + n + " was saved, but the officer agent has not signed it (status: " + st.status.replace(/_/g, " ") + "). It may have left a comment on the version; check its findings.");
   }
   // The clinician has reviewed everything and kept it: findings only the clinician decides stop blocking, recorded with their name and reason.
   const fv = await call<{ gates: { canClinicianSign: boolean }; groups: { findings: { id: string; severity: string; yours: boolean }[] }[] }>(base + "/versions/" + n + "/findings?audience=clinician");
