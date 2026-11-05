@@ -20,9 +20,9 @@ import type { CrossCheckInput } from "../validation/finding.js";
  *    image) means "not supplied", and the findings say plainly which checks did not run. A path that
  *    was configured explicitly and is missing, or any malformed input, is an error, never a silent skip.
  *
- * TODO (DEC-020): the default golden cases are tests/fixtures/logic/golden-proposed.json, PROPOSED cases
- * written for v1.json and awaiting Medic; replace them with the clinician-confirmed cases of the pathway
- * (or a loader exported by the golden-case work) and move both settings into src/config.ts.
+ * The default golden cases are the 12 Medic-confirmed cases GF01 to GF12 (golden/golden-confirmed.json, from
+ * golden-cases-final-12-annotated.xlsx). The 20 proposed cases (g01 to g20) are not used by the checks.
+ * TODO (DEC-020): move both settings into src/config.ts.
  */
 
 export interface CheckInputs {
@@ -40,7 +40,8 @@ export const compileSettingsKey = (runId: string): string => artifactKey(runId, 
 export const crossCheckKey = (runId: string): string => artifactKey(runId, "inputs", "cross_check_model.json");
 
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-export const DEFAULT_GOLDEN_CASES_PATH = path.join(backendDir, "tests", "fixtures", "logic", "golden-proposed.json");
+/** The 12 Medic-confirmed golden cases GF01 to GF12 (golden/golden-confirmed.json). Bundled in the image, so a Lambda run has them. */
+export const DEFAULT_GOLDEN_CASES_PATH = path.join(backendDir, "golden", "golden-confirmed.json");
 export const DEFAULT_COMPILE_SETTINGS_PATH = path.join(backendDir, "compile-demo", "settings.demo.json");
 
 const CompileSettingsSchema = z
